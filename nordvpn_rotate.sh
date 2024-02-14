@@ -1,5 +1,33 @@
 #!/bin/bash
 
+
+########################################################################################################
+# Makes sure the code is not executed too often
+
+# Path to the file where the last run timestamp is stored
+timestamp_file="/tmp/nordvpn_rotate.timestamp"
+
+# Define a function to ensure a minimum delay between script executions
+ensure_delay() {
+    local delay_seconds=$1
+
+    if [ -f "$timestamp_file" ]; then
+        local last_run=$(cat "$timestamp_file")
+        local current_time=$(date +%s)
+        local time_diff=$((current_time - last_run))
+
+        if [ "$time_diff" -lt "$delay_seconds" ]; then
+            exit
+        fi
+    fi
+
+    # Update the timestamp file with the current time
+    date +%s > "$timestamp_file"
+}
+
+ensure_delay 5
+########################################################################################################
+
 echo "The following bash script will disconnect from the current NordVPN server and connect to the next one on a list of countries."
 
 # Environment variable holding the list of countries as lowercase codes

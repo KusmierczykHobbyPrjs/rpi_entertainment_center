@@ -11,6 +11,7 @@ else
   echo "NordVPN is not connected. Connecting...";
 
   nordvpn login --token $NORDVPN_TOKEN
-  nordvpn connect pl;
   nordvpn set meshnet on;
+
+  bash nordvpn_rotate.sh
 fi
