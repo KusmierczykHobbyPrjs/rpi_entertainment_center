@@ -1,15 +1,15 @@
 #!/bin/bash
 
-echo "The script monitors nordvpn status and when detects that it was disconnected or a server changed executes another script."
 
 #######################################################################
+# Make sure only one instance is running.
 
 # Lock file path
 LOCK_FILE="/tmp/nordvpn_monitor.lock"
 
 # Check if the lock file exists
 if [ -f "$LOCK_FILE" ]; then
-    echo "Another instance of the script is already running."
+    # echo "Another instance of the script is already running."
     exit
 else
     # Create a lock file
@@ -21,6 +21,7 @@ trap "rm -f $LOCK_FILE" EXIT
 
 #######################################################################
 
+echo "The script monitors nordvpn status and when detects that it was disconnected or a server changed executes another script."
 
 # Path to the scripts you want to execute on change
 SCRIPT_WHEN_CONNECTED="speech_en.sh"
