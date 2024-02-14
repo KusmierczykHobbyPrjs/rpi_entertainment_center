@@ -5,6 +5,7 @@
 # > sudo apt-get install socat
 
 #######################################################################
+# Makes sure the code is executed only once
 
 # Lock file path
 LOCK_FILE="/tmp/port_forwarding.lock"
