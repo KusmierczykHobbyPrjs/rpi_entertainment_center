@@ -3,7 +3,7 @@ Scripts, links and instructions of how to set up a home entertainemnt center on 
 
 ## Rotating UI between Kodi, EmulationStation and the default graphical environment
 
- - [rotate_ui.sh](rotate_ui.sh) - automates the rotation between Kodi, EmulationStation, and Xorg, starting each UI in sequence to ensure that the user can switch between different interfaces without manual intervention. The script is started at system logging from autostart.sh.
+ - [ui_rotate.sh](ui_rotate.sh) - automates the rotation between Kodi, EmulationStation, and Xorg, starting each UI in sequence to ensure that the user can switch between different interfaces without manual intervention. The script is started at system logging from autostart.sh.
  - [stop_current_ui.sh](stop_current_ui.sh) - stops the currently running UI application among Kodi, EmulationStation, or Xorg. The script is executed by pressing a physical button (GPIO slope detection). Physical buttons are handled by [gpio_commands.sh](gpio_commands.sh) which is started at system logging from autostart.sh. 
 
 ### Why
