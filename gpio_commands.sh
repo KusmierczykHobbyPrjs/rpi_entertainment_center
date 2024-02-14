@@ -2,7 +2,7 @@
 
 # Executes commands when buttons are pressed (always running in background)
 
-ALREADY_RUNNING=`ps -Af | grep -v grep | grep button2command`
+ALREADY_RUNNING=`ps -Af | grep -v grep | grep gpio2command`
 if [ -z "$ALREADY_RUNNING" ]; then
     # Add below commands to be executed when a GPIO pin slope is detected (e.g. button pressed)
     python3 gpio2command.py 3 "shutdown" "now" &    
