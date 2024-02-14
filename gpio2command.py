@@ -5,7 +5,7 @@ import subprocess
 import sys
 import time
 
-print("[button2command] Executes a command when a selected button is pressed.")
+# Executes a command when GPIO slope is detected
 
 # default: shutdown at gpio pin=3
 BCM_GPIO_NO = 3
@@ -15,9 +15,10 @@ CMD = ['shutdown', 'now']
 try:
     BCM_GPIO_NO = int(sys.argv[1])
     CMD = sys.argv[2:]
-    print("[button2command] GPIO=%d selected. CMD=%s" % (BCM_GPIO_NO, CMD))
+    print("[gpio2command] Mapping GPIO=%d to CMD=%s" % (BCM_GPIO_NO, CMD))
 except:
-    print("[button2command] No argument passed. Default GPIO=%d used. CMD=%s" % (BCM_GPIO_NO, CMD))
+    print("[gpio2command] Executes a command when GPIO slope is detected e.g. a selected button is pressed.")
+    print("[gpio2command] No argument passed. Default GPIO=%d used. CMD=%s" % (BCM_GPIO_NO, CMD))
 
 # setup
 GPIO.setmode(GPIO.BCM)
@@ -31,7 +32,7 @@ def execute_cmd(*args, **kwargs):
     if time.time()-last_time<=1: return 
     last_time = time.time()
     
-    print("[button2command] Button GPIO=%d pressed. Executing: %s" % (BCM_GPIO_NO, CMD))
+    print("[gpio2command] Button GPIO=%d pressed. Executing: %s" % (BCM_GPIO_NO, CMD))
     subprocess.call(CMD, shell=False)
 
 #GPIO.wait_for_edge(BCM_GPIO_NO, GPIO.FALLING)
