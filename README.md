@@ -1,6 +1,7 @@
 # rpi_entertainment_center
 Scripts, links and instructions of how to set up a home entertainemnt center on RaspberryPI(3b+) using Kodi and RetroPie
 
+
 ## Rotating UI between Kodi, EmulationStation and the default graphical environment
 
  - [ui_rotate.sh](ui_rotate.sh) - automates the rotation between Kodi, EmulationStation, and Xorg, starting each UI in sequence to ensure that the user can switch between different interfaces without manual intervention. In particular, when a UI is closed or killed by [stop_current_ui.sh](stop_current_ui.sh) the next UI is automatically started. The script is started at system logging from autostart.sh. 
@@ -12,3 +13,10 @@ These scripts are useful for systems that serve multiple purposes (media center,
 ### What
 These scripts are designed for managing and rotating between different User Interfaces (UIs) on a Linux system, specifically targeting environments where Kodi (a media center software), EmulationStation (a graphical front-end for emulators), and Xorg (the X Window System) are used. They implement functionality to ensure these UIs are not running simultaneously, prevent rapid execution, and facilitate the rotation between these applications to maintain system stability and user experience.
 
+
+## Speech synthesis
+
+ - [speech.sh](speech.sh) - reads text in a selected language using `mpg123` and Google Translate web api. Example `bash speech.sh en Welcome home!`
+ - [speech_text_splitter.py] - auxiliary script to efficiently manage long text inputs by splitting them into segments that do not exceed a specified maximum length
+ - [speech_en.sh](speech_en.sh) - wrapper for English 
+ - [speech_en.sh](speech_en.sh) - wrapper for Polish 
