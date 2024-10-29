@@ -20,3 +20,14 @@ These scripts are designed for managing and rotating between different User Inte
  - [speech_text_splitter.py] - auxiliary script to efficiently manage long text inputs by splitting them into segments that do not exceed a specified maximum length
  - [speech_en.sh](speech_en.sh) - wrapper for English 
  - [speech_en.sh](speech_en.sh) - wrapper for Polish 
+ 
+### Prerequisites 
+ - `sudo apt-get install mpg123`
+ 
+ 
+## Port forwarding (use Pi as a gateway)
+
+ - [port_forwarding.sh](port_forwarding.sh) - This script forwards TCP traffic from Raspberry Pi ports to dedicated LAN servers or devices. For example, I use an [IP web cam](https://play.google.com/store/apps/details?id=com.pas.webcam&hl=pl&pli=1) installed on an old Android 4.0 device. I prefer not to pay for online streaming services or expose the webcam to public internet access. However, my Raspberry Pi I can connect via VLAN from anywhere in the world (and the old Android device I cannot). Therefore, I set up the Pi to forward traffic from port 8282 to the webcam at `192.168.1.20:8080`.
+
+### Prerequisites 
+ - `sudo apt-get install socat` 
