@@ -17,7 +17,7 @@ These scripts are designed for managing and rotating between different User Inte
 ## Speech synthesis
 
  - [speech.sh](speech.sh) - reads text in a selected language using `mpg123` and Google Translate web api. Example `bash speech.sh en Welcome home!`
- - [speech_text_splitter.py] - auxiliary script to efficiently manage long text inputs by splitting them into segments that do not exceed a specified maximum length
+ - [speech_text_splitter.py](speech_text_splitter.py) - auxiliary script to efficiently manage long text inputs by splitting them into segments that do not exceed a specified maximum length
  - [speech_en.sh](speech_en.sh) - wrapper for English 
  - [speech_en.sh](speech_en.sh) - wrapper for Polish 
  
@@ -31,3 +31,8 @@ These scripts are designed for managing and rotating between different User Inte
 
 ### Prerequisites 
  - `sudo apt-get install socat` 
+ 
+ 
+## Configuration
+ 
+  - [config.sh](config.sh) - contains environment variables used by other scripts. For example, `VOLUME` used by speech synthesis.
