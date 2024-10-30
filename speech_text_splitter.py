@@ -69,7 +69,7 @@ def split_text(text, max_length):
     
     
 if __name__ == "__main__":
-    input_text = sys.argv[2]
+    input_text = " ".join(sys.argv[2: ])
     max_length = int(sys.argv[1])
 
     for line in split_text(input_text, max_length):
