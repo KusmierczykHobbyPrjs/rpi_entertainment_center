@@ -8,7 +8,7 @@ declare -a ui_start_commands=("kodi &" "emulationstation &" "startx &")
 default_ui_command="kodi &"  
 # Commands to stop each UI
 declare -a ui_commands=("kodi-send --action=\"Quit\"" "pkill emulationstatio" "killall Xorg")
-# Define UIs in an array
+# UI processes names (as by `ps -A`); used to monitor if running
 declare -a uis=("kodi" "emulationstatio" "Xorg")
 
 
