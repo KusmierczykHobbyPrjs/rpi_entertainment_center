@@ -24,6 +24,6 @@ trap "rm -f $LOCK_FILE" EXIT
 
 #######################################################################
 
-
+# LIST OF FORWARDS:
 # Forwards port=8282 => 192.168.1.20:8080
 socat tcp-listen:8282,fork,reuseaddr tcp:192.168.1.20:8080 

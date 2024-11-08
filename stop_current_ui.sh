@@ -1,8 +1,15 @@
 
 #!/bin/bash
 
-# Kills the current UI
-# Complementary to ui_rotate.sh script 
+# Generic script to rotate between different UIs and create a script to start the next UI.
+# When executed kills the current UI. Complementary to ui_rotate.sh script 
+
+# Find the directory where the script is located
+script_dir="$(dirname "$0")"
+# Source the config.sh from the same directory
+source "$script_dir/config.sh"
+
+start_script_path="/tmp/start_next_ui.sh"
 
 ########################################################################################################
 # Makes sure the code is not executed too often
@@ -31,37 +38,31 @@ ensure_delay() {
 ensure_delay 5
 ########################################################################################################
 
-KODI_RUNNING_FLAG=`ps -A | grep -v grep | grep kodi | grep -v emu | grep -v Xorg`
-XORG_RUNNING_FLAG=`ps -A | grep -v grep | grep Xorg | grep -v emu | grep -v kodi`
-EMU_RUNNING_FLAG=`ps -A | grep -v grep | grep emu | grep -v Xorg | grep -v kodi`
+# Find which UI is running and determine the next UI to start
+current_index=-1
+for i in "${!uis[@]}"; do
+    if ps -A | grep -qw "${uis[$i]}"; then
+        current_index=$i
+        break
+    fi
+done
 
+if [ "$current_index" -ne -1 ]; then
+    # Close the current UI
+    echo "Clossing ${uis[$current_index]} with command=${ui_commands[$current_index]}"
+    eval "${ui_commands[$current_index]}"
 
-if [ ! -z "$KODI_RUNNING_FLAG" ] ; then
-        echo "CLOSING KODI"
-        kodi-send --action="Quit"
-        #killall kodi kodi-standalone kodi.bin_v7 > /dev/null 2>&1;
+    # Calculate next UI index
+    next_index=$(((current_index + 1) % ${#uis[@]}))
 
-        #echo "STARTING EMULATION STATION";
-        #emulationstation & 
-        #emulationstation --force-kiosk & 
-
-elif [ ! -z "$EMU_RUNNING_FLAG" ] ; then
-        echo "CLOSING EMULATIONSTATION";
-        pkill emulationstatio > /dev/null 2>&1    
-        #killall emulationstation emulationstatio > /dev/null 2>&1;
-             
-        #echo "STARTING KODI";
-        #kodi-standalon   
-
-elif [ ! -z "$XORG_RUNNING_FLAG" ] ; then
-        echo "CLOSING XORG"; 
-        killall Xorg > /dev/null 2>&1;
+    # Create script to start the next UI
+    echo "#!/bin/bash" > "$start_script_path"
+    echo "${ui_start_commands[$next_index]}" >> "$start_script_path"
+    chmod +x "$start_script_path"
+    echo "Script to start the next UI (${uis[$next_index]}) has been created at $start_script_path"
 
 else
-        echo "NO RUNNING INTERFACE FOUND!";
+    echo "NO RUNNING INTERFACE FOUND!"
 
 fi
-
-
-
 

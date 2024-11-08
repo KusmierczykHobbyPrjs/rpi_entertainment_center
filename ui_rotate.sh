@@ -1,57 +1,64 @@
 #!/bin/bash
 
-# The script keeps rotating UI apps in a loop
+# Continuously monitors UIs and ensures one is always running, ensuring single instance.
+# Complementary to stop_current_ui.sh script
 
-########################################################################################################
-# Makes sure the code is not executed too often
+# Find the directory where the script is located
+script_dir="$(dirname "$0")"
+# Source the config.sh from the same directory
+source "$script_dir/config.sh"
 
-# Path to the file where the last run timestamp is stored
-timestamp_file="/tmp/ui_rotate.timestamp"
-
-# Define a function to ensure a minimum delay between script executions
-ensure_delay() {
-    local delay_seconds=$1
-
-    if [ -f "$timestamp_file" ]; then
-        local last_run=$(cat "$timestamp_file")
-        local current_time=$(date +%s)
-        local time_diff=$((current_time - last_run))
-
-        if [ "$time_diff" -lt "$delay_seconds" ]; then
-            exit
-        fi
-    fi
-
-    # Update the timestamp file with the current time
-    date +%s > "$timestamp_file"
-}
+start_script_path="/tmp/start_next_ui.sh"
 
 ########################################################################################################
 
-ALREADY_RUNNING=`ps -A | grep -v grep | grep -E "emulation|kodi|Xorg|autostart"`
-if [ -z "$ALREADY_RUNNING" ] ; then
-        # Startup sound
-        #omxplayer -o local win95startup.mp3 &
-   
-        # Run in loop
-        while :
-        do
-                echo "STARTING KODI...";
-                #bash speech_en.sh STARTING KODI... &;
-                kodi;
-                ensure_delay 5
+lockfile="/tmp/ui_monitor.lock"
 
-                echo "STARTING EMULATION STATION...";
-                #bash speech_en.sh STARTING EMULATION STATION... &;
-                emulationstation;
-                ensure_delay 5
-
-                echo "STARTING XORG...";
-                ##bash speech_en.sh STARTING XORG... &;
-                startx;        
-                ensure_delay 5  
-        done
-
+# Create a lock file to ensure only one instance runs
+if [ -f "$lockfile" ]; then
+    #echo "Another instance of the script is already running."
+    exit
+else
+    touch "$lockfile"
+    trap "rm -f $lockfile; exit" INT TERM EXIT  # Ensures lock file is removed on script exit
 fi
 
+########################################################################################################
+
+# Function to check if any UI is currently running
+check_uis_running() {
+    for ui in "${uis[@]}"; do
+        if ps -A | grep -qw "$ui"; then
+            return 0  # If any UI is found running, return 0
+        fi
+    done
+    return 1  # No UIs are running
+}
+
+# Main loop to monitor UIs
+while true; do
+    check_uis_running
+    if [ $? -ne 0 ]; then  # No UI is running
+        echo "No UI is currently running."
+        #bash speech_en.sh "No UI running."
+        
+        if [ -f "$start_script_path" ]; then
+            echo "Starting next UI using script $start_script_path:"
+            cat "$start_script_path"
+            #bash speech_en.sh "Starting next UI."
+            bash "$start_script_path"
+            sleep 10  # let it start
+            
+        else
+            echo "No UI is yet selected. Starting default UI with command=$default_ui_command."
+            #bash speech_en.sh "Start script not found. Starting default UI."
+            eval "$default_ui_command"
+            sleep 10  # let it start
+                        
+        fi
+        
+    fi
+    
+    sleep 1  # Delay for X seconds before checking again
+done
 
