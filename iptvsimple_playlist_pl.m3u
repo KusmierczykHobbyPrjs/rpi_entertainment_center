@@ -1,0 +1,345 @@
+#EXTM3U
+
+
+#EXTINF:-1 tvg-name="4FUN TV [Polish]" tvg-logo="http://meichsner.tel/TVList/img/7432.jpg",4FUN TV [Polish] 
+https://stream.4fun.tv:8888/hls/4f_med/index.m3u8 
+#EXTINF:-1 tvg-name="TRUSO.TV (Elbląg) [Polish]" tvg-logo="http://meichsner.tel/TVList/img/7435.png",TRUSO.TV (Elbląg) [Polish] 
+http://95.160.28.218:1935/elblag/myStream_aac/playlist.m3u8 
+#EXTINF:-1 tvg-name="TV Kujawy [Polish]" tvg-logo="http://meichsner.tel/TVList/img/1397.jpg",TV Kujawy [Polish] 
+http://stream.tvkujawy.pl:8080/live/broadcast.m3u8 
+#EXTINF:-1 tvg-name="TV Regionalna [Polish]" tvg-logo="http://meichsner.tel/TVList/img/7436.png",TV Regionalna [Polish] 
+https://tvreg.klemit.net/regionalna/stream/index.m3u8 
+#EXTINF:-1 tvg-name="TV Republika PL [Polish]" tvg-logo="http://meichsner.tel/TVList/img/5784.png",TV Republika PL [Polish] 
+https://ec08.luz1.cache.orange.pl/jupiter/o2-cl7/live/tvrepublika/live.m3u8 
+#EXTINF:-1 tvg-name="TVT Rybnik [Polish]" tvg-logo="http://meichsner.tel/TVList/img/1417.png",TVT Rybnik [Polish] 
+http://176.107.129.219/media/tvt/index.m3u8 
+#EXTINF:-1 tvg-name="TVT Zgorzelec [Polish]" tvg-logo="http://meichsner.tel/TVList/img/1419.png",TVT Zgorzelec [Polish] 
+http://gargoyle.tomkow.pl/hls/tvt.m3u8 
+#EXTINF:-1 tvg-name="TV Torun [Polish]" tvg-logo="http://meichsner.tel/TVList/img/1398.png",TV Torun [Polish] 
+http://217.173.176.107:1935/live/ngrp:tvk.stream_all/master.m3u8 
+#EXTINF:-1 tvg-name="TV Trwam [Polish]" tvg-logo="http://meichsner.tel/TVList/img/7437.png",TV Trwam [Polish] 
+https://trwamtv.live.e59-po.insyscd.net/cl01/out/u/trwam_3.m3u8 
+#EXTINF:-1 tvg-name="Telewizja Pogranicze [Polish]" tvg-logo="http://meichsner.tel/TVList/img/5783.jpg",Telewizja Pogranicze [Polish] 
+http://95.160.28.218:1935/pogranicze/myStream/playlist.m3u8 
+#EXTINF:-1 tvg-name="Telewizja Republika [Polish]" tvg-logo="http://meichsner.tel/TVList/img/7434.png",Telewizja Republika [Polish] 
+https://ec08.luz1.cache.orange.pl/jupiter/o2-cl7/live/tvrepublika/live-tvrepublika-1700k.m3u8 
+#EXTINF:-1 tvg-name="Twoja TV [Polish]" tvg-logo="http://meichsner.tel/TVList/img/1420.png",Twoja TV [Polish] 
+http://94.246.169.19/ttv_hls/live_720p/index.m3u8 
+#EXTINF:-1 tvg-name="dla ciebie tv [Polish]" tvg-logo="http://meichsner.tel/TVList/img/1386.png",dla ciebie tv [Polish] 
+http://94.246.128.53:1935/tv/_definst_/dlaCiebieTv/playlist.m3u8
+
+
+#EXTINF:-1 radio="true",Polskie Radio Jedynka
+http://mp3.polskieradio.pl:8900/;.mp3
+#EXTINF:-1 radio="true",Polskie Radio Dwójka
+http://mp3.polskieradio.pl:8902/;.mp3
+#EXTINF:-1 radio="true",Polskie Radio Trójka
+http://mp3.polskieradio.pl:8904/;.mp3
+#EXTINF:-1 radio="true",Polskie Radio Czwórka
+http://mp3.polskieradio.pl:8906/;.mp3
+
+#EXTINF:0 radio="true",Radio WNET  
+http://audio.radiownet.pl:8000/stream
+#EXTINF:0 radio="true",Radio ZET
+https://zt03.cdn.eurozet.pl/zet-tun.mp3
+#EXTINF:0 radio="true",RMF FM
+http://195.150.20.7/rmf_fm
+#EXTINF:0 radio="true",AntyRadio
+http://ant.cdn.eurozet.pl/ant-waw.mp3
+#EXTINF:0 radio="true",Antyradio Warszawa
+http://ant-waw-01.cdn.eurozet.pl:8602
+#EXTINF:0 radio="true",Eska Warszawa
+http://pldm.ml/radio?url=https://www.eskago.pl/radio/eska-warszawa
+#EXTINF:0 radio="true",Radio Plus
+http://plu.cdn.eurozet.pl/plu-waw.mp3
+#EXTINF:0 radio="true",Radio Kolor 103 FM
+http://stream4.nadaje.com:15358/radiokolor
+#EXTINF:0 radio="true",rdc
+http://stream2.nadaje.com:11140/rdc
+#EXTINF:0 radio="true",RMF Maxxx 106.5 FM Radom
+http://195.150.20.7:8000/rmf_maxxx
+#EXTINF:0 radio="true",Polskastacja Polski Rock
+http://stream.polskastacja.pl/ps29?
+#EXTINF:0 radio="true",Tylko Polskie Przeboje
+http://stream.open.fm/111
+#EXTINF:0 radio="true",RMF Classic rock
+http://195.150.20.9/CLASSICROCKVT
+#EXTINF:0 radio="true",RMF Polski rock
+http://195.150.20.8/POLSKIROCK
+#EXTINF:0 radio="true",RMF Gold
+http://31.192.216.10/GOLD
+#EXTINF:0 radio="true",Radioparty
+http://s2.radioparty.pl:8005
+
+#EXTINF:0 radio="true",Polskastacja Biesiada
+http://stream.polskastacja.pl/ps59?
+#EXTINF:0 radio="true",Polskastacja Disco Polo Classic
+http://stream.polskastacja.pl/ps49?
+#EXTINF:0 radio="true",Polskastacja Muzyka Filmowa
+http://stream.polskastacja.pl/ps38?
+#EXTINF:0 radio="true",Polskastacja Dance
+http://stream.polskastacja.pl/ps31?
+
+
+#EXTINF:0 radio="true",Chilli ZET
+http://chi.cdn.eurozet.pl/chi-net.mp3
+#EXTINF:0 radio="true",MeloRadio
+http://mel02.cdn.eurozet.pl:8800/mel-net.mp3
+#EXTINF:0 radio="true",Planeta FM
+http://pla.cdn.eurozet.pl/pla-net.mp3
+#EXTINF:0 radio="true",Złote Przeboje
+http://lodz.radio.pionier.net.pl:8000/
+
+
+#EXTINF:0 radio="true",Wawa Warszawa
+http://pldm.ml/radio?url=https://www.eskago.pl/radio/wawa
+#EXTINF:0 radio="true",VOX FM
+http://pldm.ml/radio?url=https://www.eskago.pl/radio/vox-fm
+#EXTINF:0 radio="true",Open.fm-Impreza PL
+http://stream.open.fm/12
+#EXTINF:0 radio="true",Open.fm-Disco Polo
+http://stream.open.fm/21
+#EXTINF:0 radio="true",Rock Radio Polska
+https://play.adtonos.com/rock-radio?cache=1560639027/;
+#EXTINF:0 radio="true",Radio Pogoda
+http://stream.radioagora.pl/tuba38-1.mp3?cache=1560639291/;
+#EXTINF:0 radio="true",Radio TOK FM posluchaj aby zrozumiec
+http://poznan5-4.radio.pionier.net.pl:8000/tuba10-1.mp3?cache=1560639469/;
+#EXTINF:0 radio="true",TechnoBase.FM 24h Techno,Dance,HandsUp and More
+http://aach.stream.tb-group.fm/tb-high.aac?
+#EXTINF:0 radio="true",Radio Weszlo
+https://radio.weszlo.fm/s7d70a7895/listen
+#EXTINF:0 radio="true",Radio Silesia 96.2 FM
+http://s1.slotex.pl:7926/;
+#EXTINF:0 radio="true",Radio Profeto
+http://151.80.24.114/streammq.mp3
+#EXTINF:0 radio="true",Radio Andrychow
+http://s1.slotex.pl:7114/;
+#EXTINF:0 radio="true",Radio KASZEBE
+http://stream2.nadaje.com:8060/;
+#EXTINF:0 radio="true",Radio Studio Souto - Love Songs
+http://192.99.150.31:8897/stream?MWINFO
+#EXTINF:0 radio="true",Radio WAKAI.pl
+http://s1.slotex.pl:7076/;
+#EXTINF:0 radio="true",NC+ Polskie Radio
+http://83.3.167.236:8001/1:0:1:1418:5dc:13e:820000:0:0:0.mpeg
+#EXTINF:0 radio="true",NC+ RADIO pl
+http://83.3.167.236:8001/1:0:1:141a:5dc:13e:820000:0:0:0.mpeg
+#EXTINF:0 radio="true",Chillizet 
+https://n-6-1.dcs.redcdn.pl/sc/o2/Eurozet/live/chillizet.livx?audio=5&ts=1563119915840
+#EXTINF:0 radio="true",Muzo.fm 
+http://stream4.nadaje.com/muzo
+#EXTINF:0 radio="true",Meloradio 
+http://mel0201.cdn.eurozet.pl:8800/mel-net.mp3
+#EXTINF:0 radio="true",Muzyczne Radio Live
+http://stream3.nadaje.com:9000/;*.mp3
+#EXTINF:0 radio="true",WeekendFM.pl MP3 128kb/s
+http://188.125.128.15:8000/weekendfm_najlepsza.mp3
+#EXTINF:0 radio="true",Rock Radio
+http://poznan5-4.radio.pionier.net.pl:8000/tuba8-1.mp3
+#EXTINF:0 radio="true",Radio EXPRESS FM
+http://stream4.nadaje.com:13324/express
+#EXTINF:0 radio="true",RADIO PARK FM
+http://sluchaj2.radiopark.biz.pl:8055/stream
+#EXTINF:0 radio="true",Akademicke Radio LUZ
+http://156.17.39.65:8000/luzhifi.mp3
+#EXTINF:0 radio="true",Radio RAM
+http://stream4.nadaje.com:9220/ram
+#EXTINF:0 radio="true",Rekord Radom
+http://stream2.nadaje.com:8108/;stream/1
+
+
+#EXTINF:0 radio="true",Radioparty
+http://s2.radioparty.pl:8005
+#EXTINF:0 radio="true",Polskastacja Biesiada
+http://stream.polskastacja.pl/ps59?
+#EXTINF:0 radio="true",Polskastacja Disco Polo
+http://stream.polskastacja.pl/ps21?
+#EXTINF:0 radio="true",Polskastacja Disco Polo Classic
+http://stream.polskastacja.pl/ps49?
+#EXTINF:0 radio="true",Polskastacja Muzyka Filmowa
+http://stream.polskastacja.pl/ps38?
+#EXTINF:0 radio="true",Polskastacja Dance
+http://stream.polskastacja.pl/ps31?
+#EXTINF:0 radio="true",Polskastacja Polski Rock
+http://stream.polskastacja.pl/ps29?
+#EXTINF:0 radio="true",Polskastacja Jazz
+http://stream.polskastacja.pl/ps166?
+#EXTINF:0 radio="true",Radio MRS
+http://play.radiomrs.com:7494/stream.mp3
+#EXTINF:0 radio="true",Pulsstacja.fm
+http://91.232.4.33:7078/;stream.mp3
+#EXTINF:0 radio="true",Toksyna FM
+http://s01.toksyna.fm:8000/;0986735918559134stream.nsv
+#EXTINF:0 radio="true",Tylko Polskie Przeboje
+http://stream.open.fm/111
+#EXTINF:0 radio="true",Rock Radio
+http://poznan5-4.radio.pionier.net.pl:8000/tuba8-1.mp3
+#EXTINF:0 radio="true",SmoothJazz.com.pl Radio
+http://stream14.shoutcastsolutions.com:8057/stream/1/
+#EXTINF:0 radio="true",Polskie Radio Bialystok
+http://stream4.nadaje.com:15476/radiobialystok
+#EXTINF:0 radio="true",Katolickie Radio Ciechanów 103.9 FM
+http://s1.slotex.pl:7762/stream/1/
+#EXTINF:0 radio="true",Katolickie Radio Podlasie
+http://s1.slotex.pl:7038/stream/1/
+#EXTINF:0 radio="true",Radio Niepokalanow 102.7 FM Teresin
+http://88.199.169.10:8000/stream/1/
+#EXTINF:0 radio="true",Radio Bogoria
+http://91.232.4.22:8888/;audio.mp3?hash=1563695739090
+
+
+#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Genesis
+http://mp3.polskieradio.pl:8574
+#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Strefa rokendrola wolna od angola
+http://mp3.polskieradio.pl:8576
+#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Piosenki Niezaleznych
+http://mp3.polskieradio.pl:8578
+#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Niezly Jazz
+http://mp3.polskieradio.pl:8584
+#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Mijaja lata zostaja piosenki
+http://mp3.polskieradio.pl:8568
+
+
+#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Zabawy z jezykiem
+http://mp3.polskieradio.pl:8400
+#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Radio Freud
+http://mp3.polskieradio.pl:8404
+#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Zapiski ze wspolczesnosci
+http://mp3.polskieradio.pl:8406
+#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Kosmos
+http://mp3.polskieradio.pl:8408
+#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Koncerty w Trojce
+http://mp3.polskieradio.pl:8410
+#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Reportaz w Trojce
+http://mp3.polskieradio.pl:8412
+#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Wywiady Marka Niedzwieckiego
+http://mp3.polskieradio.pl:8416
+#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Wojciech Mann i Marek Niedzwiecki
+http://mp3.polskieradio.pl:8418
+#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Najpiekniejsze polskie piosenki
+http://mp3.polskieradio.pl:8420
+#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Konkurs Chopinowski
+http://mp3.polskieradio.pl:8422
+#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_W jazzowym klimacie
+http://mp3.polskieradio.pl:8424
+#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Przeboje Lata z Radiem
+http://mp3.polskieradio.pl:8426
+#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Minimax
+http://mp3.polskieradio.pl:8446
+#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Bajki samograjki
+http://mp3.polskieradio.pl:8452
+#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Classic Rock
+http://mp3.polskieradio.pl:8460
+#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Najpiekniejsze polskie piosenki
+http://mp3.polskieradio.pl:8420
+#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Classic Rock
+http://mp3.polskieradio.pl:8460
+#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Prog Rock
+http://mp3.polskieradio.pl:8462
+#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Przeboje PRL
+http://mp3.polskieradio.pl:8466
+#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Led Zeppelin
+http://mp3.polskieradio.pl:8468
+#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Pink Floyd
+http://mp3.polskieradio.pl:8470
+#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Ballady
+http://mp3.polskieradio.pl:8474
+#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Polski top Wszech Czasow
+http://mp3.polskieradio.pl:8556
+#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Muzyka zrodel
+http://mp3.polskieradio.pl:8558
+#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Klasycy rocka
+http://mp3.polskieradio.pl:8166
+
+
+
+#EXTINF:-1 radio="true",RMF QUEEN
+http://217.74.72.11/QUEEN
+#EXTINF:0 radio="true",RMF Beatlemania
+http://195.150.20.8/BEATLEMANIA
+#EXTINF:0 radio="true",RMF Lady Pank
+http://31.192.216.8/LADYPANK
+#EXTINF:0 radio="true",RMF LOVE
+http://31.192.216.10/LOVE
+#EXTINF:-1 radio="true",RMF SŁONECZNE PRZEBOJE
+http://217.74.72.11/SPRZEBOJE
+#EXTINF:0 radio="true",RMF Top 30 PL
+http://31.192.216.10/TOP5PL
+#EXTINF:0 radio="true",RMF Ballady
+http://31.192.216.8/NOSTALGIA
+#EXTINF:0 radio="true",RMF Blues
+http://31.192.216.8/BLUES
+#EXTINF:0 radio="true",RMF Reggae
+http://195.150.20.9/REGGAE
+#EXTINF:0 radio="true",RMF CLUB
+http://31.192.216.6/CLUB
+
+
+#EXTINF:0 radio="true",RMF Niezapomniane melodie
+http://31.192.216.8/NIEZAPOMNIANEMELODIE
+#EXTINF:-1 radio="true",RMF STUDENCKA IMPREZA
+http://217.74.72.11/STUDENCKAIMPREZA
+#EXTINF:-1 radio="true",RMF NIEZAPOMNIANE MELODIE
+http://217.74.72.11/NIEZAPOMNIANEMELODIE
+#EXTINF:-1 radio="true",RMF NAJWIĘKSZE POLSKIE PRZEBOJE
+http://217.74.72.11/NPPRMFON
+#EXTINF:-1 radio="true",RMF POLSKA PRYWATKA
+http://217.74.72.11/POLSKAPRYWATKA
+#EXTINF:-1 radio="true",RMF 90S DANCE
+http://217.74.72.11/90SDANCE
+#EXTINF:-1 radio="true",RMF 90S
+http://217.74.72.11/90S
+#EXTINF:-1 radio="true",RMF 80S DISCO
+http://217.74.72.11/80SDISCO
+#EXTINF:-1 radio="true",RMF 80S
+http://217.74.72.11/80S
+#EXTINF:-1 radio="true",RMF 70S
+http://217.74.72.11/70S
+#EXTINF:-1 radio="true",RMF 70S DISCO
+http://217.74.72.11/70SDISCO
+#EXTINF:-1 radio="true",RMF 60S
+http://217.74.72.11/60S
+#EXTINF:-1 radio="true",RMF 50S
+http://217.74.72.11/50S
+#EXTINF:-1 radio="true",RMF DISCO POLO
+http://217.74.72.11/POLSKIEDISCO
+#EXTINF:-1 radio="true",RMF SZANTY
+http://217.74.72.11/SZANTY
+#EXTINF:-1 radio="true",RMF TEKŚCIORY
+http://217.74.72.11/TEKSCIORY
+#EXTINF:-1 radio="true",25 LAT RMF FM
+http://217.74.72.11/20LAT
+#EXTINF:-1 radio="true",RMF FM CLASSICROCK
+http://217.74.72.11/CLASSICROCK
+#EXTINF:-1 radio="true",RMF TOP30 ROCK
+http://217.74.72.11/TOP5ROCK
+#EXTINF:-1 radio="true",RMF POLSKI ROCK
+http://217.74.72.11/POLSKIROCK
+#EXTINF:-1 radio="true",RMF HARD-HEAVY
+http://217.74.72.11/HARDHEAVY
+#EXTINF:-1 radio="true",RMF REGGAE
+http://217.74.72.11/REGGAE
+#EXTINF:-1 radio="true",RMF LATINO
+http://217.74.72.11/LATINO
+#EXTINF:-1 radio="true",RMF RELAKS
+http://217.74.72.11/RELAKS
+#EXTINF:0 radio="true",RMF Pobudka
+http://195.150.20.9/POBUDKA
+#EXTINF:0 radio="true",RMF Piosenka filmowa
+http://31.192.216.10/PIOSENKAFILMOWA
+#EXTINF:0 radio="true",RMF Ed Sheeran
+http://31.192.216.10/TOP
+#EXTINF:0 radio="true",RMF Elvis Presley
+http://fo.trillada.com:8080/live/kepbgSsuHn/PnrWlBI0gS/5260.ts
+#EXTINF:0 radio="true",RMF 5 Łagodne Przeboje
+http://195.150.20.8/RMF5
+#EXTINF:0 radio="true",RMF 70s disco
+http://195.150.20.9/70SDISCO
+#EXTINF:0 radio="true",RMF 80s disco
+http://195.150.20.9/80SDISCO
+#EXTINF:0 radio="true",RMF DISCO POLO
+http://195.150.20.6/DISCOPOLOVT?aw_0_1st.rmf_disable_preroll=true
+#EXTINF:0 radio="true",RMF CLUB
+http://31.192.216.6/CLUB
+

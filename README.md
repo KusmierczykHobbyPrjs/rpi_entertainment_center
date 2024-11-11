@@ -2,6 +2,24 @@
 Scripts, links and instructions of how to set up a home entertainemnt center on RaspberryPI(3b+) using Kodi and RetroPie
 
 
+## Kodi
+
+Requirements:
+```
+sudo apt-get install kod kodi-inputstream-adaptive kodi-inputstream-rtmp  # basic + streaming
+sudo apt-get install kodi-peripheral-joystick  # joystick control
+sudo apt-get install kodi-eventclients-kodi-send  # command-line control
+```
+
+## Kodi: IP TV
+
+Install and enable (in UI) `PVR IPTV Simple Client` add-on:
+```
+sudo apt-get install kodi-pvr-iptvsimple
+```
+
+ - [iptvsimple_playlist_pl.m3u](sample playlist with Polish radio stations and a few TV channels)
+
 ## Switching UIs (Kodi / EmulationStation / default graphical environment)
 
  - [ui_rotate.sh](ui_rotate.sh) - automates the rotation between UIs (Kodi, EmulationStation, and Xorg defined in [config.sh](config.sh)), starting each UI in sequence to ensure that the user can switch between different interfaces without manual intervention. In particular, when a UI is closed or killed by [stop_current_ui.sh](stop_current_ui.sh) the next UI is automatically started. The script is started at system logging from autostart.sh. 
