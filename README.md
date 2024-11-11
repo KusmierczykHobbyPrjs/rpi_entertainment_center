@@ -18,7 +18,7 @@ Install and enable (in UI) `PVR IPTV Simple Client` add-on:
 sudo apt-get install kodi-pvr-iptvsimple
 ```
 
- - [iptvsimple_playlist_pl.m3u](sample playlist with Polish radio stations and a few TV channels)
+ - [sample playlist with Polish radio stations and a few TV channels](iptvsimple_playlist_pl.m3u)
 
 ## Switching UIs (Kodi / EmulationStation / default graphical environment)
 
