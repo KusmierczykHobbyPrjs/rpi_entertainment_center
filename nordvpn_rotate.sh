@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# NordVPN disconnecting from the current server and connecting to the next one on a list of countries
 
 ########################################################################################################
 # Makes sure the code is not executed too often
@@ -28,21 +29,25 @@ ensure_delay() {
 ensure_delay 5
 ########################################################################################################
 
-echo "The following bash script will disconnect from the current NordVPN server and connect to the next one on a list of countries."
+echo "NordVPN connecting to the next server on list of countries or disconnecting if country is xx."
 
 # Environment variable holding the list of countries as lowercase codes
-# Format: "us uk de fr"
-COUNTRIES_LIST="${NORDVPN_COUNTRIES:-us de fr}"
+# Format: "us uk de fr", xx stands for disconnected
+COUNTRIES_LIST="${NORDVPN_COUNTRIES:-xx us de fr}"
 
 # Convert the countries list into an array
 countries=($COUNTRIES_LIST)
+
 
 # Function to extract the current country code from the NordVPN hostname
 get_current_country_code() {
     # Extract the country code from the hostname (e.g., se153.nordvpn.com -> se)
     current_hostname=$(nordvpn status | grep -oP 'Hostname: \K.*')
-    [[ "$current_hostname" =~ ([a-z]{2}) ]]
-    echo "${BASH_REMATCH[1]}"
+    if [[ "$current_hostname" =~ ^([a-z]{2}) ]]; then
+        echo "${BASH_REMATCH[1]}"
+    else
+        echo "xx"
+    fi
 }
 
 # Determine the next country to connect to based on the current country code
@@ -69,7 +74,22 @@ determine_next_country() {
 
 # Determine the next country to connect to and connect
 next_country=$(determine_next_country)
-nordvpn connect $next_country
 
-echo "Connecting to $next_country..."
+
+if [[ "$next_country" == "xx" ]]; then
+    echo "NordVPN disconnecting (country code=$next_country)..."
+    bash signal_action.sh &
+    nordvpn disconnect              # sentinel: just drop the tunnel
+
+else
+    echo "NordVPN connecting to $next_country..."
+    bash signal_action.sh &
+    nordvpn connect "$next_country" # connect to the requested country
+
+fi
+
+
+
+
+
 

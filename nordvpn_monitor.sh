@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# NordVPN status monitoring and detecting when it disconnected
 
 #######################################################################
 # Make sure only one instance is running.
@@ -21,11 +22,11 @@ trap "rm -f $LOCK_FILE" EXIT
 
 #######################################################################
 
-echo "The script monitors nordvpn status and when detects that it was disconnected or a server changed executes another script."
+echo "NordVPN status monitoring and detecting when it disconnected."
 
 # Path to the scripts you want to execute on change
 SCRIPT_WHEN_CONNECTED="speech_en.sh"
-SCRIPT_WHEN_DISCONNECTED="aplay ~/sounds/beep-10.wav"
+SCRIPT_WHEN_DISCONNECTED="speech_en.sh"
 
 # Initially set previous values to null
 previous_country=""
@@ -41,14 +42,14 @@ while true; do
     # Extract current country and city
     extract_details
 
-    if [[ "$country" != "$previous_country" ]] || [[ "$city" != "$previous_city" ]]; then
+    if [[ "$country" != "$previous_country" ]] && [[ "$city" != "$previous_city" ]]; then
         if [[ "$country" == "" ]] || [[ "$city" == "" ]]; then
-            echo "VPN is disconnected from $previous_country."
+            echo "NordVPN is now disconnected from $previous_country."
             bash "$SCRIPT_WHEN_DISCONNECTED" "VPN got disconnected."
         else
-            echo "VPN server has changed to $country, $city"
+            echo "NordVPN server has changed to $country, $city"
             # Execute another script with country and city as arguments
-            bash "$SCRIPT_WHEN_CONNECTED" "VPN has changed to $country, $city"
+            bash "$SCRIPT_WHEN_CONNECTED" "VPN changed to $country, $city"
         fi
         # Update previous values
         previous_country=$country

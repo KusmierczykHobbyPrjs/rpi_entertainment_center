@@ -21,6 +21,4 @@ export ACTION_SOUND="signal_action.mp3"
 
 ## PUT HERE YOUR TOKENS & APP PASSWORDS
 export NORDVPN_TOKEN="PUT-YOUR-TOKEN-HERE"
-export NORDVPN_COUNTRIES="pl fi uk2431"  # xx means no vpn
-
-
+export NORDVPN_COUNTRIES="xx pl fi uk2431"  # xx means no vpn
