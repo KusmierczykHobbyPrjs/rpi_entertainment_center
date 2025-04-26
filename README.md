@@ -49,11 +49,11 @@ These scripts are designed for managing and rotating between different User Inte
 
 KDE Connect is a framework for integrating phones and desktops, using DBus, TCP/IP, and encryption. It enables control of LXDE (e.g., input, notifications, file transfer) from a mobile device via KDE Connect.
 
-
 Requirements:
 ```
 sudo apt install kdeconnect
-sudo apt install indicator-kdeconnect # optional tray applet
+sudo apt install indicator-kdeconnect  # optional tray applet
+sudo apt install xclip  # reading from clipboard
 ```
 
 Pairing the device:
