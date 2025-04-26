@@ -1,8 +1,6 @@
 #!/bin/bash
 
-# Reads text passed as an argument using google translate
-# Pass language code as the first argument
-
+# Plays a sound at a volume using mpg123
 
 # Check for volume environment variable, default to 100 if not set
 VOLUME_LEVEL=${VOLUME:-100}
