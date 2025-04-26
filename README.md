@@ -45,6 +45,33 @@ These scripts are useful for systems that serve multiple purposes (media center,
 These scripts are designed for managing and rotating between different User Interfaces (UIs) on a Linux system, specifically targeting environments where Kodi (a media center software), EmulationStation (a graphical front-end for emulators), and Xorg (the X Window System) are used. They implement functionality to ensure these UIs are not running simultaneously, prevent rapid execution, and facilitate the rotation between these applications to maintain system stability and user experience.
 
 
+## Remote Control of LXDE Desktop Using KDE Connect
+
+KDE Connect is a framework for integrating phones and desktops, using DBus, TCP/IP, and encryption. It enables control of LXDE (e.g., input, notifications, file transfer) from a mobile device via KDE Connect.
+
+
+Requirements:
+```
+sudo apt install kdeconnect
+sudo apt install indicator-kdeconnect # optional tray applet
+```
+
+Pairing the device:
+ - Open the KDE Connect app on your phone or computer.
+ - Detect the Raspberry Pi device.
+ - Send and accept the pairing request.
+
+### Use Case: Watching a Movie from a Website-Based Player
+
+LXDE, by default, runs using the maximum possible resolution. It can be reduced by editing `/boot/config.txt`. However, to avoid global changes, [lxde_set_resolution.sh](lxde_set_resolution.sh) allows fixing the screen resolution to a predefined value only for the desktop (edit the script directly).
+
+To make it start automatically:
+ - Edit: `sudo nano /etc/xdg/lxsession/LXDE-pi/autostart`
+ - Add the line: `@/home/pi/lxde_set_resolution.sh`
+
+A website can be conveniently opened from a phone by adding a user-defined command to KDE Connect: [clipboard2chromium.sh](clipboard2chromium.sh) opens a URL from the clipboard in Chromium in full screen. After the command is added, to open a URL: (1) copy it to the clipboard on your phone; (2) synchronize clipboards in KDE Connect; (3) execute the command.
+
+
 ## Speech synthesis
 
  - [speech.sh](speech.sh) - reads text in a selected language using `mpg123` and Google Translate web api. Example `bash speech.sh en Welcome home!`
