@@ -1,6 +1,19 @@
 # rpi_entertainment_center
-Scripts, links and instructions of how to set up a home entertainemnt center on RaspberryPI(3b+) using Kodi and RetroPie
+Scripts, links and instructions of how to set up a home entertainemnt center on RaspberryPI(3b+) using RaspbianOS with Kodi (multimedia server) and RetroPie (retro gaming).
 
+The following functionalities are covered:
+ * three environments (Kodi, EmulationStation (RetroPie), LXDM (Desktop)) at the same device
+ * support for external buttons (GPIO): also for tuning on and off the device
+ * support for NordVPN 
+ *  for Kodi:
+  - remote control (e.g. from smarthpone) using Kore
+  - internet tv and radios via IPTV
+  - streaming from YouTube, iPlayer (BBC), Netflix, Disney, Finnish Yle, Polish TVP VOD, Polsat etc.
+ * for LXDM (Desktop):
+  - remote control (e.g. from smarthpone) for LXDE using KDE-Connect
+  - KDE-Connect command opening a url from clipboard in full-screen Chromium browser window
+ * voice messages using (free) Google services
+ * port forwarding from LAN devices to make them available globally e.g. through NordVPN Meshnet
 
 ## Kodi
 
