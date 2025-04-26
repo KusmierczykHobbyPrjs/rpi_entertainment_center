@@ -4,6 +4,8 @@
 # Generic script to rotate between different UIs and create a script to start the next UI.
 # When executed kills the current UI. Complementary to ui_rotate.sh script 
 
+bash signal_action.sh &
+
 # Find the directory where the script is located
 script_dir="$(dirname "$0")"
 # Source the config.sh from the same directory
