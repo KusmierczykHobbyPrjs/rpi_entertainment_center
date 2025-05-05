@@ -1,8 +1,8 @@
-
 #!/bin/bash
 
 # Generic script to rotate between different UIs and create a script to start the next UI.
-# When executed kills the current UI. Complementary to ui_rotate.sh script 
+# When executed kills the current UI. Complementary to ui_rotate.sh script
+# If an argument is passed, it rotates to the PREVIOUS UI instead of the next.
 
 bash signal_action.sh &
 
@@ -54,17 +54,24 @@ if [ "$current_index" -ne -1 ]; then
     echo "Clossing ${uis[$current_index]} with command=${ui_commands[$current_index]}"
     eval "${ui_commands[$current_index]}"
 
-    # Calculate next UI index
-    next_index=$(((current_index + 1) % ${#uis[@]}))
+    # Calculate next or previous UI index based on argument presence
+    if [ $# -gt 0 ]; then
+        # Argument passed: Calculate PREVIOUS index
+        # Formula handles wrap-around from index 0 to the last index
+        next_index=$(( (current_index - 1 + ${#uis[@]}) % ${#uis[@]} ))
+    else
+        # No argument passed: Calculate NEXT index (original behavior)
+        next_index=$(((current_index + 1) % ${#uis[@]}))
+    fi
 
-    # Create script to start the next UI
+    # Create script to start the next/previous UI
     echo "#!/bin/bash" > "$start_script_path"
     echo "${ui_start_commands[$next_index]}" >> "$start_script_path"
     chmod +x "$start_script_path"
+    # Kept original message for minimal change, although 'next' might now mean 'previous'
     echo "Script to start the next UI (${uis[$next_index]}) has been created at $start_script_path"
 
 else
     echo "NO RUNNING INTERFACE FOUND!"
 
 fi
-
