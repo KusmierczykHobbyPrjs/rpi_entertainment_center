@@ -1,9 +1,9 @@
-NordVPN disconnect:exitcode 0:bash signal_action.sh & nordvpn disconnect
-NordVPN Poland:exitcode 0:bash signal_action.sh & nordvpn connect pl
-NordVPN Finland:exitcode 0:bash signal_action.sh & nordvpn connect fi
-NordVPN UK:exitcode 0:bash signal_action.sh & nordvpn connect uk
-NordVPN USA:exitcode 0:bash signal_action.sh & nordvpn connect us
-NordVPN Ukraine:exitcode 0:bash signal_action.sh & nordvpn connect ua
-NordVPN status:show:bash signal_action.sh & nordvpn status
-NordVPN status:show:bash signal_action.sh & nordvpn status
+NordVPN disconnect:exitcode 0:nordvpn disconnect
+NordVPN Poland:exitcode 0:nordvpn connect pl
+NordVPN Finland:exitcode 0:nordvpn connect fi
+NordVPN UK:exitcode 0:nordvpn connect uk
+NordVPN USA:exitcode 0:nordvpn connect us
+NordVPN Ukraine:exitcode 0:nordvpn connect ua
+NordVPN status:show:nordvpn status
+
 
