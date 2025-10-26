@@ -3,9 +3,13 @@ Scripts, links and instructions of how to set up a home entertainemnt center on 
 
 The following functionalities are covered:
  * three environments (Kodi, EmulationStation (RetroPie), LXDM (Desktop)) at the same device
+ * UI watchdog
  * support for external buttons (GPIO): also for tuning on and off the device
- * support for NordVPN 
- *  for Kodi:
+ * support for NordVPN
+   - status monitoring and signaling by voice messages
+   - control from Shell Command Launcher add-on
+   - control by a physical button
+ * for Kodi:
    - remote control (e.g. from smarthpone) using Kore
    - internet tv and radios via IPTV
    - streaming from YouTube, iPlayer (BBC), Netflix, Disney, Finnish Yle, Polish TVP VOD, Polsat etc.
@@ -33,7 +37,7 @@ sudo apt-get install kodi-pvr-iptvsimple
 
  - [sample playlist with Polish radio stations and a few TV channels](iptvsimple_playlist_pl.m3u)
 
-## Switching UIs (Kodi / EmulationStation / default graphical environment)
+## Switching UIs (Kodi / EmulationStation / default graphical environment) + watchdog
 
  - [ui_rotate.sh](ui_rotate.sh) - automates the rotation between UIs (Kodi, EmulationStation, and Xorg defined in [config.sh](config.sh)), starting each UI in sequence to ensure that the user can switch between different interfaces without manual intervention. In particular, when a UI is closed or killed by [stop_current_ui.sh](stop_current_ui.sh) the next UI is automatically started. The script is started at system logging from autostart.sh. 
  - [stop_current_ui.sh](stop_current_ui.sh) - stops the currently running UI. The script is executed by pressing a physical button (GPIO slope detection). Physical buttons are handled by [gpio_commands.sh](gpio_commands.sh) which is started at system logging from [autostart.sh](autostart.sh). Commands to monitor, start or stop UIs are loaded from [config.sh](config.sh). 
