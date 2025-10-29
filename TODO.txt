@@ -1,2 +1,7 @@
  
  - improve detection of nordvpn server change if no country and no city is chagned but just a number is different
+ - nordvpn_monitor does not say "Vpn got disconnected". The error:
+ [src/resolver.c:305] error: Resolving translate.google.com:80: Temporary failure in name resolution
+  [src/httpget.c:606] error: Unable to establish connection to translate.google.com
+main: [src/mpg123.c:715] error: Access to http resource http://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&q=%56%50%4e%20%67%6f%74%20%64%69%73%63%6f%6e%6e%65%63%74%65%64&tl=en failed.
+

@@ -35,7 +35,8 @@ parts=($(python3 speech_text_splitter.py $MAX_LENGTH "$INPUT" ))
 
 for part in "${parts[@]}"
   do
-    NEXTURL=$(echo $part | xxd -plain | tr -d '\n' | sed 's/\(..\)/%\1/g')
-    #echo "$NEXTURL"
+    echo "[speech] Processing: $part"
+    NEXTURL=$(echo $part | tr -d '\n' | xxd -plain | tr -d '\n' | sed 's/\(..\)/%\1/g')
+    echo "[speech] nexturl=$NEXTURL"
     mpg123 -q -b 100 -f $VOLUME_SCALE "http://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&q=$NEXTURL&tl=$LANG_CODE"
 done

@@ -57,5 +57,5 @@ while true; do
     fi
 
     # Check every x seconds
-    sleep 1
+    sleep 0.5
 done
