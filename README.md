@@ -1,14 +1,12 @@
 # rpi_entertainment_center
-Scripts, links and instructions of how to set up a home entertainemnt center on RaspberryPI(3b+) using RaspbianOS with Kodi (multimedia server) and RetroPie (retro gaming).
+Scripts, links and instructions of how to set up a multi-purpose entertainemnt center on RaspberryPI (tested on 3b) using RaspbianOS with Kodi (multimedia server), RetroPie (retro gaming) and a standard Desktop.
+
+## Overview
 
 The following functionalities are covered:
  * three environments (Kodi, EmulationStation (RetroPie), LXDM (Desktop)) at the same device
  * UI watchdog
  * support for external buttons (GPIO): also for tuning on and off the device
- * support for NordVPN
-   - status monitoring and signaling by voice messages
-   - control from Shell Command Launcher add-on
-   - control by a physical button
  * for Kodi:
    - remote control (e.g. from smarthpone) using Kore
    - internet tv and radios via IPTV
@@ -16,10 +14,15 @@ The following functionalities are covered:
  * for LXDM (Desktop):
    - remote control (e.g. from smarthpone) for LXDE using KDE-Connect
    - KDE-Connect command opening a url from clipboard in full-screen Chromium browser window
+ * support for NordVPN (+VLAN via meshnet)
+   - status monitoring and signaling by voice messages
+   - control from Shell Command Launcher add-on
+   - control by a physical button
  * voice messages using (free) Google services
  * port forwarding from LAN devices to make them available globally e.g. through NordVPN Meshnet
 
-## Kodi
+
+## [Kodi](https://kodi.tv/)
 
 Requirements:
 ```
@@ -28,25 +31,38 @@ sudo apt-get install kodi-peripheral-joystick  # joystick control
 sudo apt-get install kodi-eventclients-kodi-send  # command-line control
 ```
 
-## Kodi: IP TV
+
+## [Kodi: IP TV](https://kodi.tv/addons/omega/pvr.iptvsimple/)
 
 Install and enable (in UI) `PVR IPTV Simple Client` add-on:
 ```
 sudo apt-get install kodi-pvr-iptvsimple
 ```
 
- - [sample playlist with Polish radio stations and a few TV channels](iptvsimple_playlist_pl.m3u)
+ - [a sample playlist with Polish radio stations and a few TV channels](iptvsimple_playlist_pl.m3u)
 
-## Switching UIs (Kodi / EmulationStation / default graphical environment) + watchdog
+Online lists with IPTV channels (for Polish):
+ - [http://iptv-org.github.io/iptv/languages/pol.m3u](http://iptv-org.github.io/iptv/languages/pol.m3u)
+ - [https://github.com/iptv-org/iptv/blob/master/streams/pl.m3u](https://github.com/iptv-org/iptv/blob/master/streams/pl.m3u) -> [RAW file](https://raw.githubusercontent.com/iptv-org/iptv/refs/heads/master/streams/pl.m3u)
+
+
+### Tips & Tricks
+
+Set in the add-on configuration (in Advanced settings) the following User Agent: `Mozilla/5.0` or `VLC`.
+
+## Kodi: Streaming
+@TODO
+
+
+
+## Multiple UIs (Kodi / EmulationStation / default graphical environment) + watchdog
+
+The below scripts are useful for systems that serve multiple purposes (media center, gaming station, and general computing) by managing and rotating the active UI, enhancing the user experience by simplifying the transition between different uses of the system. 
+
+These scripts are designed for managing and rotating between different User Interfaces (UIs) on a Linux system, specifically targeting environments where Kodi (a media center software), EmulationStation (a graphical front-end for emulators), and Xorg (the X Window System) are used. They implement functionality to ensure these UIs are not running simultaneously, prevent rapid execution, and facilitate the rotation between these applications to maintain system stability.
 
  - [ui_rotate.sh](ui_rotate.sh) - automates the rotation between UIs (Kodi, EmulationStation, and Xorg defined in [config.sh](config.sh)), starting each UI in sequence to ensure that the user can switch between different interfaces without manual intervention. In particular, when a UI is closed or killed by [stop_current_ui.sh](stop_current_ui.sh) the next UI is automatically started. The script is started at system logging from autostart.sh. 
  - [stop_current_ui.sh](stop_current_ui.sh) - stops the currently running UI. The script is executed by pressing a physical button (GPIO slope detection). Physical buttons are handled by [gpio_commands.sh](gpio_commands.sh) which is started at system logging from [autostart.sh](autostart.sh). Commands to monitor, start or stop UIs are loaded from [config.sh](config.sh). 
-
-### Why
-These scripts are useful for systems that serve multiple purposes (media center, gaming station, and general computing) by managing and rotating the active UI, enhancing the user experience by simplifying the transition between different uses of the system.
-
-### What
-These scripts are designed for managing and rotating between different User Interfaces (UIs) on a Linux system, specifically targeting environments where Kodi (a media center software), EmulationStation (a graphical front-end for emulators), and Xorg (the X Window System) are used. They implement functionality to ensure these UIs are not running simultaneously, prevent rapid execution, and facilitate the rotation between these applications to maintain system stability and user experience.
 
 
 ## Remote Control of LXDE Desktop Using KDE Connect
@@ -76,15 +92,7 @@ To make it start automatically:
 A website can be conveniently opened from a phone by adding a user-defined command to KDE Connect: [clipboard2chromium.sh](clipboard2chromium.sh) opens a URL from the clipboard in Chromium in full screen. After the command is added, to open a URL: (1) copy it to the clipboard on your phone; (2) synchronize clipboards in KDE Connect; (3) execute the command.
 
 
-## Speech synthesis
 
- - [speech.sh](speech.sh) - reads text in a selected language using `mpg123` and Google Translate web api. Example `bash speech.sh en Welcome home!`
- - [speech_text_splitter.py](speech_text_splitter.py) - auxiliary script to efficiently manage long text inputs by splitting them into segments that do not exceed a specified maximum length
- - [speech_en.sh](speech_en.sh) - wrapper for English 
- - [speech_en.sh](speech_en.sh) - wrapper for Polish 
- 
-### Prerequisites 
- - `sudo apt-get install mpg123`
  
  
 ## Port forwarding (use Pi as a gateway)
@@ -93,15 +101,11 @@ A website can be conveniently opened from a phone by adding a user-defined comma
 
 ### Prerequisites 
  - `sudo apt-get install socat` 
- 
- 
-## Configuration
- 
-  - [config.sh](config.sh) - contains environment variables used by other scripts. For example, `VOLUME` used by speech synthesis.
-  
+
   
 ## NordVPN
 
+NordVPN is a VPN and VLAN (through meshnet). 
 It can be installed by following the instructions from [https://nordvpn.com/download/raspberry-pi/](https://nordvpn.com/):
 ```
   echo "Installing NordVPN"
@@ -115,3 +119,21 @@ It can be installed by following the instructions from [https://nordvpn.com/down
 
 There is no plugin compatible with Kodi 19, but apart from using GPIO commands, its behavior can be controlled via `ShellScriptLauncher`. Download [the repo](https://github.com/wastis/LinuxAddonRepo), install the add-on, and configure it to read commands from [~/shell_command_launcher.menu](shell_command_launcher.menu). To make the add-on easily accessible, add it to 'Favorites' (right click -> Add to Favorites).
 
+
+## Speech synthesis
+
+The speech synthesis scripts are auxiliary and are used by other scripts to signal events.
+
+ - [speech.sh](speech.sh) - reads text in a selected language using `mpg123` and Google Translate web api. Example `bash speech.sh en Welcome home!`
+ - [speech_text_splitter.py](speech_text_splitter.py) - auxiliary script to efficiently manage long text inputs by splitting them into segments that do not exceed a specified maximum length
+ - [speech_en.sh](speech_en.sh) - wrapper for English 
+ - [speech_en.sh](speech_en.sh) - wrapper for Polish 
+ 
+### Prerequisites 
+ - `sudo apt-get install mpg123`
+ 
+## Configuration
+ 
+  - [config.sh](config.sh) - contains environment variables used by other scripts. For example, `VOLUME` used by speech synthesis.
+  
+## Autostart
