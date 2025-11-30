@@ -25,9 +25,10 @@ The following functionalities are covered:
 ## Installation
 1. Setup Raspbian on your Raspberry (tested with Pi 3B).
 2. Download and unpack this repostiory into your main folder.
-3. Configure [config.sh](config.sh)
-4. Add `bash autostart.sh &` at the end of the `.bashrc` in your home directory, so the scripts are started automatically.
-5. Run `sudo raspi-config` and change setting in 'System Options' -> 'Boot / Auto Login' to 'Console Autologin', so the system does not start GUI and UI (run by [autostart.sh](autostart.sh)) will be started.
+3. Install all the addittional packages needed to run the scripts (see below all the lines starting with `sudo apt-get`).
+4. Configure [config.sh](config.sh) and edit out things you don't need from [autostart.sh](autostart.sh).
+5. Add `bash autostart.sh &` at the end of the `.bashrc` in your home directory, so the scripts are started automatically.
+6. Run `sudo raspi-config` and change setting in 'System Options' -> 'Boot / Auto Login' to 'Console Autologin', so the system does not start GUI and UI (run by [autostart.sh](autostart.sh)) will be started.
 
 
 ## [Kodi](https://kodi.tv/)
@@ -145,3 +146,6 @@ The speech synthesis scripts are auxiliary and are used by other scripts to sign
   - [config.sh](config.sh) - contains environment variables used by other scripts. For example, `VOLUME` used by speech synthesis.
   
 ## Autostart
+
+@TODO
+
