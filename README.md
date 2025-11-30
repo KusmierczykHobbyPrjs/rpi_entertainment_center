@@ -1,4 +1,4 @@
-# rpi_entertainment_center
+# SmartTV (+much more) that does not watch you
 Scripts, links and instructions of how to set up a multi-purpose entertainemnt center on RaspberryPI (tested on 3b) using RaspbianOS with Kodi (multimedia server), RetroPie (retro gaming) and a standard Desktop.
 
 ## Overview
@@ -20,6 +20,14 @@ The following functionalities are covered:
    - control by a physical button
  * voice messages using (free) Google services
  * port forwarding from LAN devices to make them available globally e.g. through NordVPN Meshnet
+
+
+## Installation
+1. Setup Raspbian on your Raspberry (tested with Pi 3B).
+2. Download and unpack this repostiory into your main folder.
+3. Configure [config.sh](config.sh)
+4. Add `bash autostart.sh &` at the end of the `.bashrc` in your home directory, so the scripts are started automatically.
+5. Run `sudo raspi-config` and change setting in 'System Options' -> 'Boot / Auto Login' to 'Console Autologin', so the system does not start GUI and UI (run by [autostart.sh](autostart.sh)) will be started.
 
 
 ## [Kodi](https://kodi.tv/)
