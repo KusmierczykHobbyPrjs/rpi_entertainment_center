@@ -50,9 +50,10 @@ sudo apt-get install kodi-pvr-iptvsimple
 
  - [a sample playlist with Polish radio stations and a few TV channels](iptvsimple_playlist_pl.m3u)
 
-Online lists with IPTV channels (for Polish):
- - [http://iptv-org.github.io/iptv/languages/pol.m3u](http://iptv-org.github.io/iptv/languages/pol.m3u)
- - [https://github.com/iptv-org/iptv/blob/master/streams/pl.m3u](https://github.com/iptv-org/iptv/blob/master/streams/pl.m3u) -> [RAW file](https://raw.githubusercontent.com/iptv-org/iptv/refs/heads/master/streams/pl.m3u)
+Online lists with IPTV channels:
+ - [fmstream.org](https://fmstream.org/index.php) - find a station you want and add the entry to the m3u file e.g. [iptvsimple_playlist_pl.m3u](iptvsimple_playlist_pl.m3u) 
+ - (for Polish): [http://iptv-org.github.io/iptv/languages/pol.m3u](http://iptv-org.github.io/iptv/languages/pol.m3u)
+ - (for Polish): [https://github.com/iptv-org/iptv/blob/master/streams/pl.m3u](https://github.com/iptv-org/iptv/blob/master/streams/pl.m3u) -> [RAW file](https://raw.githubusercontent.com/iptv-org/iptv/refs/heads/master/streams/pl.m3u)
 
 
 ### Tips & Tricks

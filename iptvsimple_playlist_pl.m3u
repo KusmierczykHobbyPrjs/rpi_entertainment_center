@@ -264,6 +264,10 @@ http://mp3.polskieradio.pl:8906/;.mp3
 
 #EXTINF:0 radio="true",Radio WNET  
 http://audio.radiownet.pl:8000/stream
+
+#EXTINF:-1 radio="true",Radio 357
+https://stream.rcs.revma.com/an1ugyygzk8uv
+
 #EXTINF:0 radio="true",Radio ZET
 https://zt03.cdn.eurozet.pl/zet-tun.mp3
 #EXTINF:0 radio="true",RMF FM
@@ -278,10 +282,19 @@ http://pldm.ml/radio?url=https://www.eskago.pl/radio/eska-warszawa
 http://plu.cdn.eurozet.pl/plu-waw.mp3
 #EXTINF:0 radio="true",Radio Kolor 103 FM
 http://stream4.nadaje.com:15358/radiokolor
-#EXTINF:0 radio="true",rdc
+#EXTINF:0 radio="true",RDC
 http://stream2.nadaje.com:11140/rdc
+#EXTINF:0 radio="true",Radio TOK FM 
+https://radiostream.pl/tuba10-1.mp3
+
+#EXTINF:0 radio="true",PR Łódź
+https://stream.radiolodz.pl/RadioLodz-1.mp3
+#EXTINF:0 radio="true",PR Kielce
+https://streaming.g-news.pl:8030/rk2
+
 #EXTINF:0 radio="true",RMF Maxxx 106.5 FM Radom
 http://195.150.20.7:8000/rmf_maxxx
+
 #EXTINF:0 radio="true",Polskastacja Polski Rock
 http://stream.polskastacja.pl/ps29?
 #EXTINF:0 radio="true",Tylko Polskie Przeboje
@@ -327,8 +340,7 @@ http://stream.open.fm/21
 https://play.adtonos.com/rock-radio?cache=1560639027/;
 #EXTINF:0 radio="true",Radio Pogoda
 http://stream.radioagora.pl/tuba38-1.mp3?cache=1560639291/;
-#EXTINF:0 radio="true",Radio TOK FM posluchaj aby zrozumiec
-http://poznan5-4.radio.pionier.net.pl:8000/tuba10-1.mp3?cache=1560639469/;
+
 #EXTINF:0 radio="true",TechnoBase.FM 24h Techno,Dance,HandsUp and More
 http://aach.stream.tb-group.fm/tb-high.aac?
 #EXTINF:0 radio="true",Radio Weszlo
@@ -413,67 +425,67 @@ http://88.199.169.10:8000/stream/1/
 http://91.232.4.22:8888/;audio.mp3?hash=1563695739090
 
 
-#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Genesis
+#EXTINF:-1 radio="true",PR - aac_Genesis
 http://mp3.polskieradio.pl:8574
-#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Strefa rokendrola wolna od angola
+#EXTINF:-1 radio="true",PR - aac_Strefa rokendrola wolna od angola
 http://mp3.polskieradio.pl:8576
-#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Piosenki Niezaleznych
+#EXTINF:-1 radio="true",PR - aac_Piosenki Niezaleznych
 http://mp3.polskieradio.pl:8578
-#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Niezly Jazz
+#EXTINF:-1 radio="true",PR - aac_Niezly Jazz
 http://mp3.polskieradio.pl:8584
-#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Mijaja lata zostaja piosenki
+#EXTINF:-1 radio="true",PR - aac_Mijaja lata zostaja piosenki
 http://mp3.polskieradio.pl:8568
 
 
-#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Zabawy z jezykiem
+#EXTINF:-1 radio="true",PR - aac_Zabawy z jezykiem
 http://mp3.polskieradio.pl:8400
-#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Radio Freud
+#EXTINF:-1 radio="true",PR - aac_Radio Freud
 http://mp3.polskieradio.pl:8404
-#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Zapiski ze wspolczesnosci
+#EXTINF:-1 radio="true",PR - aac_Zapiski ze wspolczesnosci
 http://mp3.polskieradio.pl:8406
-#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Kosmos
+#EXTINF:-1 radio="true",PR - aac_Kosmos
 http://mp3.polskieradio.pl:8408
-#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Koncerty w Trojce
+#EXTINF:-1 radio="true",PR - aac_Koncerty w Trojce
 http://mp3.polskieradio.pl:8410
-#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Reportaz w Trojce
+#EXTINF:-1 radio="true",PR - aac_Reportaz w Trojce
 http://mp3.polskieradio.pl:8412
-#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Wywiady Marka Niedzwieckiego
+#EXTINF:-1 radio="true",PR - aac_Wywiady Marka Niedzwieckiego
 http://mp3.polskieradio.pl:8416
-#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Wojciech Mann i Marek Niedzwiecki
+#EXTINF:-1 radio="true",PR - aac_Wojciech Mann i Marek Niedzwiecki
 http://mp3.polskieradio.pl:8418
-#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Najpiekniejsze polskie piosenki
+#EXTINF:-1 radio="true",PR - aac_Najpiekniejsze polskie piosenki
 http://mp3.polskieradio.pl:8420
-#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Konkurs Chopinowski
+#EXTINF:-1 radio="true",PR - aac_Konkurs Chopinowski
 http://mp3.polskieradio.pl:8422
-#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_W jazzowym klimacie
+#EXTINF:-1 radio="true",PR - aac_W jazzowym klimacie
 http://mp3.polskieradio.pl:8424
-#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Przeboje Lata z Radiem
+#EXTINF:-1 radio="true",PR - aac_Przeboje Lata z Radiem
 http://mp3.polskieradio.pl:8426
-#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Minimax
+#EXTINF:-1 radio="true",PR - aac_Minimax
 http://mp3.polskieradio.pl:8446
-#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Bajki samograjki
+#EXTINF:-1 radio="true",PR - aac_Bajki samograjki
 http://mp3.polskieradio.pl:8452
-#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Classic Rock
+#EXTINF:-1 radio="true",PR - aac_Classic Rock
 http://mp3.polskieradio.pl:8460
-#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Najpiekniejsze polskie piosenki
+#EXTINF:-1 radio="true",PR - aac_Najpiekniejsze polskie piosenki
 http://mp3.polskieradio.pl:8420
-#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Classic Rock
+#EXTINF:-1 radio="true",PR - aac_Classic Rock
 http://mp3.polskieradio.pl:8460
-#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Prog Rock
+#EXTINF:-1 radio="true",PR - aac_Prog Rock
 http://mp3.polskieradio.pl:8462
-#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Przeboje PRL
+#EXTINF:-1 radio="true",PR - aac_Przeboje PRL
 http://mp3.polskieradio.pl:8466
-#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Led Zeppelin
+#EXTINF:-1 radio="true",PR - aac_Led Zeppelin
 http://mp3.polskieradio.pl:8468
-#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Pink Floyd
+#EXTINF:-1 radio="true",PR - aac_Pink Floyd
 http://mp3.polskieradio.pl:8470
-#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Ballady
+#EXTINF:-1 radio="true",PR - aac_Ballady
 http://mp3.polskieradio.pl:8474
-#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Polski top Wszech Czasow
+#EXTINF:-1 radio="true",PR - aac_Polski top Wszech Czasow
 http://mp3.polskieradio.pl:8556
-#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Muzyka zrodel
+#EXTINF:-1 radio="true",PR - aac_Muzyka zrodel
 http://mp3.polskieradio.pl:8558
-#EXTINF:-1 radio="true",Polskie Radio S.A. -- aac_Klasycy rocka
+#EXTINF:-1 radio="true",PR - aac_Klasycy rocka
 http://mp3.polskieradio.pl:8166
 
 
