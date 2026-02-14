@@ -20,6 +20,7 @@ The following functionalities are covered:
    - control by a physical button
  * voice messages using (free) Google services
  * port forwarding from LAN devices to make them available globally e.g. through NordVPN Meshnet
+ * home http server visible from anywhere in the world (NoIP + Apache2)
 
 
 ## Installation
@@ -149,4 +150,238 @@ The speech synthesis scripts are auxiliary and are used by other scripts to sign
 ## Autostart
 
 @TODO
+
+## Locally-hosted WebServer with global access via NoIP
+
+**No-IP** is a Dynamic DNS (DDNS) service that allows a device with a changing public IP address—such as a home internet connection or a Raspberry Pi behind a consumer ISP—to be reachable through a stable, human-readable hostname. No-IP maps this hostname to the device's current public IP and updates the mapping automatically whenever the IP changes. To use the service, create a free or paid account on the No-IP website, add a hostname (for example, `example.ddns.net`) under the DNS/Hostnames section, and associate it with your current IP address. The No-IP Dynamic Update Client installed on the Raspberry Pi then authenticates with your account and periodically reports the device's public IP, ensuring the hostname always resolves to the correct address.
+
+To make services on the Raspberry Pi accessible from the internet, router port forwarding is also required: this involves configuring your home router to forward incoming connections on a specific external port (e.g., TCP port 22 or 80) to the Raspberry Pi's internal IP address and corresponding internal port. Without port forwarding, external requests reaching your public IP and No-IP hostname will be blocked at the router and never reach the device.
+
+There might be an option to configure No-IP on your router directly. If not follow the below instructions.
+
+
+### Apache HTTP server with PHP
+
+The following instructions setup an Apache server on your Raspberry:
+```
+sudo apt install apache2 -y
+sudo apt install php -y
+sudo apt install php libapache2-mod-php -y
+sudo systemctl restart apache2
+echo "<?php phpinfo(); ?>" | sudo tee /var/www/html/info.php
+```
+
+
+### NoIP installation for Rasbian
+
+[NoIP installation instructions](https://my.noip.com/dynamic-dns/duc) do not work for Raspbian.
+Instead follow the standard, reliable procedure to install the **No-IP Dynamic Update Client (DUC)** on a Raspberry Pi running Raspberry Pi OS or another Debian-based distribution:
+
+1. Update the system and install build tools
+   Run:
+
+```
+sudo apt update
+sudo apt install -y gcc make
+```
+
+2. Download the No-IP Dynamic Update Client
+   Obtain the latest Linux source package from **No-IP**:
+
+```
+cd /usr/local/src
+sudo wget https://www.noip.com/client/linux/noip-duc-linux.tar.gz
+```
+
+3. Extract the archive
+
+```
+sudo tar xzf noip-duc-linux.tar.gz
+cd noip-*
+```
+
+4. Compile and install
+
+```
+sudo make
+sudo make install
+```
+
+During installation, you will be prompted for:
+
+* No-IP account email
+* No-IP account password
+* Hostname to update
+* Update interval (default is acceptable)
+
+5. Test the client manually
+
+```
+sudo noip2
+```
+
+Verify that the client starts without errors.
+
+6. Enable automatic startup (systemd)
+   Create a service file:
+
+```
+sudo nano /etc/systemd/system/noip2.service
+```
+
+Insert:
+
+```
+[Unit]
+Description=No-IP Dynamic DNS Update Client
+After=network-online.target
+
+[Service]
+Type=forking
+ExecStart=/usr/local/bin/noip2
+ExecStop=/usr/local/bin/noip2 -K
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable and start the service:
+
+```
+sudo systemctl daemon-reload
+sudo systemctl enable noip2
+sudo systemctl start noip2
+```
+
+7. Verify status
+
+```
+systemctl status noip2
+```
+
+Notes:
+* Configuration is stored in `/usr/local/etc/no-ip2.conf`.
+* To reconfigure, stop the service and run `sudo noip2 -C`.
+* This method is architecture-independent and works on all Raspberry Pi models.
+
+
+### HTTPS for an Apache server
+To enable HTTPS for an Apache server on Raspberry Pi OS (Raspbian), the standard and recommended approach is to use TLS certificates from **Let's Encrypt** via **Certbot**.
+
+First, prerequisites must be satisfied. Your Raspberry Pi must be reachable from the public internet on TCP ports 80 and 443, your No-IP hostname must resolve to your public IP, and your router must forward ports 80 and 443 to the Raspberry Pi. Apache must already be installed and serving HTTP correctly.
+
+Install Apache and Certbot:
+
+```
+sudo apt update
+sudo apt install -y apache2 certbot python3-certbot-apache
+```
+
+Ensure Apache is running:
+
+```
+sudo systemctl enable apache2
+sudo systemctl start apache2
+```
+
+Request and install an HTTPS certificate for your No-IP hostname:
+
+```
+sudo certbot --apache
+```
+
+During the process, select your hostname, agree to the terms, and choose the option to redirect HTTP to HTTPS. Certbot will automatically configure Apache virtual hosts and enable SSL.
+
+Verify HTTPS:
+Open `https://your-hostname.ddns.net` in a browser and confirm the certificate is valid.
+
+Enable automatic certificate renewal:
+
+```
+sudo systemctl enable certbot.timer
+sudo systemctl start certbot.timer
+```
+
+You can test renewal with:
+
+```
+sudo certbot renew --dry-run
+```
+
+Notes:
+
+* Certificates are stored under `/etc/letsencrypt/`.
+* If port 80 is blocked by your ISP, HTTP-based validation will fail; in that case, DNS-based validation must be used instead.
+* Apache SSL configuration files are typically created as `*-le-ssl.conf` under `/etc/apache2/sites-enabled/`.
+
+This configuration provides industry-standard HTTPS with automatic renewal and minimal manual maintenance.
+
+### Safe server
+
+To reduce the risk of compromise on a Raspberry Pi running Apache, you must address **system updates**, **service exposure**, and **basic hardening**. The steps below are sufficient for a home-exposed server.
+
+1. Keep the operating system fully updated
+   Run regularly:
+
+```
+sudo apt update
+sudo apt full-upgrade -y
+sudo apt autoremove --purge -y
+```
+
+Enable unattended security updates:
+
+```
+sudo apt install unattended-upgrades
+sudo dpkg-reconfigure unattended-upgrades
+```
+
+This ensures critical vulnerabilities are patched automatically.
+
+2. Minimize exposed network surface
+   Only expose ports that are strictly required.
+
+Check listening services:
+
+```
+sudo ss -tlnp
+```
+
+If you only need HTTPS:
+
+* Keep **443** open
+* Close **80** externally (or redirect internally)
+* Close everything else at the router
+
+Do not expose SSH unless necessary.
+
+3. Harden Apache configuration
+   Disable directory listing:
+
+```
+sudo a2dismod autoindex
+sudo systemctl reload apache2
+```
+
+Hide version information. Edit:
+
+```
+sudo nano /etc/apache2/conf-available/security.conf
+```
+
+Ensure:
+
+```
+ServerTokens Prod
+ServerSignature Off
+```
+
+Disable unused modules:
+
+```
+sudo apachectl -M
+sudo a2dismod <module>
+```
+
 
