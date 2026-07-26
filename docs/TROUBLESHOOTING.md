@@ -297,13 +297,34 @@ one to maximum achieves very little on its own.
 ./bin/doctor.sh audio          # reports each stage
 ```
 
-Raise them all, and persist the ALSA level so it survives a reboot:
+### Use the right tool, or it reverts at every reboot
+
+**On Bookworm and later, WirePlumber owns the hardware mixer.** It stores its
+own per-device volume and re-applies it at every startup — *after* ALSA has
+restored anything you saved. So:
 
 ```bash
+# CORRECT on PipeWire - WirePlumber persists this itself
 wpctl set-volume @DEFAULT_AUDIO_SINK@ 100%
 wpctl set-mute   @DEFAULT_AUDIO_SINK@ 0
+
+# DOES NOT SURVIVE A REBOOT on PipeWire - WirePlumber overwrites it
 amixer sset PCM 100%
 sudo alsactl store
+```
+
+If `alsamixer` shows the level dropping back after every reboot, this is why:
+you set it with the wrong tool, and the thing that runs last wins.
+
+There is nothing extra to run — WirePlumber saves the `wpctl` value under
+`~/.local/state/wireplumber/` by itself.
+
+**Only on systems without PipeWire** is the `amixer` + `alsactl store` pair
+correct, and there it also needs `alsa-restore.service` enabled to reapply the
+saved state at boot:
+
+```bash
+systemctl is-enabled alsa-restore
 ```
 
 PipeWire accepts values above 100%, which genuinely helps on a Pi:

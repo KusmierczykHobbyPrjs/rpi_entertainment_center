@@ -39,26 +39,44 @@ fi
 step "Setting the system volume levels"
 # Volume here is a chain: Kodi x PipeWire stream x PipeWire sink x ALSA PCM.
 # Every stage multiplies, so one link left low makes everything quiet however
-# high the others are set. A fresh install commonly leaves ALSA around 40%,
-# and the symptom is "volume is at maximum and it is still quiet".
-volume_changed=0
+# high the others are set.
+#
+# WHICH TOOL depends on what owns the mixer:
+#
+#   PipeWire present -> WirePlumber owns the hardware controls and re-applies
+#       its own remembered volume at every startup. Setting ALSA directly with
+#       amixer and saving with `alsactl store` therefore does NOT survive a
+#       reboot: WirePlumber runs afterwards and overwrites it. Use wpctl,
+#       which WirePlumber persists itself.
+#
+#   No PipeWire -> amixer plus `alsactl store` is correct.
+have_pipewire=0
+if rec_has wpctl && (pgrep -x pipewire >/dev/null 2>&1 || rec_has pipewire); then
+    have_pipewire=1
+fi
 
-if rec_has wpctl; then
+if (( have_pipewire == 1 )); then
+    ok "PipeWire detected - setting volume through wpctl (it persists this)"
+
     cur="$(wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null | grep -oP 'Volume: \K[0-9.]+')"
     cur_pct="$(awk -v v="${cur:-0}" 'BEGIN{printf "%d", v*100}')"
     if (( cur_pct >= 90 )); then
-        skip "PipeWire sink already at ${cur_pct}%"
+        skip "Default sink already at ${cur_pct}%"
     else
-        note "PipeWire sink is at ${cur_pct}%"
-        if confirm "Raise the PipeWire sink to 100%?"; then
+        note "Default sink is at ${cur_pct}%"
+        if confirm "Raise it to 100%?"; then
             wpctl set-volume @DEFAULT_AUDIO_SINK@ 100% && ok "Sink set to 100%"
-            wpctl set-mute @DEFAULT_AUDIO_SINK@ 0 2>/dev/null
             volume_changed=1
         fi
     fi
-fi
+    wpctl set-mute @DEFAULT_AUDIO_SINK@ 0 2>/dev/null
 
-if rec_has amixer; then
+    note "WirePlumber stores this under ~/.local/state/wireplumber/ and"
+    note "re-applies it at login, so it survives reboots on its own."
+    note "Do NOT set this with amixer - WirePlumber will overwrite it."
+else
+    ok "No PipeWire - using amixer and alsactl"
+    volume_changed=0
     for ctl in PCM Master Headphone; do
         raw="$(amixer sget "$ctl" 2>/dev/null | grep -oP '\[\K[0-9]+(?=%\])' | head -1)"
         [[ -n "$raw" ]] || continue
@@ -73,15 +91,20 @@ if rec_has amixer; then
         fi
         break
     done
-fi
 
-# Without this ALSA forgets the level at the next boot, and the quiet comes
-# back with no obvious cause.
-if (( volume_changed == 1 )) && rec_has alsactl; then
-    if sudo alsactl store 2>/dev/null; then
-        ok "Levels saved (persist across reboots)"
-    else
-        fail "Could not run 'sudo alsactl store' - the level will reset at boot"
+    # Without this ALSA forgets the level at the next boot.
+    if (( volume_changed == 1 )) && rec_has alsactl; then
+        sudo alsactl store 2>/dev/null \
+            && ok "Levels saved to /var/lib/alsa/asound.state" \
+            || fail "'sudo alsactl store' failed - the level will reset at boot"
+    fi
+
+    # alsa-restore is what applies asound.state at boot; without it, storing
+    # achieves nothing.
+    if systemctl list-unit-files alsa-restore.service >/dev/null 2>&1; then
+        systemctl is-enabled --quiet alsa-restore 2>/dev/null \
+            && ok "alsa-restore.service will reapply it at boot" \
+            || fail "alsa-restore.service is not enabled - levels will not be restored"
     fi
 fi
 

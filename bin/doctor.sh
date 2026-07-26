@@ -523,14 +523,38 @@ if rec_has amixer; then
     for ctl in PCM Master Headphone; do
         raw="$(amixer sget "$ctl" 2>/dev/null | grep -oP '\[\K[0-9]+(?=%\])' | head -1)"
         [[ -n "$raw" ]] || continue
-        if (( raw >= 90 )); then
-            pass "ALSA '$ctl' at ${raw}%"
+        # On a PipeWire system WirePlumber owns this control and re-applies its
+        # own value at startup, so amixer/alsactl changes do not survive a
+        # reboot. Recommend the tool that actually persists.
+        if rec_has wpctl && pgrep -x pipewire >/dev/null 2>&1; then
+            if (( raw >= 90 )); then
+                pass "ALSA '$ctl' at ${raw}% (managed by WirePlumber)"
+            else
+                warn "ALSA '$ctl' is at ${raw}%" \
+                     "Set it via wpctl, not amixer: wpctl set-volume @DEFAULT_AUDIO_SINK@ 100%"
+            fi
         else
-            warn "ALSA '$ctl' is at ${raw}%" \
-                 "amixer sset $ctl 100% && sudo alsactl store"
+            if (( raw >= 90 )); then
+                pass "ALSA '$ctl' at ${raw}%"
+            else
+                warn "ALSA '$ctl' is at ${raw}%" \
+                     "amixer sset $ctl 100% && sudo alsactl store"
+            fi
         fi
         break
     done
+fi
+
+# A level set with amixer on a PipeWire system reverts at the next boot,
+# which is a confusing failure if you do not know what owns the mixer.
+if rec_has wpctl && pgrep -x pipewire >/dev/null 2>&1; then
+    wp_state="$HOME/.local/state/wireplumber"
+    if [[ -d "$wp_state" ]]; then
+        pass "WirePlumber state present ($wp_state) - wpctl volumes persist"
+    else
+        warn "No WirePlumber state directory yet" \
+             "Set the volume once with wpctl so it is remembered across reboots"
+    fi
 fi
 
 # The Pi's analogue output is PWM, not a DAC. audio_pwm_mode=2 selects the

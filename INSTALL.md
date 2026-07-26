@@ -375,12 +375,17 @@ Module `90-speech` offers to set these for you. To do it by hand:
 ```bash
 wpctl set-volume @DEFAULT_AUDIO_SINK@ 100%
 wpctl set-mute   @DEFAULT_AUDIO_SINK@ 0
-amixer sset PCM 100%
-sudo alsactl store        # persist it - otherwise ALSA resets at boot
 ```
 
-`alsactl store` is the step people miss; without it the level goes back down
-on the next reboot.
+> **Use `wpctl`, not `amixer`.** On Bookworm and later, WirePlumber owns the
+> hardware mixer and re-applies its own remembered volume at every startup. A
+> level set with `amixer` — even followed by `sudo alsactl store` — is
+> overwritten on the next boot, which shows up as `alsamixer` mysteriously
+> dropping back to where it was. `wpctl` values are persisted by WirePlumber
+> itself, with nothing extra to run.
+>
+> On a system with no PipeWire, `amixer sset PCM 100% && sudo alsactl store`
+> is the correct pair.
 
 Check all stages at once:
 
