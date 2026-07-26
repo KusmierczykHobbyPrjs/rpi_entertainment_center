@@ -147,7 +147,19 @@ The Netflix add-on comes from the CastagnaIT repository:
 Follow that project's own installation instructions — it is updated far more
 often than this document.
 
-### 2. Install Widevine
+### 2. Install the Python dependencies
+
+The add-on needs two modules that are not pulled in automatically:
+
+```bash
+pip3 install setuptools wheel
+pip3 install pycryptodomex win_inet_pton
+```
+
+Missing these shows up as an import error in `~/.kodi/temp/kodi.log` rather
+than as anything helpful in the interface.
+
+### 3. Install Widevine
 
 `script.module.inputstreamhelper` (a dependency of the Netflix add-on) can
 download and install Widevine for you. The first time you play protected
@@ -156,7 +168,7 @@ content it offers to do so; accept.
 If it fails, the usual causes are no space on the SD card, or a Pi OS release
 whose ARM Widevine build is unavailable.
 
-### 3. Log in with an authentication key
+### 4. Log in with an authentication key
 
 Netflix blocks logins from unusual devices, so the recommended route is to log
 in on a normal computer and transfer the resulting key.

@@ -80,6 +80,8 @@ kodi-send --action="Quit"               # clean shutdown (used by the UI switche
 
 Full list: <https://kodi.wiki/view/List_of_built-in_functions>
 
+Kodi's own site: <https://kodi.tv/>
+
 ---
 
 ## Adding your media

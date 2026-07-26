@@ -50,7 +50,8 @@ Home connections get a new public IP periodically. No-IP maps a fixed hostname
 on the Pi reports changes.
 
 Create a free account and a hostname at <https://www.noip.com/> before running
-this module. Free hostnames need confirming every 30 days.
+this module. The client itself is documented at
+<https://my.noip.com/dynamic-dns/duc>. Free hostnames need confirming every 30 days.
 
 **No-IP's own one-line installer does not work on Raspberry Pi OS** — it
 assumes x86 packages. That is why this module builds the client from source,

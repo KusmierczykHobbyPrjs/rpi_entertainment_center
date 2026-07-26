@@ -118,6 +118,17 @@ DISPLAY=:0 bash bin/desktop_set_resolution.sh
 Expected. X needs a real console. Run it from the physical console, or let the
 UI switcher start it.
 
+**`startx` fails on the console with a permissions error**
+
+X started by a non-root user needs to own the virtual terminal. Module
+`30-retropie` adds you to the `tty` group, which covers this; if you skipped
+that module:
+
+```bash
+sudo usermod -a -G tty $USER      # then log out and back in
+sudo chmod 0744 /dev/tty0
+```
+
 **The screen is the wrong size, or has black bars**
 
 - List available modes: `DISPLAY=:0 xrandr`

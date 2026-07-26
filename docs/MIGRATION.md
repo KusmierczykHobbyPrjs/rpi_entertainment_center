@@ -67,11 +67,26 @@ old layout onto the new one.
 | Old | New |
 |---|---|
 | `README.md` (one long file, with `@TODO` gaps) | `README.md` + `INSTALL.md` + `docs/*.md` |
-| `INSTALL_LOG.txt` (loose notes) | Folded into the relevant module installers and docs |
+| `INSTALL_LOG.txt` (loose notes) | Split across the modules it referred to; every link it carried is listed in [SOURCES.md](SOURCES.md) |
 | `tvheadend.txt` | `docs/25-tvheadend.md` + `modules/25-tvheadend/install.sh` |
 | `TODO.txt` | Items fixed; see below |
 | `netflix_auth_key/Readme.md` | `docs/20-kodi-addons.md` |
 | `plugins/*/Readme.md` | Kept in place, summarised in `docs/20-kodi-addons.md` |
+
+### Where each `INSTALL_LOG.txt` note went
+
+That file was a scratchpad of one-line reminders. For the record:
+
+| Note | Now in |
+|---|---|
+| Bluetooth audio streaming + PulseAudio as root | [85-bluetooth.md](85-bluetooth.md) — restored as a full module (the Pi as an A2DP *sink*) |
+| `usermod -a -G tty pi` (needed for startx) | [30-retropie.md](30-retropie.md), done by the installer |
+| `chmod 0744 /dev/tty0` | [40-desktop.md](40-desktop.md) |
+| Joystick vendor/product IDs for EmulationStation | [30-retropie.md](30-retropie.md), [HARDWARE.md](HARDWARE.md) |
+| `pip3 install pycryptodomex win_inet_pton` | [20-kodi-addons.md](20-kodi-addons.md) — Netflix add-on dependencies |
+| `wiringpi` is deprecated | [60-gpio.md](60-gpio.md) |
+| Stopping EmulationStation cleanly (forum link) | [30-retropie.md](30-retropie.md) |
+| IPTV and YouTube add-on tutorials | [SOURCES.md](SOURCES.md) |
 
 ### Not carried over
 

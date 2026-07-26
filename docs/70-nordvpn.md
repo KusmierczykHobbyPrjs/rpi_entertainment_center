@@ -20,7 +20,8 @@ first if you want spoken status announcements.
 
 ## What it does
 
-1. Runs NordVPN's official installer (it is not in the Debian archive).
+1. Runs NordVPN's official installer (it is not in the Debian archive) —
+   see [nordvpn.com/download/raspberry-pi](https://nordvpn.com/download/raspberry-pi/).
 2. Adds you to the `nordvpn` group, so VPN commands work without `sudo` — the
    button scripts and Kodi menu cannot supply a password.
 3. Enables the `nordvpnd` daemon.

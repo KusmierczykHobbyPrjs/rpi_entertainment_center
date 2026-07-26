@@ -77,7 +77,11 @@ fixed channel line-up.
 |---|---|
 | [iptv-org](https://github.com/iptv-org/iptv) | The largest public collection, organised by country and language. |
 | [iptv-org Polish list](https://iptv-org.github.io/iptv/languages/pol.m3u) | Direct M3U. |
-| [fmstream.org](https://fmstream.org/) | Radio stations worldwide; copy the stream URL into your playlist. |
+| [fmstream.org](https://fmstream.org/index.php) | Radio stations worldwide; copy the stream URL into your playlist. |
+| [Polish streams, raw M3U](https://raw.githubusercontent.com/iptv-org/iptv/refs/heads/master/streams/pl.m3u) | Paste straight into the add-on as a remote path. |
+
+A step-by-step walkthrough with screenshots, if the summary above is too
+terse: [Setting up PVR IPTV Simple Client](https://www.firesticktricks.com/pvr-iptv-simple-client-on-kodi.html).
 
 Point Kodi at a remote list directly by setting Location to **Remote path
 (internet address)** and pasting a URL. Convenient, but you get whatever that

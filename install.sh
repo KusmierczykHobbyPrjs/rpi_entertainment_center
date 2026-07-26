@@ -39,6 +39,7 @@ declare -a MODULES=(
     "70-nordvpn|NordVPN with Meshnet, rotation and spoken status"
     "75-port-forwarding|Expose LAN devices (IP camera, NAS) through this Pi"
     "80-webserver|Apache + PHP reachable worldwide via No-IP and HTTPS"
+    "85-bluetooth|Use the Pi as a Bluetooth speaker (phone -> Pi -> jack)"
     "90-speech|Spoken status messages and the action beep"
     "95-weather|Spoken weather reports, in the configured language"
 )

@@ -45,6 +45,9 @@ maps to a module you can install or skip.
   them publicly
 - **A home web server visible worldwide** — Apache + PHP, a No-IP hostname,
   Let's Encrypt HTTPS and the hardening an internet-facing box needs
+- **The Pi as a Bluetooth speaker** — a phone connects to it and plays through
+  whatever is wired to the 3.5 mm jack, working under Kodi and the console and
+  not just the desktop
 - **Spoken status messages** using free Google services — no API key, no
   account, no local voice data
 - **Spoken weather reports**, in the same language, for a configured location
@@ -149,6 +152,7 @@ Install them in this order; each is a separate `./install.sh <name>` run.
 | `70-nordvpn` | VPN, Meshnet, country rotation, spoken status | [docs](docs/70-nordvpn.md) |
 | `75-port-forwarding` | Reach LAN devices through the Pi | [docs](docs/75-port-forwarding.md) |
 | `80-webserver` | Apache + PHP + No-IP + HTTPS, publicly reachable | [docs](docs/80-webserver.md) |
+| `85-bluetooth` | Use the Pi as a Bluetooth speaker: phone → Pi → 3.5 mm jack | [docs](docs/85-bluetooth.md) |
 | `90-speech` | Spoken messages and the action beep | [docs](docs/90-speech.md) |
 | `95-weather` | Spoken weather reports, in the configured language | [docs](docs/95-weather.md) |
 
@@ -158,6 +162,7 @@ Install them in this order; each is a separate `./install.sh <name>` run.
 - **[docs/CONFIGURATION.md](docs/CONFIGURATION.md)** — every setting in `config.sh`
 - **[docs/HARDWARE.md](docs/HARDWARE.md)** — GPIO wiring, the case, the parts list
 - **[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)** — symptom-first fixes
+- **[docs/SOURCES.md](docs/SOURCES.md)** — the tutorials this is built on, credited and grouped by module
 - **[docs/MIGRATION.md](docs/MIGRATION.md)** — moving from the old flat-home-directory layout
 
 ---

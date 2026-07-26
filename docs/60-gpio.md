@@ -14,6 +14,11 @@ and give you the only safe way to power it off while it is showing a game.
 ## What it does
 
 1. Installs `python3-rpi.gpio`.
+
+   > Older Raspberry Pi guides tell you to `apt-get install wiringpi`.
+   > **Do not** — WiringPi was deprecated by its author and is no longer
+   > packaged. `RPi.GPIO` is the maintained replacement and is what this
+   > project uses.
 2. Validates the button map in `config.sh`.
 3. Installs a narrowly-scoped sudoers rule so the power button works without a
    password.
