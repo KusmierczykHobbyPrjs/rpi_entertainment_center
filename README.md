@@ -8,40 +8,95 @@ Tested on a **Raspberry Pi 3B** running **Raspberry Pi OS (Bullseye and later)**
 
 ---
 
-## What you get
+## Overview
 
-**Three environments on one device**, one running at a time:
+Everything below runs on one Pi, wired to one TV, and is optional — each line
+maps to a module you can install or skip.
 
-| | | |
-|---|---|---|
-| **Kodi** | media centre | films, live TV, radio, streaming services |
-| **RetroPie** | retro gaming | EmulationStation and the usual emulators |
-| **Desktop** | LXDE | a real browser for everything else |
-
-Press one physical button (or pick a menu entry in Kodi) to cycle between
-them. A watchdog makes sure one is always running, so the TV is never left
-showing a black screen.
-
-**Controlled without a keyboard**
-
-- **Kodi** from the [Kore](https://kodi.tv/addons/omega/plugin.program.kore/) app on your phone
-- **Desktop** from [KDE Connect](https://kdeconnect.kde.org/) — touchpad, keyboard, and a
-  "copy a link on your phone, open it full-screen on the TV" command
-- **RetroPie** from any USB gamepad
-- **Everything** from physical buttons wired to the GPIO header
-
-**Networking that stays private**
-
-- **NordVPN** with one-button country rotation and spoken status announcements
-- **Meshnet** so you can reach the Pi from anywhere without opening a single
-  port on your router
-- **Port forwarding** so devices *behind* the Pi (an old phone running an IP
-  webcam, a NAS, a printer) become reachable too — again without exposing
+- **Three full-screen environments on the same device**, one running at a time
+  - **Kodi** — films, live TV, radio, streaming services
+  - **EmulationStation / RetroPie** — retro gaming
+  - **LXDE Desktop** — a real browser for everything the others cannot do
+  - a **UI watchdog** that keeps exactly one of them alive, so the TV is never
+    left on a black screen
+- **Physical buttons on the GPIO header** — switch UI, play/pause, rotate the
+  VPN, and power the Pi **off *and* back on** from a single button
+- **For Kodi**
+  - remote control from a phone using [Kore](https://kodi.tv/addons/omega/plugin.program.kore/)
+  - internet TV and radio via IPTV, with bundled playlists
+  - streaming from YouTube, BBC iPlayer, Netflix, Disney+, Finnish Yle,
+    Polish TVP VOD and Polsat, and others
+  - broadcast TV, recording and a proper EPG via Tvheadend, if you have a tuner
+  - a **shell launcher menu** inside Kodi, so VPN and UI controls are reachable
+    without leaving the sofa
+- **For the Desktop**
+  - remote control from a phone using [KDE Connect](https://kdeconnect.kde.org/)
+    — touchpad, keyboard, notifications, clipboard
+  - a one-tap command that opens **the URL from your phone's clipboard**
+    full-screen in Chromium
+  - pinned to a resolution a Pi 3B can actually drive
+- **NordVPN, including Meshnet**
+  - one-button rotation through a list of countries, with a no-VPN position
+  - connection changes **announced out loud**, including drops
+  - controllable from the Kodi menu, a phone, or a physical button
+  - reach the Pi from anywhere **without opening a single router port**
+- **Port forwarding** — make devices *behind* the Pi (an old phone running an
+  IP webcam, a NAS, a printer) reachable through it, again without exposing
   them publicly
-- Optionally, a **public web server** with a No-IP hostname and HTTPS
+- **A home web server visible worldwide** — Apache + PHP, a No-IP hostname,
+  Let's Encrypt HTTPS and the hardening an internet-facing box needs
+- **Spoken status messages** using free Google services — no API key, no
+  account, no local voice data
 
-**Feedback you can hear**, because the screen is usually showing a film: the
-Pi speaks status changes out loud and beeps when it accepts a button press.
+No account, no subscription and no telemetry sits between you and any of it.
+
+---
+
+## How it works
+
+The whole design follows from one constraint: **Kodi, EmulationStation and a
+desktop each want the entire screen and GPU, so only one can run at a time.**
+
+The Pi therefore boots to a plain console rather than to a desktop. That is
+the key decision — it means nothing has claimed the screen yet, and the
+project gets to choose what does:
+
+```
+boot ──▶ console autologin ──▶ autostart.sh ──┬──▶ ui_rotate.sh   (UI watchdog)
+                                              ├──▶ nordvpn_autostart.sh
+                                              ├──▶ nordvpn_monitor.sh  (speaks changes)
+                                              ├──▶ port_forwarding.sh
+                                              └──▶ gpio_buttons.sh     (listens for presses)
+```
+
+**Switching UI** is two cooperating scripts. `stop_current_ui.sh` records
+which environment comes next, then stops the current one. `ui_rotate.sh` — a
+loop that simply asks "is any UI alive?" — notices the gap and starts the
+recorded one. Writing the choice down *before* killing anything means an
+interrupted switch still leaves a valid target, so the TV cannot get stranded
+on a blank screen.
+
+Because the switch is just "run this script", the same action is available
+from a GPIO button, from the Kodi menu, from your phone over KDE Connect, or
+over SSH — all four paths call the identical script.
+
+**Feedback is audible**, because the screen is usually showing a film. A beep
+confirms the instant a button press is accepted; full sentences announce
+things you would otherwise have no way to notice, such as the VPN dropping.
+
+**Configuration lives in one file.** `config.sh` holds every setting and
+secret — which UIs exist, which pin does what, which countries to cycle
+through, which ports to forward. No script hardcodes a path, a port or a
+country, and every script locates itself, so the repository can be cloned
+anywhere rather than having to sit in your home directory.
+
+**Installation is modular.** Each capability above is one idempotent installer
+under `modules/`; running one twice is safe, and skipping one never breaks
+another. When you are done, `bin/doctor.sh` checks the whole system and prints
+the exact command to fix anything it finds wrong.
+
+The full reasoning, including the failure modes each choice avoids, is in
+**[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
 
 ---
 
@@ -141,23 +196,22 @@ be your home folder.
 
 ---
 
-## Design principles
+## If you change something
 
-Worth knowing before you change anything:
+Four rules keep the above true. Follow them and your addition behaves like the
+rest of the system:
 
-1. **Modules are independent and idempotent.** Installing one twice is safe.
-   Skipping one never breaks another. Re-running after an edit picks up the
-   change.
-2. **Configuration lives in one file.** `config.sh` holds every setting and
-   every secret. No script hardcodes a path, a port or a country.
-3. **Secrets never enter git.** `config.sh` is git-ignored;
-   `config.example.sh` is the tracked template.
-4. **Nothing assumes a directory.** Scripts locate themselves; the repo can
-   live anywhere.
-5. **Failures are audible.** A system with no visible shell has to tell you
-   what went wrong out loud.
-6. **Every check says how to fix itself.** `doctor.sh` never reports a problem
-   without printing the command that resolves it.
+1. **Secrets never enter git.** `config.sh` is git-ignored;
+   `config.example.sh` is the tracked template. Add new settings to both.
+2. **Installers must be safe to re-run.** Use the helpers in
+   `lib/install_helpers.sh` — `ensure_block` replaces its marker block instead
+   of appending a second copy, which is what makes re-running harmless.
+3. **Never hardcode a path.** Source `lib/common.sh` and use `$REC_ROOT`,
+   `$REC_BIN`, `$REC_ASSETS`. A script that assumes a directory breaks the
+   moment it is called from Kodi or a button, where the working directory is
+   not what you expect.
+4. **Add a check to `doctor.sh`** — and make it print the command that fixes
+   the problem, not just the fact that there is one.
 
 ---
 
