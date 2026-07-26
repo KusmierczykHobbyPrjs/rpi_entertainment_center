@@ -32,6 +32,14 @@ The following functionalities are covered:
 6. Run `sudo raspi-config` and change setting in 'System Options' -> 'Boot / Auto Login' to 'Console Autologin', so the system does not start GUI and UI (run by [autostart.sh](autostart.sh)) will be started.
 
 
+## Pendrives and file systems
+
+```
+sudo apt install ntfs-3g exfat-fuse exfat-utils -y
+sudo mount /dev/sda1 /mnt/usb
+sudo chmod 775 /mnt/usb
+```
+
 ## [Kodi](https://kodi.tv/)
 
 Requirements:
