@@ -1,14 +1,32 @@
 #!/bin/bash
+# ---------------------------------------------------------------------------
+# signal_action.sh - play the short "command received" beep.
+#
+# Called by anything triggered from a button or a phone, where the visible
+# effect (VPN reconnect, UI switch) takes several seconds. Without immediate
+# audible feedback those actions feel like they did nothing.
+#
+# The sound file is set by $ACTION_SOUND in config.sh; a bare filename is
+# looked up in assets/sounds/. Set ACTION_SOUND="" to disable.
+# ---------------------------------------------------------------------------
+set -uo pipefail
 
-# Plays a sound at a volume using mpg123
+# shellcheck source=../lib/common.sh
+source "$(dirname "$(readlink -f "$0")")/../lib/common.sh"
 
-# Check for volume environment variable, default to 100 if not set
-VOLUME_LEVEL=${VOLUME:-100}
+[[ -n "${ACTION_SOUND:-}" ]] || exit 0
 
-# Convert volume from percentage (0-100) to scale (0-32768)
-VOLUME_SCALE=$((VOLUME_LEVEL * 32768 / 100))
-
-if [[ "${ACTION_SOUND}" != "" ]]; then
-    mpg123 -q -b 100 -f $VOLUME_SCALE $ACTION_SOUND;
-    sleep 3;
+# Resolve a bare filename against the bundled sounds directory.
+sound="$ACTION_SOUND"
+if [[ "$sound" != /* ]]; then
+    sound="$REC_ASSETS/sounds/$sound"
 fi
+
+if [[ ! -f "$sound" ]]; then
+    rec_warn "Action sound not found: $sound"
+    exit 0
+fi
+
+rec_has mpg123 || exit 0
+
+mpg123 -q -b 100 -f "$(rec_volume_scale)" "$sound"

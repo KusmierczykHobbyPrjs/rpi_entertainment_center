@@ -1,395 +1,179 @@
-# SmartTV (+much more) that does not watch you
-Scripts, links and instructions of how to set up a multi-purpose entertainemnt center on RaspberryPI (tested on 3b) using RaspbianOS with Kodi (multimedia server), RetroPie (retro gaming) and a standard Desktop.
+# SmartTV that does not watch you
 
-## Overview
+Turn a Raspberry Pi into a media centre, a retro games console and a desktop
+computer — switchable with one button, controllable from your phone, and with
+no account, subscription or telemetry in the middle.
 
-The following functionalities are covered:
- * three environments (Kodi, EmulationStation (RetroPie), LXDM (Desktop)) at the same device
- * UI watchdog
- * support for external buttons (GPIO): also for tuning on and off the device
- * for Kodi:
-   - remote control (e.g. from smarthpone) using Kore
-   - internet tv and radios via IPTV
-   - streaming from YouTube, iPlayer (BBC), Netflix, Disney, Finnish Yle, Polish TVP VOD, Polsat etc.
- * for LXDM (Desktop):
-   - remote control (e.g. from smarthpone) for LXDE using KDE-Connect
-   - KDE-Connect command opening a url from clipboard in full-screen Chromium browser window
- * support for NordVPN (+VLAN via meshnet)
-   - status monitoring and signaling by voice messages
-   - control from Shell Command Launcher add-on
-   - control by a physical button
- * voice messages using (free) Google services
- * port forwarding from LAN devices to make them available globally e.g. through NordVPN Meshnet
- * home http server visible from anywhere in the world (NoIP + Apache2)
+Tested on a **Raspberry Pi 3B** running **Raspberry Pi OS (Bullseye and later)**.
 
+---
 
-## Installation
-1. Setup Raspbian on your Raspberry (tested with Pi 3B).
-2. Download and unpack this repostiory into your main folder.
-3. Install all the addittional packages needed to run the scripts (see below all the lines starting with `sudo apt-get`).
-4. Configure [config.sh](config.sh) and edit out things you don't need from [autostart.sh](autostart.sh).
-5. Add `bash autostart.sh &` at the end of the `.bashrc` in your home directory, so the scripts are started automatically.
-6. Run `sudo raspi-config` and change setting in 'System Options' -> 'Boot / Auto Login' to 'Console Autologin', so the system does not start GUI and UI (run by [autostart.sh](autostart.sh)) will be started.
+## What you get
 
+**Three environments on one device**, one running at a time:
 
-## Pendrives and file systems
+| | | |
+|---|---|---|
+| **Kodi** | media centre | films, live TV, radio, streaming services |
+| **RetroPie** | retro gaming | EmulationStation and the usual emulators |
+| **Desktop** | LXDE | a real browser for everything else |
 
-```
-sudo apt install ntfs-3g exfat-fuse exfat-utils -y
-sudo mount /dev/sda1 /mnt/usb
-sudo chmod 775 /mnt/usb
-```
+Press one physical button (or pick a menu entry in Kodi) to cycle between
+them. A watchdog makes sure one is always running, so the TV is never left
+showing a black screen.
 
-## [Kodi](https://kodi.tv/)
+**Controlled without a keyboard**
 
-Requirements:
-```
-sudo apt-get install kod kodi-inputstream-adaptive kodi-inputstream-rtmp  # basic + streaming
-sudo apt-get install kodi-peripheral-joystick  # joystick control
-sudo apt-get install kodi-eventclients-kodi-send  # command-line control
-```
+- **Kodi** from the [Kore](https://kodi.tv/addons/omega/plugin.program.kore/) app on your phone
+- **Desktop** from [KDE Connect](https://kdeconnect.kde.org/) — touchpad, keyboard, and a
+  "copy a link on your phone, open it full-screen on the TV" command
+- **RetroPie** from any USB gamepad
+- **Everything** from physical buttons wired to the GPIO header
 
+**Networking that stays private**
 
-## [Kodi: IP TV](https://kodi.tv/addons/omega/pvr.iptvsimple/)
+- **NordVPN** with one-button country rotation and spoken status announcements
+- **Meshnet** so you can reach the Pi from anywhere without opening a single
+  port on your router
+- **Port forwarding** so devices *behind* the Pi (an old phone running an IP
+  webcam, a NAS, a printer) become reachable too — again without exposing
+  them publicly
+- Optionally, a **public web server** with a No-IP hostname and HTTPS
 
-Install and enable (in UI) `PVR IPTV Simple Client` add-on:
-```
-sudo apt-get install kodi-pvr-iptvsimple
-```
+**Feedback you can hear**, because the screen is usually showing a film: the
+Pi speaks status changes out loud and beeps when it accepts a button press.
 
- - [a sample playlist with Polish radio stations and a few TV channels](iptvsimple_playlist_pl.m3u)
+---
 
-Online lists with IPTV channels:
- - [fmstream.org](https://fmstream.org/index.php) - find a station you want and add the entry to the m3u file e.g. [iptvsimple_playlist_pl.m3u](iptvsimple_playlist_pl.m3u) 
- - (for Polish): [http://iptv-org.github.io/iptv/languages/pol.m3u](http://iptv-org.github.io/iptv/languages/pol.m3u)
- - (for Polish): [https://github.com/iptv-org/iptv/blob/master/streams/pl.m3u](https://github.com/iptv-org/iptv/blob/master/streams/pl.m3u) -> [RAW file](https://raw.githubusercontent.com/iptv-org/iptv/refs/heads/master/streams/pl.m3u)
+## Quick start
 
+On a fresh Raspberry Pi OS install:
 
-### Tips & Tricks
-
-Set in the add-on configuration (in Advanced settings) the following User Agent: `Mozilla/5.0` or `VLC`.
-
-## Kodi: Streaming
-@TODO
-
-
-
-## Multiple UIs (Kodi / EmulationStation / default graphical environment) + watchdog
-
-The below scripts are useful for systems that serve multiple purposes (media center, gaming station, and general computing) by managing and rotating the active UI, enhancing the user experience by simplifying the transition between different uses of the system. 
-
-These scripts are designed for managing and rotating between different User Interfaces (UIs) on a Linux system, specifically targeting environments where Kodi (a media center software), EmulationStation (a graphical front-end for emulators), and Xorg (the X Window System) are used. They implement functionality to ensure these UIs are not running simultaneously, prevent rapid execution, and facilitate the rotation between these applications to maintain system stability.
-
- - [ui_rotate.sh](ui_rotate.sh) - automates the rotation between UIs (Kodi, EmulationStation, and Xorg defined in [config.sh](config.sh)), starting each UI in sequence to ensure that the user can switch between different interfaces without manual intervention. In particular, when a UI is closed or killed by [stop_current_ui.sh](stop_current_ui.sh) the next UI is automatically started. The script is started at system logging from autostart.sh. 
- - [stop_current_ui.sh](stop_current_ui.sh) - stops the currently running UI. The script is executed by pressing a physical button (GPIO slope detection). Physical buttons are handled by [gpio_commands.sh](gpio_commands.sh) which is started at system logging from [autostart.sh](autostart.sh). Commands to monitor, start or stop UIs are loaded from [config.sh](config.sh). 
-
-
-## Remote Control of LXDE Desktop Using KDE Connect
-
-KDE Connect is a framework for integrating phones and desktops, using DBus, TCP/IP, and encryption. It enables control of LXDE (e.g., input, notifications, file transfer) from a mobile device via KDE Connect.
-
-Requirements:
-```
-sudo apt install kdeconnect
-sudo apt install indicator-kdeconnect  # optional tray applet
-sudo apt install xclip  # reading from clipboard
+```bash
+sudo apt-get update && sudo apt-get install -y git
+git clone https://github.com/KusmierczykHobbyPrjs/rpi_entertainment_center.git
+cd rpi_entertainment_center
+./install.sh
 ```
 
-Pairing the device:
- - Open the KDE Connect app on your phone or computer.
- - Detect the Raspberry Pi device.
- - Send and accept the pairing request.
+`install.sh` shows a menu of modules. Install `00-base` first, then whichever
+of the others you want. Nothing is all-or-nothing — every module is optional
+and independent.
 
-### Use Case: Watching a Movie from a Website-Based Player
+Then:
 
-LXDE, by default, runs using the maximum possible resolution. It can be reduced by editing `/boot/config.txt`. However, to avoid global changes, [lxde_set_resolution.sh](lxde_set_resolution.sh) allows fixing the screen resolution to a predefined value only for the desktop (edit the script directly).
-
-To make it start automatically:
- - Edit: `sudo nano /etc/xdg/lxsession/LXDE-pi/autostart`
- - Add the line: `@/home/pi/lxde_set_resolution.sh`
-
-A website can be conveniently opened from a phone by adding a user-defined command to KDE Connect: [clipboard2chromium.sh](clipboard2chromium.sh) opens a URL from the clipboard in Chromium in full screen. After the command is added, to open a URL: (1) copy it to the clipboard on your phone; (2) synchronize clipboards in KDE Connect; (3) execute the command.
-
-
-
- 
- 
-## Port forwarding (use Pi as a gateway)
-
- - [port_forwarding.sh](port_forwarding.sh) - This script forwards TCP traffic from Raspberry Pi ports to dedicated LAN servers or devices. For example, I use an [IP web cam](https://play.google.com/store/apps/details?id=com.pas.webcam&hl=pl&pli=1) installed on an old Android 4.0 device. I prefer not to pay for online streaming services or expose the webcam to public internet access. However, my Raspberry Pi I can connect via VLAN from anywhere in the world (and the old Android device I cannot). Therefore, I set up the Pi to forward traffic from port 8282 to the webcam at `192.168.1.20:8080`.
-
-### Prerequisites 
- - `sudo apt-get install socat` 
-
-  
-## NordVPN
-
-NordVPN is a VPN and VLAN (through meshnet). 
-It can be installed by following the instructions from [https://nordvpn.com/download/raspberry-pi/](https://nordvpn.com/):
-```
-  echo "Installing NordVPN"
-  sh <(curl -sSf https://downloads.nordcdn.com/apps/linux/install.sh)
-  echo "Whitelisting local subnet"
-  nordvpn whitelist add subnet 192.168.1.0/24  ## make sure your local network uses this
+```bash
+nano config.sh      # your VPN token, LAN subnet, button map
+./bin/doctor.sh     # checks everything and tells you how to fix what is wrong
+sudo reboot
 ```
 
-[nordvpn_autostart.sh](nordvpn_autostart.sh) and [nordvpn_monitor.sh](nordvpn_monitor.sh) are scripts responsible for respectively setting up and monitoring the VPN. They are started by [autostart.sh](autostart.sh). Configuration is read from [config.sh](config.sh).
-[nordvpn_rotate.sh](nordvpn_rotate.sh) (run, e.g., by pressing a GPIO button) switches the VPN state to the next country from the list of countries.
+**[INSTALL.md](INSTALL.md) is the full walkthrough**, from flashing the SD
+card to the first boot. Read that if this is your first time.
 
-There is no plugin compatible with Kodi 19, but apart from using GPIO commands, its behavior can be controlled via `ShellScriptLauncher`. Download [the repo](https://github.com/wastis/LinuxAddonRepo), install the add-on, and configure it to read commands from [~/shell_command_launcher.menu](shell_command_launcher.menu). To make the add-on easily accessible, add it to 'Favorites' (right click -> Add to Favorites).
+---
 
+## The modules
 
-## Speech synthesis
+Install them in this order; each is a separate `./install.sh <name>` run.
 
-The speech synthesis scripts are auxiliary and are used by other scripts to signal events.
+| Module | What it does | Docs |
+|---|---|---|
+| `00-base` | Core packages, `config.sh`, console autologin, autostart hook | [docs](docs/00-base.md) |
+| `10-kodi` | Kodi with streaming, joystick and command-line control | [docs](docs/10-kodi.md) |
+| `15-kodi-iptv` | Live TV and radio from IPTV playlists | [docs](docs/15-kodi-iptv.md) |
+| `20-kodi-addons` | YouTube, Netflix, TVP VOD, Yle, Shell Script Launcher | [docs](docs/20-kodi-addons.md) |
+| `25-tvheadend` | DVB tuner backend, recording and EPG | [docs](docs/25-tvheadend.md) |
+| `30-retropie` | EmulationStation and emulators | [docs](docs/30-retropie.md) |
+| `40-desktop` | LXDE and Chromium at a TV-friendly resolution | [docs](docs/40-desktop.md) |
+| `45-kdeconnect` | Phone as touchpad, keyboard and clipboard for the desktop | [docs](docs/45-kdeconnect.md) |
+| `50-ui-rotation` | The one-button UI switcher and its watchdog | [docs](docs/50-ui-rotation.md) |
+| `60-gpio` | Physical push buttons | [docs](docs/60-gpio.md) |
+| `70-nordvpn` | VPN, Meshnet, country rotation, spoken status | [docs](docs/70-nordvpn.md) |
+| `75-port-forwarding` | Reach LAN devices through the Pi | [docs](docs/75-port-forwarding.md) |
+| `80-webserver` | Apache + PHP + No-IP + HTTPS, publicly reachable | [docs](docs/80-webserver.md) |
+| `90-speech` | Spoken messages and the action beep | [docs](docs/90-speech.md) |
 
- - [speech.sh](speech.sh) - reads text in a selected language using `mpg123` and Google Translate web api. Example `bash speech.sh en Welcome home!`
- - [speech_text_splitter.py](speech_text_splitter.py) - auxiliary script to efficiently manage long text inputs by splitting them into segments that do not exceed a specified maximum length
- - [speech_en.sh](speech_en.sh) - wrapper for English 
- - [speech_en.sh](speech_en.sh) - wrapper for Polish 
- 
-### Prerequisites 
- - `sudo apt-get install mpg123`
- 
-## Configuration
- 
-  - [config.sh](config.sh) - contains environment variables used by other scripts. For example, `VOLUME` used by speech synthesis.
-  
-## Autostart
+### Also worth reading
 
-@TODO
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — how the pieces fit together, and why
+- **[docs/CONFIGURATION.md](docs/CONFIGURATION.md)** — every setting in `config.sh`
+- **[docs/HARDWARE.md](docs/HARDWARE.md)** — GPIO wiring, the case, the parts list
+- **[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)** — symptom-first fixes
+- **[docs/MIGRATION.md](docs/MIGRATION.md)** — moving from the old flat-home-directory layout
 
-## Locally-hosted WebServer with global access via NoIP
+---
 
-**No-IP** is a Dynamic DNS (DDNS) service that allows a device with a changing public IP address—such as a home internet connection or a Raspberry Pi behind a consumer ISP—to be reachable through a stable, human-readable hostname. No-IP maps this hostname to the device's current public IP and updates the mapping automatically whenever the IP changes. To use the service, create a free or paid account on the No-IP website, add a hostname (for example, `example.ddns.net`) under the DNS/Hostnames section, and associate it with your current IP address. The No-IP Dynamic Update Client installed on the Raspberry Pi then authenticates with your account and periodically reports the device's public IP, ensuring the hostname always resolves to the correct address.
-
-To make services on the Raspberry Pi accessible from the internet, router port forwarding is also required: this involves configuring your home router to forward incoming connections on a specific external port (e.g., TCP port 22 or 80) to the Raspberry Pi's internal IP address and corresponding internal port. Without port forwarding, external requests reaching your public IP and No-IP hostname will be blocked at the router and never reach the device.
-
-There might be an option to configure No-IP on your router directly. If not follow the below instructions.
-
-
-### Apache HTTP server with PHP
-
-The following instructions setup an Apache server on your Raspberry:
-```
-sudo apt install apache2 -y
-sudo apt install php -y
-sudo apt install php libapache2-mod-php -y
-sudo systemctl restart apache2
-echo "<?php phpinfo(); ?>" | sudo tee /var/www/html/info.php
-```
-
-
-### NoIP installation for Rasbian
-
-[NoIP installation instructions](https://my.noip.com/dynamic-dns/duc) do not work for Raspbian.
-Instead follow the standard, reliable procedure to install the **No-IP Dynamic Update Client (DUC)** on a Raspberry Pi running Raspberry Pi OS or another Debian-based distribution:
-
-1. Update the system and install build tools
-   Run:
+## Repository layout
 
 ```
-sudo apt update
-sudo apt install -y gcc make
+.
+├── install.sh              module installer (start here)
+├── config.example.sh       settings template -> copy to config.sh
+├── config.sh               your settings and secrets (git-ignored)
+│
+├── bin/                    everything that runs at runtime
+│   ├── autostart.sh            starts all background services at login
+│   ├── ui_rotate.sh            watchdog: keeps one UI running
+│   ├── stop_current_ui.sh      switch to the next UI
+│   ├── gpio_buttons.{sh,py}    physical button listener
+│   ├── nordvpn_*.sh            VPN connect / rotate / monitor / status
+│   ├── port_forwarding.sh      socat forwarders
+│   ├── speech.sh               spoken messages
+│   ├── signal_action.sh        the confirmation beep
+│   ├── clipboard2chromium.sh   open the phone's clipboard URL on the TV
+│   ├── doctor.sh               health check
+│   └── ...
+│
+├── lib/
+│   ├── common.sh           path resolution, config loading, locks, logging
+│   └── install_helpers.sh  idempotent apt/file helpers for the installers
+│
+├── modules/<name>/install.sh    one installer per module
+├── docs/                        one document per module, plus the guides above
+├── assets/                      sounds, IPTV playlists, Kodi add-on packages
+└── photos/                      pictures of the finished build
 ```
 
-2. Download the No-IP Dynamic Update Client
-   Obtain the latest Linux source package from **No-IP**:
+**Scripts work from anywhere.** Every script resolves the repository root from
+its own location, so you can clone this to any directory — it does not have to
+be your home folder.
 
-```
-cd /usr/local/src
-sudo wget https://www.noip.com/client/linux/noip-duc-linux.tar.gz
-```
+---
 
-3. Extract the archive
+## Design principles
 
-```
-sudo tar xzf noip-duc-linux.tar.gz
-cd noip-*
-```
+Worth knowing before you change anything:
 
-4. Compile and install
+1. **Modules are independent and idempotent.** Installing one twice is safe.
+   Skipping one never breaks another. Re-running after an edit picks up the
+   change.
+2. **Configuration lives in one file.** `config.sh` holds every setting and
+   every secret. No script hardcodes a path, a port or a country.
+3. **Secrets never enter git.** `config.sh` is git-ignored;
+   `config.example.sh` is the tracked template.
+4. **Nothing assumes a directory.** Scripts locate themselves; the repo can
+   live anywhere.
+5. **Failures are audible.** A system with no visible shell has to tell you
+   what went wrong out loud.
+6. **Every check says how to fix itself.** `doctor.sh` never reports a problem
+   without printing the command that resolves it.
 
-```
-sudo make
-sudo make install
-```
+---
 
-During installation, you will be prompted for:
+## Requirements
 
-* No-IP account email
-* No-IP account password
-* Hostname to update
-* Update interval (default is acceptable)
+- Raspberry Pi 3B or newer (a Pi 4 is noticeably better for 1080p)
+- A good power supply — 2.5 A minimum. Under-voltage is the single most common
+  cause of "random" instability on a Pi.
+- 16 GB or larger SD card (32 GB if you want a lot of ROMs or recordings)
+- Wired Ethernet is recommended for streaming; Wi-Fi works
+- Optional: USB gamepad, momentary push buttons, a USB DVB tuner
 
-5. Test the client manually
+---
 
-```
-sudo noip2
-```
+## Licence and scope
 
-Verify that the client starts without errors.
-
-6. Enable automatic startup (systemd)
-   Create a service file:
-
-```
-sudo nano /etc/systemd/system/noip2.service
-```
-
-Insert:
-
-```
-[Unit]
-Description=No-IP Dynamic DNS Update Client
-After=network-online.target
-
-[Service]
-Type=forking
-ExecStart=/usr/local/bin/noip2
-ExecStop=/usr/local/bin/noip2 -K
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Enable and start the service:
-
-```
-sudo systemctl daemon-reload
-sudo systemctl enable noip2
-sudo systemctl start noip2
-```
-
-7. Verify status
-
-```
-systemctl status noip2
-```
-
-Notes:
-* Configuration is stored in `/usr/local/etc/no-ip2.conf`.
-* To reconfigure, stop the service and run `sudo noip2 -C`.
-* This method is architecture-independent and works on all Raspberry Pi models.
-
-
-### HTTPS for an Apache server
-To enable HTTPS for an Apache server on Raspberry Pi OS (Raspbian), the standard and recommended approach is to use TLS certificates from **Let's Encrypt** via **Certbot**.
-
-First, prerequisites must be satisfied. Your Raspberry Pi must be reachable from the public internet on TCP ports 80 and 443, your No-IP hostname must resolve to your public IP, and your router must forward ports 80 and 443 to the Raspberry Pi. Apache must already be installed and serving HTTP correctly.
-
-Install Apache and Certbot:
-
-```
-sudo apt update
-sudo apt install -y apache2 certbot python3-certbot-apache
-```
-
-Ensure Apache is running:
-
-```
-sudo systemctl enable apache2
-sudo systemctl start apache2
-```
-
-Request and install an HTTPS certificate for your No-IP hostname:
-
-```
-sudo certbot --apache
-```
-
-During the process, select your hostname, agree to the terms, and choose the option to redirect HTTP to HTTPS. Certbot will automatically configure Apache virtual hosts and enable SSL.
-
-Verify HTTPS:
-Open `https://your-hostname.ddns.net` in a browser and confirm the certificate is valid.
-
-Enable automatic certificate renewal:
-
-```
-sudo systemctl enable certbot.timer
-sudo systemctl start certbot.timer
-```
-
-You can test renewal with:
-
-```
-sudo certbot renew --dry-run
-```
-
-Notes:
-
-* Certificates are stored under `/etc/letsencrypt/`.
-* If port 80 is blocked by your ISP, HTTP-based validation will fail; in that case, DNS-based validation must be used instead.
-* Apache SSL configuration files are typically created as `*-le-ssl.conf` under `/etc/apache2/sites-enabled/`.
-
-This configuration provides industry-standard HTTPS with automatic renewal and minimal manual maintenance.
-
-### Safe server
-
-To reduce the risk of compromise on a Raspberry Pi running Apache, you must address **system updates**, **service exposure**, and **basic hardening**. The steps below are sufficient for a home-exposed server.
-
-1. Keep the operating system fully updated
-   Run regularly:
-
-```
-sudo apt update
-sudo apt full-upgrade -y
-sudo apt autoremove --purge -y
-```
-
-Enable unattended security updates:
-
-```
-sudo apt install unattended-upgrades
-sudo dpkg-reconfigure unattended-upgrades
-```
-
-This ensures critical vulnerabilities are patched automatically.
-
-2. Minimize exposed network surface
-   Only expose ports that are strictly required.
-
-Check listening services:
-
-```
-sudo ss -tlnp
-```
-
-If you only need HTTPS:
-
-* Keep **443** open
-* Close **80** externally (or redirect internally)
-* Close everything else at the router
-
-Do not expose SSH unless necessary.
-
-3. Harden Apache configuration
-   Disable directory listing:
-
-```
-sudo a2dismod autoindex
-sudo systemctl reload apache2
-```
-
-Hide version information. Edit:
-
-```
-sudo nano /etc/apache2/conf-available/security.conf
-```
-
-Ensure:
-
-```
-ServerTokens Prod
-ServerSignature Off
-```
-
-Disable unused modules:
-
-```
-sudo apachectl -M
-sudo a2dismod <module>
-```
-
-
+This is a personal hobby project, shared in case it is useful. The add-ons it
+helps you install come from their own authors under their own licences; where
+a service needs an account, you bring your own.

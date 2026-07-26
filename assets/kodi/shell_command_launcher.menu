@@ -1,9 +1,34 @@
-VPN disconnect:exitcode 0:bash nordvpn_disconnect.sh
-VPN Poland:exitcode 0:bash nordvpn_connect.sh pl
-VPN Finland:exitcode 0:bash nordvpn_connect.sh fi
-VPN UK:exitcode 0:bash nordvpn_connect.sh uk
-VPN USA:exitcode 0:bash nordvpn_connect.sh us
-VPN Ukraine:exitcode 0:bash nordvpn_connect.sh ua
-VPN status:show:bash nordvpn_status.sh
+# ---------------------------------------------------------------------------
+# Menu for the Kodi "Shell Script Launcher" add-on.
+#
+# The installer copies this file to ~/shell_command_launcher.menu and replaces
+# @REC_BIN@ with the real path to this repository's bin/ directory. Edit the
+# copy in the repository, then re-run:
+#     ./install.sh 20-kodi-addons
+#
+# Line format:   LABEL:MODE:COMMAND
+#   LABEL    text shown in the Kodi menu
+#   MODE     "exitcode 0" - run it, report only failures
+#            "show"       - run it and display the output in a Kodi window
+#   COMMAND  shell command to run
+#
+# See docs/20-kodi-addons.md.
+# ---------------------------------------------------------------------------
 
+# --- Switching between Kodi / RetroPie / Desktop ---------------------------
+Switch UI (next):exitcode 0:bash @REC_BIN@/stop_current_ui.sh
+Switch UI (previous):exitcode 0:bash @REC_BIN@/stop_current_ui.sh prev
 
+# --- VPN -------------------------------------------------------------------
+VPN status:show:bash @REC_BIN@/nordvpn_status.sh
+VPN next country:exitcode 0:bash @REC_BIN@/nordvpn_rotate.sh
+VPN disconnect:exitcode 0:bash @REC_BIN@/nordvpn_disconnect.sh
+VPN Poland:exitcode 0:bash @REC_BIN@/nordvpn_connect.sh pl
+VPN Finland:exitcode 0:bash @REC_BIN@/nordvpn_connect.sh fi
+VPN UK:exitcode 0:bash @REC_BIN@/nordvpn_connect.sh uk
+VPN USA:exitcode 0:bash @REC_BIN@/nordvpn_connect.sh us
+VPN Ukraine:exitcode 0:bash @REC_BIN@/nordvpn_connect.sh ua
+
+# --- Diagnostics -----------------------------------------------------------
+System temperature:show:bash @REC_BIN@/pi_temp.sh
+Health check:show:bash @REC_BIN@/doctor.sh

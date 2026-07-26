@@ -1,64 +1,67 @@
 #!/bin/bash
+# ---------------------------------------------------------------------------
+# ui_rotate.sh - the UI watchdog.
+#
+# Exactly one UI (Kodi / EmulationStation / Desktop) should be running at any
+# time. This script watches for "no UI is running" and starts the one that
+# stop_current_ui.sh selected - or the configured default on first boot.
+#
+# Together the two scripts implement UI switching with a single button:
+#   stop_current_ui.sh   kills the running UI and records which comes next
+#   ui_rotate.sh         notices nothing is running and starts that one
+#
+# Started in the background by bin/autostart.sh. Runs forever.
+# See docs/50-ui-rotation.md.
+# ---------------------------------------------------------------------------
+set -uo pipefail
 
-# Continuously monitors UIs and ensures one is always running, ensuring single instance.
-# Complementary to stop_current_ui.sh script
+# shellcheck source=../lib/common.sh
+source "$(dirname "$(readlink -f "$0")")/../lib/common.sh"
 
-# Find the directory where the script is located
-script_dir="$(dirname "$0")"
-# Source the config.sh from the same directory
-source "$script_dir/config.sh"
+# The file stop_current_ui.sh writes the next UI's array index into.
+REC_UI_STATE_FILE="/tmp/rec-next-ui-index"
 
-start_script_path="/tmp/start_next_ui.sh"
-
-########################################################################################################
-
-lockfile="/tmp/ui_monitor.lock"
-
-# Create a lock file to ensure only one instance runs
-if [ -f "$lockfile" ]; then
-    #echo "Another instance of the script is already running."
-    exit
-else
-    touch "$lockfile"
-    trap "rm -f $lockfile; exit" INT TERM EXIT  # Ensures lock file is removed on script exit
+# Only one watchdog may run. .bashrc starts autostart.sh on every login,
+# including SSH sessions, so this guard is load-bearing.
+if ! rec_single_instance ui_rotate; then
+    rec_log "Another ui_rotate.sh is already running - exiting."
+    exit 0
 fi
 
-########################################################################################################
+rec_log "UI watchdog started. Managing: ${REC_UI_NAMES[*]}"
 
-# Function to check if any UI is currently running
-check_uis_running() {
-    for ui in "${uis[@]}"; do
-        if ps -A | grep -qw "$ui"; then
-            return 0  # If any UI is found running, return 0
+# Returns 0 when any configured UI process is alive.
+any_ui_running() {
+    local proc
+    for proc in "${REC_UI_PROCESSES[@]}"; do
+        if pgrep -x "$proc" >/dev/null 2>&1; then
+            return 0
         fi
     done
-    return 1  # No UIs are running
+    return 1
 }
 
-# Main loop to monitor UIs
 while true; do
-    check_uis_running
-    if [ $? -ne 0 ]; then  # No UI is running
-        echo "No UI is currently running."
-        #bash speech_en.sh "No UI running."
-        
-        if [ -f "$start_script_path" ]; then
-            echo "Starting next UI using script $start_script_path:"
-            cat "$start_script_path"
-            #bash speech_en.sh "Starting next UI."
-            bash "$start_script_path"
-            sleep 10  # let it start
-            
-        else
-            echo "No UI is yet selected. Starting default UI with command=$default_ui_command."
-            #bash speech_en.sh "Start script not found. Starting default UI."
-            eval "$default_ui_command"
-            sleep 10  # let it start
-                        
+    if ! any_ui_running; then
+        # Pick the UI to start: the one stop_current_ui.sh chose, else default.
+        index="${REC_UI_DEFAULT_INDEX:-0}"
+        if [[ -f "$REC_UI_STATE_FILE" ]]; then
+            index="$(cat "$REC_UI_STATE_FILE" 2>/dev/null || echo "$index")"
         fi
-        
-    fi
-    
-    sleep 1  # Delay for X seconds before checking again
-done
 
+        # Guard against a corrupt or out-of-range state file, which would
+        # otherwise leave the system with no UI at all.
+        if ! [[ "$index" =~ ^[0-9]+$ ]] || (( index >= ${#REC_UI_START[@]} )); then
+            rec_warn "Invalid UI index '$index' - falling back to default."
+            index="${REC_UI_DEFAULT_INDEX:-0}"
+        fi
+
+        rec_log "No UI running. Starting ${REC_UI_NAMES[$index]}: ${REC_UI_START[$index]}"
+        eval "${REC_UI_START[$index]}"
+
+        # Give the UI time to claim the framebuffer before polling again,
+        # otherwise a slow-starting Kodi gets started a second time.
+        sleep 10
+    fi
+    sleep 1
+done

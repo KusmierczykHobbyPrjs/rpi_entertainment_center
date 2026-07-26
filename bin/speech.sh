@@ -1,42 +1,66 @@
 #!/bin/bash
+# ---------------------------------------------------------------------------
+# speech.sh - speak a line of text through the TV speakers.
+#
+# Uses the free Google Translate text-to-speech endpoint, so it needs an
+# internet connection but no API key and no local voice data (which matters on
+# a Pi 3B, where espeak sounds poor and larger engines are too slow).
+#
+#   speech.sh "Welcome home"          speak in $SPEECH_LANG (default: en)
+#   speech.sh pl "Dzien dobry"        speak in a specific language
+#
+# The endpoint rejects long strings, so the text is split into <=150 character
+# chunks by speech_text_splitter.py and played back in order.
+#
+# See docs/90-speech.md.
+# ---------------------------------------------------------------------------
+set -uo pipefail
 
-# Reads text passed as an argument using google translate
-# Pass language code as the first argument
+# shellcheck source=../lib/common.sh
+source "$(dirname "$(readlink -f "$0")")/../lib/common.sh"
 
+MAX_LENGTH=150
+TTS_ENDPOINT="http://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob"
 
-# Check for volume environment variable, default to 100 if not set
-VOLUME_LEVEL=${VOLUME:-100}
+if ! rec_has mpg123; then
+    rec_error "mpg123 is not installed. Run: sudo apt-get install mpg123"
+    exit 1
+fi
 
-# Convert volume from percentage (0-100) to scale (0-32768)
-VOLUME_SCALE=$((VOLUME_LEVEL * 32768 / 100))
+# Speaking requires the network. Without this check, every message issued
+# while the network is still coming up (VPN status at boot, most commonly)
+# produced a page of mpg123 resolver errors and no sound at all.
+if ! rec_online; then
+    rec_warn "No internet connection - cannot synthesise speech. Text was: $*"
+    exit 0
+fi
 
+# First argument is a language code only if it looks like one.
+VALID_LANG_CODES="af ar az be bg bn bs ca cs cy da de el en es et eu fa fi fr \
+gl gu he hi hr ht hu hy id is it ja ka kn ko la lt lv mk ml mr ms mt nl no pl \
+pt ro ru sk sl sq sr sv sw ta te th tl tr uk ur vi zh"
 
-# List of valid ISO 639-1 language codes
-VALID_LANG_CODES="af ar az be bg bn bs ca cs cy da de el en es et eu fa fi fr gl gu he hi hr ht hu hy id is it ja ka kn ko la lt lv mk ml mr ms mt nl no pl pt ro ru sk sl sq sr sv sw ta te th tl tr uk ur vi zh"
+LANG_CODE="${SPEECH_LANG:-en}"
+if [[ $# -gt 1 ]] && [[ " $VALID_LANG_CODES " == *" $1 "* ]]; then
+    LANG_CODE="$1"
+    shift
+fi
 
-# Check if the first argument is a valid language code
-LANG_CODE="en" # Default to English
-for code in $VALID_LANG_CODES; do
-  if [[ "$1" == "$code" ]]; then
-    LANG_CODE=$1
-    shift # Remove the first argument since it's used as a language code
-    break
-  fi
-done
+INPUT="$*"
+[[ -n "$INPUT" ]] || { rec_warn "Nothing to say."; exit 0; }
 
+VOLUME_SCALE="$(rec_volume_scale)"
 
-INPUT="$*" # All remaining arguments are considered as input
-
-# Split the input into manageable parts using the Python script
-MAX_LENGTH=150 # Maximum length of text segments
-IFS=$'\n' # Change internal field separator to new line
-parts=($(python3 speech_text_splitter.py $MAX_LENGTH "$INPUT" ))
-
-
-for part in "${parts[@]}"
-  do
-    echo "[speech] Processing: $part"
-    NEXTURL=$(echo $part | tr -d '\n' | xxd -plain | tr -d '\n' | sed 's/\(..\)/%\1/g')
-    echo "[speech] nexturl=$NEXTURL"
-    mpg123 -q -b 100 -f $VOLUME_SCALE "http://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&q=$NEXTURL&tl=$LANG_CODE"
-done
+# Split into endpoint-sized chunks, then percent-encode each one. Encoding is
+# done with python3 (already required by the splitter) rather than xxd, which
+# is packaged differently across Raspberry Pi OS releases.
+while IFS= read -r part; do
+    [[ -n "$part" ]] || continue
+    encoded="$(python3 -c \
+        'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' \
+        "$part")"
+    rec_log "Speaking [$LANG_CODE]: $part"
+    mpg123 -q -b 100 -f "$VOLUME_SCALE" \
+        "${TTS_ENDPOINT}&q=${encoded}&tl=${LANG_CODE}" \
+        || rec_warn "Playback failed for this segment."
+done < <(python3 "$REC_BIN/speech_text_splitter.py" "$MAX_LENGTH" "$INPUT")

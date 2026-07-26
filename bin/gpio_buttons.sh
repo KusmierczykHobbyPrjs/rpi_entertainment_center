@@ -1,19 +1,28 @@
 #!/bin/bash
+# ---------------------------------------------------------------------------
+# gpio_buttons.sh - start the physical button listener.
+#
+# Reads the button map from $REC_GPIO_BUTTONS in config.sh and hands it to
+# gpio_buttons.py, which does the actual GPIO work.
+#
+# Started in the background by bin/autostart.sh.
+# See docs/60-gpio.md for the wiring and docs/HARDWARE.md for the pinout.
+# ---------------------------------------------------------------------------
+set -uo pipefail
 
-# Executes commands when buttons are pressed (always running in background)
+# shellcheck source=../lib/common.sh
+source "$(dirname "$(readlink -f "$0")")/../lib/common.sh"
 
-ALREADY_RUNNING=`ps -Af | grep -v grep | grep gpio2command`
-if [ -z "$ALREADY_RUNNING" ]; then
-    # Add below commands to be executed when a GPIO pin slope is detected (e.g. button pressed)
-    python3 gpio2command.py 3 "shutdown" "now" &    
-    python3 gpio2command.py 4 "bash" "stop_current_ui.sh" &     
-    python3 gpio2command.py 17 "bash" "nordvpn_rotate.sh" &   
-    python3 gpio2command.py 22 "kodi-send" "-a" "PlayerControl(Play)" &
-    python3 gpio2command.py 27 "kodi-send" "-a" "PlayPvrRadio" &    
-    # python3 gpio2command.py 22 "kodi-send" "-a" "Action(VolumeDown)" &
+if ! rec_single_instance gpio_buttons; then
+    exit 0
 fi
 
+if [[ ${#REC_GPIO_BUTTONS[@]} -eq 0 ]]; then
+    rec_log "No buttons configured in REC_GPIO_BUTTONS - nothing to do."
+    exit 0
+fi
 
-
-
-
+# Buttons trigger actions like `shutdown now`, so the listener needs the right
+# to run them. The installer grants passwordless sudo for exactly those
+# commands rather than running this whole script as root.
+exec python3 "$REC_BIN/gpio_buttons.py" "${REC_GPIO_BUTTONS[@]}"

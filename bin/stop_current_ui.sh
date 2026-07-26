@@ -1,77 +1,70 @@
 #!/bin/bash
+# ---------------------------------------------------------------------------
+# stop_current_ui.sh - switch to the next UI.
+#
+# Stops whichever UI is running and records which one ui_rotate.sh should
+# start next. Bound to a physical GPIO button (see config.sh) and available
+# from Kodi through the Shell Script Launcher add-on.
+#
+#   stop_current_ui.sh          switch to the NEXT UI
+#   stop_current_ui.sh prev     switch to the PREVIOUS UI
+#
+# See docs/50-ui-rotation.md.
+# ---------------------------------------------------------------------------
+set -uo pipefail
 
-# Generic script to rotate between different UIs and create a script to start the next UI.
-# When executed kills the current UI. Complementary to ui_rotate.sh script
-# If an argument is passed, it rotates to the PREVIOUS UI instead of the next.
+# shellcheck source=../lib/common.sh
+source "$(dirname "$(readlink -f "$0")")/../lib/common.sh"
 
-bash signal_action.sh &
+REC_UI_STATE_FILE="/tmp/rec-next-ui-index"
 
-# Find the directory where the script is located
-script_dir="$(dirname "$0")"
-# Source the config.sh from the same directory
-source "$script_dir/config.sh"
+# A physical button bounces; ignore presses closer together than 5 seconds.
+rec_rate_limit 5
 
-start_script_path="/tmp/start_next_ui.sh"
+# Audible confirmation that the press was registered - the UI takes several
+# seconds to change, and without this the button feels broken.
+bash "$REC_BIN/signal_action.sh" &
 
-########################################################################################################
-# Makes sure the code is not executed too often
-
-# Path to the file where the last run timestamp is stored
-timestamp_file="/tmp/stop_current_ui.timestamp"
-
-# Define a function to ensure a minimum delay between script executions
-ensure_delay() {
-    local delay_seconds=$1
-
-    if [ -f "$timestamp_file" ]; then
-        local last_run=$(cat "$timestamp_file")
-        local current_time=$(date +%s)
-        local time_diff=$((current_time - last_run))
-
-        if [ "$time_diff" -lt "$delay_seconds" ]; then
-            exit
-        fi
-    fi
-
-    # Update the timestamp file with the current time
-    date +%s > "$timestamp_file"
-}
-
-ensure_delay 5
-########################################################################################################
-
-# Find which UI is running and determine the next UI to start
+# Find which UI is currently running.
 current_index=-1
-for i in "${!uis[@]}"; do
-    if ps -A | grep -qw "${uis[$i]}"; then
+for i in "${!REC_UI_PROCESSES[@]}"; do
+    if pgrep -x "${REC_UI_PROCESSES[$i]}" >/dev/null 2>&1; then
         current_index=$i
         break
     fi
 done
 
-if [ "$current_index" -ne -1 ]; then
-    # Close the current UI
-    echo "Clossing ${uis[$current_index]} with command=${ui_commands[$current_index]}"
-    eval "${ui_commands[$current_index]}"
-
-    # Calculate next or previous UI index based on argument presence
-    if [ $# -gt 0 ]; then
-        # Argument passed: Calculate PREVIOUS index
-        # Formula handles wrap-around from index 0 to the last index
-        next_index=$(( (current_index - 1 + ${#uis[@]}) % ${#uis[@]} ))
-    else
-        # No argument passed: Calculate NEXT index (original behavior)
-        next_index=$(((current_index + 1) % ${#uis[@]}))
-    fi
-
-    # Create script to start the next/previous UI
-    echo "#!/bin/bash" > "$start_script_path"
-    echo "${ui_start_commands[$next_index]}" >> "$start_script_path"
-    chmod +x "$start_script_path"
-    # Kept original message for minimal change, although 'next' might now mean 'previous'
-    echo "Script to start the next UI (${uis[$next_index]}) has been created at $start_script_path"
-
-else
-    echo "NO RUNNING INTERFACE FOUND!"
-
+if (( current_index == -1 )); then
+    rec_warn "No running UI found. Letting the watchdog start the default."
+    rm -f "$REC_UI_STATE_FILE"
+    exit 0
 fi
+
+# Work out where to go next.
+count=${#REC_UI_PROCESSES[@]}
+if [[ "${1:-}" == "prev" ]]; then
+    next_index=$(( (current_index - 1 + count) % count ))
+else
+    next_index=$(( (current_index + 1) % count ))
+fi
+
+# Record the target BEFORE killing the current UI, so that ui_rotate.sh always
+# finds a valid choice even if this script is interrupted mid-way.
+echo "$next_index" > "$REC_UI_STATE_FILE"
+rec_log "Next UI will be ${REC_UI_NAMES[$next_index]}"
+
+rec_log "Stopping ${REC_UI_NAMES[$current_index]}: ${REC_UI_STOP[$current_index]}"
+eval "${REC_UI_STOP[$current_index]}"
+
+# Kodi's clean "Quit" can take a few seconds. If it is still alive after the
+# grace period, escalate - otherwise the watchdog sees a UI running and never
+# starts the next one, which looks like the button did nothing.
+for _ in {1..10}; do
+    pgrep -x "${REC_UI_PROCESSES[$current_index]}" >/dev/null 2>&1 || exit 0
+    sleep 1
+done
+
+rec_warn "${REC_UI_NAMES[$current_index]} did not exit cleanly - forcing."
+pkill -x "${REC_UI_PROCESSES[$current_index]}" 2>/dev/null
+sleep 2
+pkill -9 -x "${REC_UI_PROCESSES[$current_index]}" 2>/dev/null

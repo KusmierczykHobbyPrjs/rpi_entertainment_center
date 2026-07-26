@@ -1,0 +1,352 @@
+# Installation — from a blank SD card to a working system
+
+This walkthrough assumes nothing. Follow it top to bottom and you will end up
+with a working entertainment centre; skip any module you do not want.
+
+**Time needed:** about 45 minutes of attention, plus up to two hours of
+unattended compiling if you install RetroPie.
+
+---
+
+## Contents
+
+1. [Before you start](#1-before-you-start)
+2. [Flash Raspberry Pi OS](#2-flash-raspberry-pi-os)
+3. [First boot and SSH](#3-first-boot-and-ssh)
+4. [System basics](#4-system-basics)
+5. [Get this repository](#5-get-this-repository)
+6. [Install the base module](#6-install-the-base-module)
+7. [Configure](#7-configure)
+8. [Install the modules you want](#8-install-the-modules-you-want)
+9. [Verify](#9-verify)
+10. [First real boot](#10-first-real-boot)
+11. [Finishing touches inside Kodi](#11-finishing-touches-inside-kodi)
+12. [Restoring a previous installation](#12-restoring-a-previous-installation)
+
+---
+
+## 1. Before you start
+
+Gather:
+
+- **Raspberry Pi 3B or newer.** A 3B is enough for 720p video, retro gaming up
+  to the PlayStation era, and light desktop use. A Pi 4 handles 1080p
+  comfortably.
+- **A power supply rated 2.5 A or more.** This matters more than anything else
+  on this list. An underpowered Pi throttles, drops USB devices and corrupts
+  SD cards, and reports none of it as an error. If you take one thing from
+  this document, take this.
+- **A 16 GB or larger SD card**, class 10 or better. 32 GB if you plan to
+  store ROMs or TV recordings.
+- **An HDMI cable and a TV.**
+- **Ethernet**, ideally. Wi-Fi works but streams less reliably.
+
+Optional, depending on which modules you want:
+
+- USB gamepad (RetroPie)
+- 4–5 momentary push buttons and some wire (GPIO control)
+- USB DVB-T tuner (Tvheadend)
+- A NordVPN subscription (VPN and Meshnet modules)
+- A free No-IP account (public web server module)
+
+---
+
+## 2. Flash Raspberry Pi OS
+
+Use the [Raspberry Pi Imager](https://www.raspberrypi.com/software/).
+
+- **OS:** Raspberry Pi OS (32-bit) **with desktop**. You need the desktop
+  variant even though the Pi will boot to a console — the desktop is one of
+  the three UIs.
+- Click the **gear icon** before writing and set:
+  - **Hostname:** something memorable, e.g. `rpi`. You will use this to
+    connect: `ssh pi@rpi`.
+  - **Enable SSH** with password authentication.
+  - **Username and password.** These docs assume the user is `pi`; anything
+    works, the scripts do not care.
+  - **Wi-Fi credentials**, if you are not using Ethernet.
+  - **Locale and timezone.**
+
+Setting these in the Imager saves you having to attach a keyboard later.
+
+Write the card, put it in the Pi, connect HDMI and Ethernet, and power it on.
+
+---
+
+## 3. First boot and SSH
+
+The first boot takes a few minutes — the filesystem is resized and the Pi
+reboots itself once.
+
+From another computer on the same network:
+
+```bash
+ssh pi@rpi
+```
+
+If the hostname does not resolve, find the Pi's IP address from your router's
+device list and use that instead.
+
+The rest of this guide is done over SSH. You do not need a keyboard attached
+to the Pi.
+
+---
+
+## 4. System basics
+
+Update everything first. On a fresh image this can take 10–20 minutes.
+
+```bash
+sudo apt-get update && sudo apt-get full-upgrade -y
+```
+
+Then open the configuration tool:
+
+```bash
+sudo raspi-config
+```
+
+Set these, if the Imager did not already:
+
+- **System Options → Password** — change it if you kept a default.
+- **Localisation Options** — locale, timezone and keyboard layout. A wrong
+  timezone shows the wrong times in the TV guide.
+- **Advanced Options → Expand Filesystem** — usually already done.
+- **Performance Options → GPU Memory** — set **128** on a Pi 3B. Kodi needs
+  the video memory; the default 64 MB causes stuttering on 1080p content.
+
+The installer sets boot behaviour and "wait for network" itself, so leave
+those alone.
+
+Reboot: `sudo reboot`
+
+---
+
+## 5. Get this repository
+
+```bash
+sudo apt-get install -y git
+git clone https://github.com/KusmierczykHobbyPrjs/rpi_entertainment_center.git
+cd rpi_entertainment_center
+```
+
+You can clone this anywhere — the scripts find themselves. `~/rpi_entertainment_center`
+is the obvious choice.
+
+---
+
+## 6. Install the base module
+
+Everything else depends on this one. It installs the shared packages, creates
+your `config.sh`, sets the Pi to boot to a console with autologin, and hooks
+the autostart script into your login shell.
+
+```bash
+./install.sh 00-base
+```
+
+> **Do not run the installer with `sudo`.** It calls `sudo` itself for the few
+> steps that need it. Running the whole thing as root would leave root-owned
+> files scattered through your home directory.
+
+### Why console autologin?
+
+Because the project decides which UI starts, and it cannot do that if the
+system has already started one. Booting to a plain console lets
+`autostart.sh` run first and hand control to Kodi, EmulationStation or the
+desktop as appropriate.
+
+---
+
+## 7. Configure
+
+```bash
+nano config.sh
+```
+
+Everything has a working default. The settings you should actually look at
+now:
+
+| Setting | Why |
+|---|---|
+| `NORDVPN_LAN_SUBNET` | **Get this right.** If it does not match your network, SSH drops the moment the VPN connects. |
+| `NORDVPN_TOKEN` | Needed for automatic VPN login at boot. |
+| `NORDVPN_COUNTRIES` | The list the VPN button cycles through. |
+| `REC_GPIO_BUTTONS` | Only if you are wiring physical buttons. |
+| `REC_PORT_FORWARDS` | Only if you want to reach LAN devices through the Pi. |
+| `VOLUME` | Volume of spoken messages, as a percentage. |
+
+Find your LAN subnet with:
+
+```bash
+ip route | grep -v default | grep "$(hostname -I | awk '{print $1}' | cut -d. -f1-3)"
+```
+
+Typically `192.168.1.0/24` or `192.168.0.0/24`.
+
+**[docs/CONFIGURATION.md](docs/CONFIGURATION.md) documents every setting.**
+
+`config.sh` is git-ignored and holds your VPN token, so keep it at mode 600
+(the installer does this for you).
+
+---
+
+## 8. Install the modules you want
+
+Run the menu and pick:
+
+```bash
+./install.sh
+```
+
+…or name them directly:
+
+```bash
+./install.sh 10-kodi 15-kodi-iptv 20-kodi-addons
+./install.sh 50-ui-rotation 60-gpio
+./install.sh 70-nordvpn 75-port-forwarding
+./install.sh 90-speech
+```
+
+Recommended order and what each costs you in time:
+
+| Order | Module | Time | Notes |
+|---|---|---|---|
+| 1 | `00-base` | 5 min | Required. |
+| 2 | `10-kodi` | 10 min | The media centre. |
+| 3 | `15-kodi-iptv` | 2 min | Live TV and radio. |
+| 4 | `20-kodi-addons` | 2 min | Stages the add-on packages; you finish inside Kodi. |
+| 5 | `90-speech` | 2 min | Do this before the VPN module so it can talk. |
+| 6 | `40-desktop` | 10 min | Only if you want the third UI. |
+| 7 | `45-kdeconnect` | 5 min | Needs `40-desktop`. |
+| 8 | `30-retropie` | **45–120 min** | Compiles emulators. Start it and walk away. |
+| 9 | `50-ui-rotation` | 1 min | Run this **after** installing the UIs you want. |
+| 10 | `60-gpio` | 2 min | Only with buttons wired. |
+| 11 | `70-nordvpn` | 5 min | Needs a subscription. |
+| 12 | `75-port-forwarding` | 2 min | Needs `70-nordvpn` to be useful. |
+| 13 | `25-tvheadend` | 5 min | Only with a TV tuner. |
+| 14 | `80-webserver` | 15 min | **Exposes the Pi to the internet** — read the doc first. |
+
+`50-ui-rotation` deliberately comes late: it checks that the UIs listed in
+`config.sh` are actually installed, which it can only do once they are.
+
+Install everything unattended with:
+
+```bash
+./install.sh --all --yes
+```
+
+---
+
+## 9. Verify
+
+```bash
+./bin/doctor.sh
+```
+
+This checks every module and prints, for each problem, the exact command that
+fixes it. Work through the `FAIL` lines. `WARN` lines are usually fine — over
+SSH it is normal to see "no UI is running" and "the watchdog is not running",
+because those only start on the physical console.
+
+Check one area at a time with e.g. `./bin/doctor.sh vpn`.
+
+---
+
+## 10. First real boot
+
+```bash
+sudo reboot
+```
+
+What should happen on the TV:
+
+1. Console text scrolls past.
+2. The Pi logs in automatically.
+3. Kodi starts (or whichever UI is at `REC_UI_DEFAULT_INDEX`).
+4. If the VPN is configured, you hear it announce the country it connected to.
+
+If the screen stays black, see
+[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md#nothing-appears-on-the-tv) —
+SSH still works, so this is recoverable.
+
+---
+
+## 11. Finishing touches inside Kodi
+
+Some things simply cannot be scripted from outside a running Kodi. These are
+one-time, five-minute jobs.
+
+**Allow add-ons from outside the official repository** (needed for everything
+in module `20-kodi-addons`):
+
+> Settings → System → Add-ons → **Unknown sources** → On
+
+**Turn on the remote-control interface** (needed for the Kore phone app):
+
+> Settings → Services → Control →
+> **Allow remote control via HTTP** → On
+> **Allow remote control from applications on other systems** → On
+
+**Install the add-ons** — the installer staged them in
+`~/kodi-addons-to-install`:
+
+> Settings → Add-ons → Install from zip file → Home folder →
+> `kodi-addons-to-install`
+
+Start with `repository.linuxaddons-1.0.1.zip`, then install **Shell Script
+Launcher** from that repository and point it at
+`~/shell_command_launcher.menu`. That is what puts VPN and UI switching inside
+Kodi.
+
+**Point the IPTV client at a playlist:**
+
+> Settings → Add-ons → My add-ons → PVR clients → PVR IPTV Simple Client →
+> Configure
+> - General → M3U play list path: `~/.local/share/rec-iptv/iptvsimple_playlist_pl.m3u`
+> - Advanced → User agent: `Mozilla/5.0`
+
+Full details in [docs/20-kodi-addons.md](docs/20-kodi-addons.md) and
+[docs/15-kodi-iptv.md](docs/15-kodi-iptv.md).
+
+---
+
+## 12. Restoring a previous installation
+
+Reinstalling and want your old settings back? These are the things worth
+keeping from the old system, and where they belong on the new one:
+
+| What | Old location | New location |
+|---|---|---|
+| Your settings and VPN token | `~/config.sh` | `<repo>/config.sh` |
+| Kodi library, add-on settings, favourites | `~/.kodi/userdata/` | same |
+| Installed Kodi add-ons | `~/.kodi/addons/` | same |
+| ROMs | `~/RetroPie/roms/` | same |
+| Emulator and controller config | `/opt/retropie/configs/` | same |
+| IPTV playlists | `~/iptvsimple_*.m3u` | `~/.local/share/rec-iptv/` |
+| Web server content | `/var/www/html/` | same |
+| Tvheadend config | `/home/hts/.hts/` | same |
+
+Back them up before wiping the card:
+
+```bash
+# from another machine
+rsync -av pi@rpi:~/.kodi/userdata/     ./backup/kodi-userdata/
+rsync -av pi@rpi:~/RetroPie/roms/      ./backup/roms/
+rsync -av pi@rpi:/opt/retropie/configs/ ./backup/retropie-configs/
+scp pi@rpi:~/config.sh                 ./backup/
+```
+
+If you are moving from the older version of this project — where every script
+sat loose in the home directory — read
+[docs/MIGRATION.md](docs/MIGRATION.md). It maps every old file to its new
+home.
+
+---
+
+## Where to go next
+
+- Something not working? → [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
+- Want to understand the design? → [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- Wiring buttons? → [docs/HARDWARE.md](docs/HARDWARE.md)
+- Tuning a setting? → [docs/CONFIGURATION.md](docs/CONFIGURATION.md)
