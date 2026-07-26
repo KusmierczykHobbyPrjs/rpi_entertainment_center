@@ -24,6 +24,21 @@ them in step when you add a setting.
 
 Verify any change with `./bin/doctor.sh`.
 
+## Overriding a setting for one run
+
+The environment beats `config.sh`, so you can override any single setting
+without editing the file:
+
+```bash
+VOLUME=0 bash bin/say_weather.sh              # run it silently
+SPEECH_LANG=pl bash bin/nordvpn_status.sh     # answer in Polish this once
+REC_WEATHER_LOCATION=Helsinki bash bin/say_weather.sh
+```
+
+This works because `rec_load_config` snapshots the exported environment before
+sourcing `config.sh` and re-applies it afterwards. Useful for testing a change
+before committing to it.
+
 ---
 
 ## User interfaces

@@ -47,6 +47,8 @@ maps to a module you can install or skip.
   Let's Encrypt HTTPS and the hardening an internet-facing box needs
 - **Spoken status messages** using free Google services — no API key, no
   account, no local voice data
+- **Spoken weather reports**, in the same language, for a configured location
+  or one detected automatically
 
 No account, no subscription and no telemetry sits between you and any of it.
 
@@ -148,6 +150,7 @@ Install them in this order; each is a separate `./install.sh <name>` run.
 | `75-port-forwarding` | Reach LAN devices through the Pi | [docs](docs/75-port-forwarding.md) |
 | `80-webserver` | Apache + PHP + No-IP + HTTPS, publicly reachable | [docs](docs/80-webserver.md) |
 | `90-speech` | Spoken messages and the action beep | [docs](docs/90-speech.md) |
+| `95-weather` | Spoken weather reports, in the configured language | [docs](docs/95-weather.md) |
 
 ### Also worth reading
 

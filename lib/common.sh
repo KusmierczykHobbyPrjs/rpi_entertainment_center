@@ -42,14 +42,34 @@ rec_die()   { rec_error "$*"; exit 1; }
 # config.example.sh is the tracked template.
 rec_load_config() {
     local cfg="$REC_ROOT/config.sh"
+
+    # Anything already set in the environment beats config.sh, so a single run
+    # can be overridden without editing the file:
+    #
+    #     VOLUME=0 SPEECH_LANG=pl bash bin/say_weather.sh
+    #
+    # Sourcing alone would not do this - config.sh assigns unconditionally and
+    # would silently overwrite the caller's value. So the exported environment
+    # is snapshotted first and re-applied afterwards. Arrays (REC_UI_*,
+    # REC_GPIO_BUTTONS) are not exported and so are unaffected.
+    # `export -p` prints "declare -x VAR=...", and `declare` inside a function
+    # creates a *local* - so replaying it verbatim would set a variable that
+    # vanishes when this function returns. Rewriting it to `export` assigns
+    # the global, which is what we need.
+    local rec_saved_env
+    rec_saved_env="$(export -p | sed 's/^declare -x /export /')"
+
     if [[ -f "$cfg" ]]; then
         # shellcheck source=/dev/null
         source "$cfg"
+        eval "$rec_saved_env" 2>/dev/null
+        return
     else
         rec_warn "config.sh not found. Copy config.example.sh to config.sh and edit it."
         rec_warn "Falling back to the defaults in config.example.sh."
         # shellcheck source=/dev/null
         source "$REC_ROOT/config.example.sh"
+        eval "$rec_saved_env" 2>/dev/null
     fi
 }
 

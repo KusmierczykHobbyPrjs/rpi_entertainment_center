@@ -115,6 +115,30 @@ REC_GPIO_BUTTONS=(
 
 
 # ===========================================================================
+# Weather
+# ===========================================================================
+# Where to report the weather for. Three accepted forms:
+#
+#   "auto"              detect the location from this machine's public IP
+#   "Helsinki"          a city name (add a country to disambiguate:
+#                       "Cambridge,GB" - there are several Cambridges)
+#   "60.17,24.94"       explicit latitude,longitude - always unambiguous
+#
+# WARNING about "auto": IP geolocation reports where your traffic leaves the
+# internet, which is the VPN exit node whenever the tunnel is up. Since this
+# system rotates the VPN between countries, "auto" will cheerfully announce
+# the weather in Finland or the UK depending on what the VPN is doing. If you
+# use the VPN, set a fixed city or coordinates instead.
+export REC_WEATHER_LOCATION="auto"
+
+# "metric" for Celsius, "imperial" for Fahrenheit.
+export REC_WEATHER_UNITS="metric"
+
+# The spoken language comes from SPEECH_LANG above - the forecast wording and
+# the greeting both follow it, so there is nothing extra to set here.
+
+
+# ===========================================================================
 # Desktop
 # ===========================================================================
 # Fixed resolution for the LXDE desktop session. The desktop otherwise uses
@@ -135,3 +159,9 @@ export REC_DESKTOP_RATE="60"
 # Leave empty to skip automatic VPN login (you can still run `nordvpn login`
 # by hand).
 export NORDVPN_TOKEN=""
+
+# OpenWeatherMap API key, used by the weather scripts. Get a free one at:
+#     https://openweathermap.org/api
+# A newly created key can take up to a couple of hours to start working.
+# Leave empty if you do not want the weather module.
+export OPENWEATHER_API_KEY=""

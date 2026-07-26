@@ -29,6 +29,9 @@ VPN UK:exitcode 0:bash @REC_BIN@/nordvpn_connect.sh uk
 VPN USA:exitcode 0:bash @REC_BIN@/nordvpn_connect.sh us
 VPN Ukraine:exitcode 0:bash @REC_BIN@/nordvpn_connect.sh ua
 
+# --- Information -----------------------------------------------------------
+Weather:exitcode 0:bash @REC_BIN@/say_weather.sh
+
 # --- Diagnostics -----------------------------------------------------------
 System temperature:show:bash @REC_BIN@/pi_temp.sh
 Health check:show:bash @REC_BIN@/doctor.sh

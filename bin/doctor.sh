@@ -6,7 +6,8 @@
 # something stops working. It only reads state - it changes nothing.
 #
 #   doctor.sh              check everything
-#   doctor.sh vpn          check one section (base|kodi|ui|gpio|vpn|net|web|audio)
+#   doctor.sh vpn          check one section
+#                          (base|kodi|ui|gpio|vpn|net|web|audio|weather)
 #
 # Every failure line says what to do about it.
 # ---------------------------------------------------------------------------
@@ -33,6 +34,10 @@ bad()     { printf '  %sFAIL%s  %s\n' "$C_RED"    "$C_OFF" "$1"; FAIL=$((FAIL+1)
 
 want="${1:-all}"
 run_section() { [[ "$want" == "all" || "$want" == "$1" ]]; }
+
+# Redact a secret down to its length, so the health check can confirm a value
+# is present without printing it into a log the user may paste somewhere.
+masked() { local v="$1"; [[ -n "$v" ]] && echo "set (${#v} chars)" || echo "empty"; }
 
 # ===========================================================================
 if run_section base; then
@@ -410,6 +415,38 @@ if [[ "${VOLUME:-100}" =~ ^[0-9]+$ ]] && (( VOLUME >= 0 && VOLUME <= 100 )); the
     pass "VOLUME is ${VOLUME}%"
 else
     bad "VOLUME='${VOLUME:-}' is not a percentage between 0 and 100" "Fix it in config.sh"
+fi
+fi
+
+# ===========================================================================
+if run_section weather; then
+section "Weather"
+
+if [[ -n "${OPENWEATHER_API_KEY:-}" ]]; then
+    pass "OPENWEATHER_API_KEY is $(masked "$OPENWEATHER_API_KEY")"
+
+    location="${REC_WEATHER_LOCATION:-auto}"
+    if [[ "$location" == "auto" ]]; then
+        pass "Location: auto (detected from the public IP)"
+        # Auto-detection follows the VPN exit node, which on this system
+        # moves between countries. Worth saying out loud.
+        if rec_has nordvpn && nordvpn status 2>/dev/null | grep -q "Status: Connected"; then
+            warn "The VPN is connected, so 'auto' reports the exit country" \
+                 "Set REC_WEATHER_LOCATION to a city or \"lat,lon\" in config.sh"
+        fi
+    else
+        pass "Location: $location"
+    fi
+
+    if [[ "${REC_WEATHER_UNITS:-metric}" =~ ^(metric|imperial)$ ]]; then
+        pass "Units: ${REC_WEATHER_UNITS:-metric}"
+    else
+        bad "REC_WEATHER_UNITS='${REC_WEATHER_UNITS}' is invalid" \
+            "Use \"metric\" or \"imperial\""
+    fi
+else
+    warn "OPENWEATHER_API_KEY is empty" \
+         "Only needed for the weather module - see docs/95-weather.md"
 fi
 fi
 

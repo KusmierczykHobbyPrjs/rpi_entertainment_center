@@ -40,6 +40,7 @@ declare -a MODULES=(
     "75-port-forwarding|Expose LAN devices (IP camera, NAS) through this Pi"
     "80-webserver|Apache + PHP reachable worldwide via No-IP and HTTPS"
     "90-speech|Spoken status messages and the action beep"
+    "95-weather|Spoken weather reports, in the configured language"
 )
 
 module_id()   { echo "${1%%|*}"; }
