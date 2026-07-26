@@ -23,7 +23,7 @@ hr() { printf '\n===== %s =====\n' "$1"; }
 hr "SYSTEM"
 grep PRETTY_NAME /etc/os-release
 echo "arch:     $(uname -m)"
-model="$(tr -d '\0' < /proc/device-tree/model 2>/dev/null)"
+model="$( { tr -d '\0' < /proc/device-tree/model; } 2>/dev/null )"
 echo "model:    ${model:-not a Raspberry Pi}"
 echo "uptime:   booted $(uptime -s)"
 echo "repo:     $REC_ROOT"
