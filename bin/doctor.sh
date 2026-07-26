@@ -101,22 +101,43 @@ REC_LOG="$HOME/.local/state/rec/autostart.log"
 
 if [[ -f "$REC_LOG" ]]; then
     pass "Autostart log exists: $REC_LOG"
-    last="$(grep -- '--- autostart invoked' "$REC_LOG" | tail -1 | cut -d' ' -f1-2)"
-    [[ -n "$last" ]] && pass "Last ran: $last"
 
-    # The single most common failure: it ran, but not on the console, so it
-    # exited immediately without starting anything.
-    if tail -30 "$REC_LOG" | grep -q "Not the console"; then
-        if tail -30 "$REC_LOG" | grep -q "On the console - proceeding"; then
-            pass "It has run on the console at least once"
-        else
-            bad "Autostart only ever ran off-console, so nothing was started" \
-                "The Pi is booting to the desktop. Run: ./install.sh 00-base"
-        fi
+    last_any="$(grep -- '--- autostart invoked' "$REC_LOG" | tail -1 | cut -d' ' -f1-2)"
+    [[ -n "$last_any" ]] && note_line="$last_any" || note_line="never"
+    pass "Last invoked: $note_line"
+
+    # Search the WHOLE log, not a fixed tail window: every SSH login appends a
+    # few lines, so a console run scrolls out of view after a handful of
+    # logins and a tail-based check reports a false failure.
+    last_console="$(grep -B1 'On the console - proceeding' "$REC_LOG" 2>/dev/null \
+                    | grep -- '--- autostart invoked' | tail -1 | cut -d' ' -f1-2)"
+    if [[ -z "$last_console" ]]; then
+        last_console="$(grep 'On the console - proceeding' "$REC_LOG" | tail -1 | cut -d' ' -f1-2)"
     fi
 
-    if grep -q "^.*SKIP " "$REC_LOG" 2>/dev/null; then
-        warn "Some services were skipped - see the log" "tail -30 $REC_LOG"
+    if [[ -n "$last_console" ]]; then
+        pass "Last ran on the console: $last_console"
+
+        # The question that actually matters: did it run on the console since
+        # this machine booted? If not, this boot did not start the services.
+        boot_epoch="$(date -d "$(uptime -s)" +%s 2>/dev/null || echo 0)"
+        cons_epoch="$(date -d "$last_console" +%s 2>/dev/null || echo 0)"
+        if (( cons_epoch >= boot_epoch )); then
+            pass "It ran on the console during the current boot"
+        else
+            bad "It has NOT run on the console since this boot ($(uptime -s))" \
+                "The Pi is not reaching a console login. Check: systemctl get-default"
+        fi
+    else
+        bad "Autostart has never run on the console, so nothing was ever started" \
+            "The Pi is booting to the desktop. Run: ./install.sh 00-base, then reboot"
+    fi
+
+    if grep -q ' SKIP ' "$REC_LOG" 2>/dev/null; then
+        warn "Some services were skipped" "grep SKIP $REC_LOG"
+    fi
+    if grep -qi 'error\|not found\|command not found' "$REC_LOG" 2>/dev/null; then
+        warn "The log contains errors" "tail -40 $REC_LOG"
     fi
 else
     warn "No autostart log yet ($REC_LOG)" \
