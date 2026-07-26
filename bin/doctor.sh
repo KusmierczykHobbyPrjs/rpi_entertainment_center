@@ -499,6 +499,53 @@ else
     bad "No sound card detected" "See docs/90-speech.md"
 fi
 
+# Volume is a chain of multiplications - Kodi x stream x sink x ALSA - so a
+# single link left low makes everything quiet no matter what the others say.
+if rec_has wpctl; then
+    sink_vol="$(wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null | grep -oP 'Volume: \K[0-9.]+')"
+    if [[ -n "$sink_vol" ]]; then
+        # bash has no floats; compare in hundredths.
+        vol_pct="$(awk -v v="$sink_vol" 'BEGIN{printf "%d", v*100}')"
+        if (( vol_pct >= 90 )); then
+            pass "PipeWire sink volume ${vol_pct}%"
+        else
+            warn "PipeWire sink volume is only ${vol_pct}%" \
+                 "wpctl set-volume @DEFAULT_AUDIO_SINK@ 100%"
+        fi
+        if wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null | grep -q MUTED; then
+            bad "The default audio sink is MUTED" "wpctl set-mute @DEFAULT_AUDIO_SINK@ 0"
+        fi
+    fi
+fi
+
+if rec_has amixer; then
+    # The Pi's analogue control is PCM; other cards vary, so try a couple.
+    for ctl in PCM Master Headphone; do
+        raw="$(amixer sget "$ctl" 2>/dev/null | grep -oP '\[\K[0-9]+(?=%\])' | head -1)"
+        [[ -n "$raw" ]] || continue
+        if (( raw >= 90 )); then
+            pass "ALSA '$ctl' at ${raw}%"
+        else
+            warn "ALSA '$ctl' is at ${raw}%" \
+                 "amixer sset $ctl 100% && sudo alsactl store"
+        fi
+        break
+    done
+fi
+
+# The Pi's analogue output is PWM, not a DAC. audio_pwm_mode=2 selects the
+# improved modulation and is a real quality difference on the 3.5 mm jack.
+BOOTCFG=/boot/firmware/config.txt
+[[ -f "$BOOTCFG" ]] || BOOTCFG=/boot/config.txt
+if [[ -f "$BOOTCFG" ]] && grep -q "Raspberry Pi" /proc/device-tree/model 2>/dev/null; then
+    if grep -qE '^\s*audio_pwm_mode=2' "$BOOTCFG"; then
+        pass "audio_pwm_mode=2 (improved analogue output)"
+    else
+        warn "audio_pwm_mode=2 is not set in $BOOTCFG" \
+             "Improves 3.5 mm jack quality noticeably; add it and reboot"
+    fi
+fi
+
 sound="${ACTION_SOUND:-}"
 if [[ -z "$sound" ]]; then
     warn "ACTION_SOUND is empty" "Button presses give no audible confirmation"

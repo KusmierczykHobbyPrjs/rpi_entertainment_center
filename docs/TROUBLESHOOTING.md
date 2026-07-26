@@ -280,6 +280,82 @@ More detail: [90-speech.md](90-speech.md).
 
 ---
 
+## Sound is too quiet, even at maximum volume
+
+Two things are going on, and only one of them is fixable in software.
+
+### Volume is a chain, not a single control
+
+```
+Kodi volume  ×  PipeWire stream  ×  PipeWire sink  ×  ALSA PCM  =  output
+```
+
+Every stage multiplies. Kodi at 100% into a sink at 40% gives you 40%. Setting
+one to maximum achieves very little on its own.
+
+```bash
+./bin/doctor.sh audio          # reports each stage
+```
+
+Raise them all, and persist the ALSA level so it survives a reboot:
+
+```bash
+wpctl set-volume @DEFAULT_AUDIO_SINK@ 100%
+wpctl set-mute   @DEFAULT_AUDIO_SINK@ 0
+amixer sset PCM 100%
+sudo alsactl store
+```
+
+PipeWire accepts values above 100%, which genuinely helps on a Pi:
+
+```bash
+wpctl set-volume @DEFAULT_AUDIO_SINK@ 150%
+```
+
+That is real amplification, so loud passages may clip. Try 120–150% and back
+off if it distorts.
+
+### Improve the analogue output itself
+
+In `/boot/firmware/config.txt`:
+
+```
+audio_pwm_mode=2
+```
+
+This selects the better PWM modulation for the 3.5 mm jack — a clear
+signal-to-noise improvement. Reboot to apply.
+
+### The part software cannot fix
+
+**The Pi's 3.5 mm jack is not a DAC.** It is pulse-width modulation from two
+GPIO pins through a passive filter. Output sits well below line level and
+carries audible noise, and on a Pi 3B it is worse than on a Pi 4.
+
+If it is still too quiet with everything maxed, you are at the hardware limit.
+In increasing order of cost:
+
+| Fix | Notes |
+|---|---|
+| **Powered speakers with their own gain** | Passive speakers cannot be driven by this output at all |
+| **HDMI audio instead** | If your TV or AV receiver handles sound, this bypasses the jack entirely and sounds far better — `sudo raspi-config` → System Options → Audio → HDMI |
+| **USB DAC** | £10–20, appears as a normal sink, transforms both level and noise floor |
+| **I²S DAC HAT** | Best quality, uses the GPIO header |
+
+**HDMI is the one to try first** — it costs nothing and is a large improvement,
+provided something downstream can take the audio.
+
+### Kodi-specific things that quieten playback
+
+- **Settings → System → Audio → Volume amplification** — per-item, resets
+  between videos, but worth checking during playback.
+- **ReplayGain** (Settings → Player → Music) applies attenuation to tagged
+  files. If music is quiet but video is not, look here.
+- Try pointing Kodi at the ALSA device directly rather than `Default
+  (PipeWire)` — one fewer resampling stage, and occasionally louder.
+
+---
+
 ## Video stutters
 
 In order of how often each is the cause:

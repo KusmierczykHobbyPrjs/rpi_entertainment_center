@@ -163,7 +163,10 @@ sudo apt-get install mpg123
 **Speech is too quiet or too loud**
 
 Adjust `VOLUME` in `config.sh` (0–100). If it is already 100 and still quiet,
-raise the system mixer with `alsamixer`.
+the limit is further down the chain — see
+[TROUBLESHOOTING.md § Sound is too quiet](TROUBLESHOOTING.md#sound-is-too-quiet-even-at-maximum-volume).
+On a Pi the 3.5 mm jack is PWM rather than a real DAC and is quiet by nature;
+HDMI or a USB DAC is a large improvement.
 
 **Speech is cut off mid-sentence**
 
