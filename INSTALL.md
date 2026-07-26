@@ -21,7 +21,8 @@ unattended compiling if you install RetroPie.
 9. [Verify](#9-verify)
 10. [First real boot](#10-first-real-boot)
 11. [Finishing touches inside Kodi](#11-finishing-touches-inside-kodi)
-12. [Restoring a previous installation](#12-restoring-a-previous-installation)
+12. [Set the audio levels](#12-set-the-audio-levels)
+13. [Restoring a previous installation](#13-restoring-a-previous-installation)
 
 ---
 
@@ -295,44 +296,118 @@ SSH still works, so this is recoverable.
 
 ## 11. Finishing touches inside Kodi
 
-Some things simply cannot be scripted from outside a running Kodi. These are
-one-time, five-minute jobs.
+Some things cannot be scripted from outside a running Kodi. These are one-time
+jobs, and **all of them are needed** — skipping one is the usual reason
+something "does not work" later.
 
-**Allow add-ons from outside the official repository** (needed for everything
-in module `20-kodi-addons`):
+### 11.1 Turn on remote control — do this first
 
-> Settings → System → Add-ons → **Unknown sources** → On
+**Without this the Kore phone app cannot connect at all.** Do it before the
+rest, because once it works you can use your phone to do everything below
+instead of hunting for a keyboard.
 
-**Turn on the remote-control interface** (needed for the Kore phone app):
+> Settings → Services → **Control**
+> - **Allow remote control via HTTP** → **On**  (port 8080)
+> - **Allow remote control from applications on other systems** → **On**
+> - Set a username and password if the Pi is reachable beyond your LAN
 
-> Settings → Services → Control →
-> **Allow remote control via HTTP** → On
-> **Allow remote control from applications on other systems** → On
+Then install [Kore](https://kodi.tv/addons/omega/plugin.program.kore/) on your
+phone. It finds the Pi automatically on the same network; if not, add it by
+hand with the Pi's IP, port 8080, and those credentials.
 
-**Install the add-ons** — the installer staged them in
-`~/kodi-addons-to-install`:
+Verify from another machine:
 
-> Settings → Add-ons → Install from zip file → Home folder →
+```bash
+curl -s -u kodi:PASSWORD \
+  'http://<pi-ip>:8080/jsonrpc?request={"jsonrpc":"2.0","method":"JSONRPC.Ping","id":1}'
+```
+
+A `"pong"` back means it is working.
+
+### 11.2 Allow add-ons from outside the official repository
+
+Needed for everything in module `20-kodi-addons`:
+
+> Settings → System → Add-ons → **Unknown sources** → **On**
+
+### 11.3 Install the add-ons
+
+The installer staged them in `~/kodi-addons-to-install`:
+
+> Settings → Add-ons → **Install from zip file** → Home folder →
 > `kodi-addons-to-install`
 
 Start with `repository.linuxaddons-1.0.1.zip`, then install **Shell Script
-Launcher** from that repository and point it at
-`~/shell_command_launcher.menu`. That is what puts VPN and UI switching inside
-Kodi.
+Launcher** from that repository and point it at `~/shell_command_launcher.menu`
+(the installer prints the full path). That is what puts VPN and UI switching
+inside Kodi.
 
-**Point the IPTV client at a playlist:**
+### 11.4 Point the IPTV client at a playlist
 
-> Settings → Add-ons → My add-ons → PVR clients → PVR IPTV Simple Client →
+> Settings → Add-ons → My add-ons → PVR clients → **PVR IPTV Simple Client** →
 > Configure
-> - General → M3U play list path: `~/.local/share/rec-iptv/iptvsimple_playlist_pl.m3u`
+> - General → M3U play list path:
+>   `~/.local/share/rec-iptv/iptvsimple_playlist_pl.m3u`
 > - Advanced → User agent: `Mozilla/5.0`
+
+Then **enable** the add-on and restart Kodi. Without the user agent many public
+streams answer 403 and simply refuse to play.
 
 Full details in [docs/20-kodi-addons.md](docs/20-kodi-addons.md) and
 [docs/15-kodi-iptv.md](docs/15-kodi-iptv.md).
 
 ---
 
-## 12. Restoring a previous installation
+## 12. Set the audio levels
+
+**Do not skip this.** Volume on this system is a chain of multiplications:
+
+```
+Kodi volume  ×  PipeWire stream  ×  PipeWire sink  ×  ALSA PCM  =  output
+```
+
+Every stage multiplies, so Kodi at 100% into an ALSA control sitting at 40%
+gives you 40%. A fresh install commonly leaves ALSA low, and the symptom is
+"the volume is at maximum and it is still quiet".
+
+Module `90-speech` offers to set these for you. To do it by hand:
+
+```bash
+wpctl set-volume @DEFAULT_AUDIO_SINK@ 100%
+wpctl set-mute   @DEFAULT_AUDIO_SINK@ 0
+amixer sset PCM 100%
+sudo alsactl store        # persist it - otherwise ALSA resets at boot
+```
+
+`alsactl store` is the step people miss; without it the level goes back down
+on the next reboot.
+
+Check all stages at once:
+
+```bash
+./bin/doctor.sh audio
+```
+
+### If it is still quiet
+
+The Pi's 3.5 mm jack is not a DAC — it is PWM from two GPIO pins through a
+passive filter, well below line level and audibly noisy.
+
+- Add `audio_pwm_mode=2` to `/boot/firmware/config.txt` and reboot — a real
+  signal-to-noise improvement.
+- PipeWire will go above 100% (`wpctl set-volume @DEFAULT_AUDIO_SINK@ 150%`),
+  which is genuine amplification at the cost of clipping.
+- **Better: use HDMI audio** if your TV or receiver can take it. It bypasses
+  the jack entirely, costs nothing, and sounds far better —
+  `sudo raspi-config` → System Options → Audio → HDMI.
+- Otherwise a £10–20 USB DAC fixes both level and noise floor.
+
+Full detail in
+[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md#sound-is-too-quiet-even-at-maximum-volume).
+
+---
+
+## 13. Restoring a previous installation
 
 Reinstalling and want your old settings back? These are the things worth
 keeping from the old system, and where they belong on the new one:

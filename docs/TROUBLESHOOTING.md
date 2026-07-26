@@ -618,7 +618,7 @@ sed -i '/>>> rpi-entertainment-center >>>/,/<<< rpi-entertainment-center <<</d' 
 ```
 
 **Reinstall the whole system:** back up the things listed in
-[INSTALL.md §12](../INSTALL.md#12-restoring-a-previous-installation) first —
+[INSTALL.md §13](../INSTALL.md#13-restoring-a-previous-installation) first —
 in particular `config.sh`, `~/.kodi/userdata/`, `~/RetroPie/roms/` and
 `/opt/retropie/configs/`.
 

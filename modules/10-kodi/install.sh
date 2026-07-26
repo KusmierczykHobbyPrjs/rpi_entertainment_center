@@ -134,6 +134,19 @@ will NOT start from a console. If Kodi never appears at boot, this is the
 first thing to check.
 
 EOF
-note "Finish the Kore remote setup inside Kodi:"
-note "  Settings > Services > Control > Allow remote control via HTTP"
-note "See docs/10-kodi.md for the full walkthrough."
+cat <<EOT
+${REC_C_BOLD}Do this first, inside Kodi${REC_C_OFF}
+
+  Settings > Services > Control
+    Allow remote control via HTTP                        -> ON  (port 8080)
+    Allow remote control from applications on other systems -> ON
+
+  Without it the Kore phone app cannot connect at all. Turn it on before
+  anything else, because once it works you can use your phone to do the
+  remaining setup instead of finding a keyboard.
+
+  Then: Settings > System > Add-ons > Unknown sources    -> ON
+  (needed for module 20-kodi-addons)
+
+See INSTALL.md section 11 for the full checklist, and docs/10-kodi.md.
+EOT
