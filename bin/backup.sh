@@ -183,6 +183,22 @@ manifest="$(mktemp)"
     echo "os:       $(grep PRETTY_NAME /etc/os-release | cut -d'"' -f2)"
     command -v git >/dev/null && [[ -d "$REC_ROOT/.git" ]] && \
         echo "commit:   $(git -C "$REC_ROOT" rev-parse --short HEAD 2>/dev/null)"
+
+    # Component versions, so restore.sh can warn when it is being unpacked
+    # onto software that has moved on. Some of this data is version-coupled:
+    # Kodi's database filenames encode their schema, and RetroPie's
+    # emulators.cfg hardcodes absolute paths to libretro cores.
+    echo "versions:"
+    echo "  kodi:      $(dpkg-query -W -f='${Version}' kodi 2>/dev/null || echo -)"
+    echo "  retropie:  $(cat /opt/retropie/VERSION 2>/dev/null || echo -)"
+    echo "  tvheadend: $(dpkg-query -W -f='${Version}' tvheadend 2>/dev/null || echo -)"
+    echo "  bluez:     $(dpkg-query -W -f='${Version}' bluez 2>/dev/null || echo -)"
+    # Kodi's schema version, read straight off the database filename.
+    echo "  kodi_db:   $(ls "$HOME/.kodi/userdata/Database"/MyVideos*.db 2>/dev/null \
+                          | head -1 | grep -oP 'MyVideos\K[0-9]+' || echo -)"
+    # The Bluetooth adapter address: pairing keys live under it, so they only
+    # apply when restored onto the same physical adapter.
+    echo "  bt_adapter: $(sudo ls /var/lib/bluetooth 2>/dev/null | head -1 || echo -)"
     echo "paths:"
     printf '  %s\n' "${present[@]}"
 } > "$manifest"

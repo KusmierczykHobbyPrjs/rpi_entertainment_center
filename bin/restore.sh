@@ -4,6 +4,7 @@
 #
 #   restore.sh <archive>              restore everything in it
 #   restore.sh <archive> --list       show what is inside, change nothing
+#   restore.sh <archive> --safe       only version-independent files
 #   restore.sh <archive> --only retropie|kodi|config|bluetooth|tvheadend|noip|content
 #
 # Order matters: install the modules FIRST, then restore. Installing over a
@@ -19,11 +20,13 @@ source "$(dirname "$(readlink -f "$0")")/../lib/common.sh"
 
 ARCHIVE=""
 LIST_ONLY=0
+SAFE_ONLY=0
 ONLY=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --list)    LIST_ONLY=1 ;;
+        --safe)    SAFE_ONLY=1 ;;
         --only)    ONLY="${2:-}"; shift ;;
         -h|--help) sed -n '3,13p' "$(readlink -f "$0")" | sed 's/^# \{0,1\}//'; exit 0 ;;
         -*)        rec_die "Unknown option: $1" ;;
@@ -36,6 +39,11 @@ done
 [[ -f "$ARCHIVE" ]] || rec_die "No such archive: $ARCHIVE"
 
 # Which paths inside the archive each --only name covers.
+# The version-independent subset: plain data no software version cares about.
+# Deliberately excludes emulators.cfg (absolute core paths), the Kodi
+# databases (schema-versioned) and Widevine (architecture and version tied).
+SAFE_PATTERN='retroarch/autoconfig|retroarch-joypads|es_input.cfg|es_settings.cfg|gamelists|config.sh|rec-iptv|sources.xml|favourites.xml|advancedsettings.xml|mediasources.xml|profiles.xml'
+
 case "$ONLY" in
     "")          pattern="" ;;
     retropie)    pattern="opt/retropie/configs" ;;
@@ -63,6 +71,61 @@ if [[ $LIST_ONLY -eq 1 ]]; then
     exit 0
 fi
 
+# --- Version drift ---------------------------------------------------------
+# Most of the archive is plain data that does not care what version reads it.
+# Two things do, and they fail in different ways, so check both explicitly.
+mf="$(tar xzOf "$ARCHIVE" MANIFEST.txt 2>/dev/null)"
+was_kodi="$(grep -oP '^\s*kodi:\s*\K\S+'       <<<"$mf" 2>/dev/null)"
+was_kodidb="$(grep -oP '^\s*kodi_db:\s*\K\S+'  <<<"$mf" 2>/dev/null)"
+was_retropie="$(grep -oP '^\s*retropie:\s*\K\S+' <<<"$mf" 2>/dev/null)"
+was_bt="$(grep -oP '^\s*bt_adapter:\s*\K\S+'   <<<"$mf" 2>/dev/null)"
+
+now_kodi="$(dpkg-query -W -f='${Version}' kodi 2>/dev/null)"
+now_kodidb="$(ls "$HOME/.kodi/userdata/Database"/MyVideos*.db 2>/dev/null | head -1 | grep -oP 'MyVideos\K[0-9]+')"
+now_retropie="$(cat /opt/retropie/VERSION 2>/dev/null)"
+now_bt="$(sudo ls /var/lib/bluetooth 2>/dev/null | head -1)"
+
+drift=0
+
+# Kodi: the number in MyVideos<N>.db IS the schema version. Kodi migrates an
+# older database forward on first start. It cannot go backwards - an older
+# Kodi simply ignores a newer file and starts with an empty library.
+if [[ -n "$was_kodidb" && -n "$now_kodidb" && "$was_kodidb" != "$now_kodidb" ]]; then
+    drift=1
+    if (( was_kodidb < now_kodidb )); then
+        rec_log "Kodi database schema $was_kodidb -> $now_kodidb (newer Kodi)."
+        rec_log "  Kodi will migrate the library forward on first start. This is fine."
+    else
+        rec_warn "Archive holds Kodi schema $was_kodidb but this Kodi uses $now_kodidb."
+        rec_warn "  That is a DOWNGRADE. Kodi cannot migrate backwards - it will"
+        rec_warn "  ignore the restored library and start empty. Your watched states"
+        rec_warn "  and library would be lost. Consider --only config instead."
+    fi
+elif [[ -n "$was_kodi" && -n "$now_kodi" && "$was_kodi" != "$now_kodi" ]]; then
+    drift=1
+    rec_log "Kodi $was_kodi -> $now_kodi. Settings migrate forward; unknown keys are ignored."
+fi
+
+# RetroPie: emulators.cfg hardcodes absolute paths to libretro cores. Install
+# a different emulator set and those paths point at nothing, which shows up as
+# a game that simply refuses to launch.
+if [[ -n "$was_retropie" && -n "$now_retropie" && "$was_retropie" != "$now_retropie" ]]; then
+    drift=1
+    rec_warn "RetroPie $was_retropie -> $now_retropie."
+    rec_warn "  emulators.cfg refers to cores by absolute path. Any core you did not"
+    rec_warn "  reinstall will fail to launch. This script checks for that afterwards."
+fi
+
+# Bluetooth link keys live under the adapter's own MAC address, so they only
+# mean anything on the same physical hardware.
+if [[ -n "$was_bt" && -n "$now_bt" && "$was_bt" != "$now_bt" ]]; then
+    drift=1
+    rec_warn "Bluetooth adapter $was_bt -> $now_bt (different hardware)."
+    rec_warn "  Pairing keys will not apply; devices must be paired again."
+fi
+
+(( drift == 1 )) && echo
+
 # --- Warn about ordering ---------------------------------------------------
 cat <<EOF
 Restoring will OVERWRITE the current versions of these files.
@@ -78,12 +141,18 @@ read -r -p "Continue? [y/N] " reply
 # Extracting to / needs root for the system paths. Keep permissions and
 # ownership as recorded, so Bluetooth link keys and hts files stay usable.
 declare -a members=()
+declare -a stopped=()
+if [[ $SAFE_ONLY -eq 1 ]]; then
+    pattern="$SAFE_PATTERN"
+    rec_log "Safe mode: only version-independent files"
+fi
+
 if [[ -n "$pattern" ]]; then
     mapfile -t members < <(tar tzf "$ARCHIVE" | grep -E "$pattern" || true)
     if [[ ${#members[@]} -eq 0 ]]; then
         rec_die "Nothing matching '--only $ONLY' found in the archive."
     fi
-    rec_log "Restoring ${#members[@]} path(s) matching '$ONLY'"
+    rec_log "Restoring ${#members[@]} path(s) matching '${ONLY:-safe}'"
 else
     rec_log "Restoring everything"
 fi
@@ -121,8 +190,33 @@ if [[ -f "$REC_ROOT/config.sh" ]]; then
     fi
 fi
 
-for svc in "${stopped[@]:-}"; do
-    [[ -n "$svc" ]] || continue
+# --- Validate what we just put back ----------------------------------------
+# emulators.cfg names cores by absolute path. After a reinstall with a
+# different emulator set those paths can point at nothing, and the only
+# symptom is a game that refuses to start with no useful error.
+if [[ -d /opt/retropie/configs ]]; then
+    missing_cores=()
+    while IFS= read -r core; do
+        [[ -e "$core" ]] || missing_cores+=("$core")
+    done < <(grep -rhoE '/opt/retropie/libretrocores/[^ "]+\.so' \
+                 /opt/retropie/configs/*/emulators.cfg 2>/dev/null | sort -u)
+
+    if (( ${#missing_cores[@]} > 0 )); then
+        echo
+        rec_warn "${#missing_cores[@]} emulator core(s) referenced by the restored"
+        rec_warn "configs are not installed on this system:"
+        printf '    %s\n' "${missing_cores[@]}" | head -10
+        (( ${#missing_cores[@]} > 10 )) && echo "    ... and $(( ${#missing_cores[@]} - 10 )) more"
+        rec_warn "Games set to use them will not launch. Either install them:"
+        rec_warn "    sudo ~/RetroPie-Setup/retropie_setup.sh   (Manage packages)"
+        rec_warn "or pick a different emulator per system by holding a button at"
+        rec_warn "launch, which rewrites emulators.cfg."
+    else
+        rec_log "All emulator cores referenced by the restored configs are present."
+    fi
+fi
+
+for svc in "${stopped[@]}"; do
     rec_log "Starting $svc"
     sudo systemctl start "$svc" 2>/dev/null
 done
