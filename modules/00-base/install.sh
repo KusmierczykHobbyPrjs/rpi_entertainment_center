@@ -46,26 +46,66 @@ ok "Set the executable bit on bin/ and the module installers"
 
 # --- Boot behaviour --------------------------------------------------------
 step "Configuring boot behaviour"
+# B2 = console with autologin. The project needs a plain console session,
+# because autostart.sh (run from .bashrc) is what decides which UI starts.
+# Booting to the desktop takes that decision away - and is what happens by
+# default on a Raspberry Pi OS "with desktop" image.
 if rec_has raspi-config; then
-    # B2 = console with autologin. The project needs a plain console session,
-    # because autostart.sh (run from .bashrc) is what decides which UI starts.
-    # Booting straight to the desktop would take that decision away.
-    if sudo raspi-config nonint do_boot_behaviour B2; then
-        ok "Boot set to 'Console Autologin'"
-    else
-        fail "Could not set boot behaviour - do it manually:"
-        fail "  sudo raspi-config -> System Options -> Boot / Auto Login -> Console Autologin"
-    fi
+    sudo raspi-config nonint do_boot_behaviour B2 >/dev/null 2>&1
+    sudo raspi-config nonint do_boot_wait 0 >/dev/null 2>&1
+fi
 
-    # Wait for the network before handing control to the login shell, so that
-    # the VPN autostart is not racing dhcpcd on every boot.
-    if sudo raspi-config nonint do_boot_wait 0; then
-        ok "Boot now waits for the network"
-    else
-        skip "Could not enable 'wait for network' - set it in raspi-config if VPN autostart is flaky"
-    fi
+# Do not trust the exit code - verify. On some releases raspi-config returns
+# success without changing anything, and the failure only shows up as "the Pi
+# booted to the desktop and nothing started".
+boot_ok=1
+target="$(systemctl get-default 2>/dev/null)"
+if [[ "$target" == "multi-user.target" ]]; then
+    ok "Boot target is multi-user.target (console)"
 else
-    skip "raspi-config not found - set 'Console Autologin' by hand"
+    fail "Boot target is '$target', not multi-user.target"
+    boot_ok=0
+fi
+
+if [[ -f /etc/systemd/system/getty@tty1.service.d/autologin.conf ]]; then
+    ok "Console autologin is configured"
+else
+    fail "Console autologin is NOT configured"
+    boot_ok=0
+fi
+
+# A display manager left enabled will grab the screen even with the right
+# boot target, which looks identical to "autostart did not run".
+for dm in lightdm gdm3 sddm greetd; do
+    if systemctl is-enabled --quiet "$dm" 2>/dev/null; then
+        fail "Display manager '$dm' is still enabled and will take over the screen"
+        note "Disable it with: sudo systemctl disable $dm"
+        boot_ok=0
+    fi
+done
+
+if [[ $boot_ok -eq 0 ]]; then
+    cat <<EOF
+
+  ${REC_C_BOLD}Boot behaviour could not be set automatically.${REC_C_OFF}
+
+  Without this the Pi boots into the desktop, ~/.bashrc never runs on the
+  console, and none of the background services start - which looks like
+  everything is broken.
+
+  Fix it by hand, then re-run this module:
+
+      sudo raspi-config
+        -> System Options -> Boot / Auto Login -> Console Autologin
+
+  Verify with:
+
+      systemctl get-default          # want: multi-user.target
+
+EOF
+    if ! confirm "Continue anyway?"; then
+        exit 1
+    fi
 fi
 
 # --- Autostart hook --------------------------------------------------------

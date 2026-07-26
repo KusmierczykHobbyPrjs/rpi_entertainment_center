@@ -32,6 +32,68 @@ is still wrong.
 
 ---
 
+## Nothing starts at boot — no Kodi, no services
+
+The most common cause is that **the Pi booted into the desktop instead of the
+console**, so `~/.bashrc` never ran on tty1 and `autostart.sh` never executed.
+A Raspberry Pi OS "with desktop" image does this by default.
+
+**First, look at the log.** `autostart.sh` records every run:
+
+```bash
+cat ~/.local/state/rec/autostart.log
+./bin/doctor.sh autostart
+```
+
+| What the log says | Meaning |
+|---|---|
+| *(file does not exist)* | It has never run at all — the boot target is wrong, see below |
+| `Not the console (tty='')` only | It ran from SSH but never on the console — same cause |
+| `On the console - proceeding` | It ran; the problem is further down (a UI failing to start) |
+
+**Check the boot target:**
+
+```bash
+systemctl get-default                  # want: multi-user.target
+ls /etc/systemd/system/getty@tty1.service.d/autologin.conf
+```
+
+If either is wrong:
+
+```bash
+sudo raspi-config
+  → System Options → Boot / Auto Login → Console Autologin
+sudo reboot
+```
+
+**Check no display manager is grabbing the screen.** This produces exactly the
+same symptom even with a correct boot target:
+
+```bash
+for dm in lightdm gdm3 sddm greetd; do systemctl is-enabled $dm 2>/dev/null; done
+sudo systemctl disable lightdm         # whichever is enabled
+```
+
+**If it ran on the console but no UI appeared**, the configured UI cannot
+start. The usual cause on Bookworm and later is Wayland: `config.example.sh`
+defaults to `startx` / `Xorg`, which do not exist on a Wayland session.
+
+```bash
+echo "$XDG_SESSION_TYPE"       # from a desktop session
+./bin/doctor.sh ui
+```
+
+See [40-desktop.md](40-desktop.md#wayland-changes-the-ui-entries) for the
+`REC_UI_*` values Wayland needs.
+
+**Test the whole chain without rebooting**, from the physical console:
+
+```bash
+REC_FORCE_AUTOSTART=1 bash bin/autostart.sh
+```
+
+---
+
 ## Nothing appears on the TV
 
 Black screen after boot. **SSH still works, so this is always recoverable.**

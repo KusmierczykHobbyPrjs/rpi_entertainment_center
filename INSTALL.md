@@ -58,12 +58,21 @@ Use the [Raspberry Pi Imager](https://www.raspberrypi.com/software/).
 - **OS:** Raspberry Pi OS (32-bit) **with desktop**. You need the desktop
   variant even though the Pi will boot to a console — the desktop is one of
   the three UIs.
+
+  On a Pi 3B choose **32-bit**, not 64-bit: with 1 GB of RAM the 64-bit
+  build costs roughly 90 MB more at idle and buys you nothing this project
+  uses.
 - Click the **gear icon** before writing and set:
-  - **Hostname:** something memorable, e.g. `rpi`. You will use this to
-    connect: `ssh pi@rpi`.
-  - **Enable SSH** with password authentication.
-  - **Username and password.** These docs assume the user is `pi`; anything
-    works, the scripts do not care.
+  - **Hostname.** The default is `raspberrypi`, so without changing it you
+    connect with `ssh <user>@raspberrypi`. Set it to something shorter here
+    (e.g. `rpi`) if you would rather — but whatever you choose, use *that*
+    everywhere these docs write `raspberrypi`.
+  - **Enable SSH** with password authentication. **This is not on by
+    default** — if you skip it here, SSH will refuse to connect and you will
+    need a keyboard and monitor to turn it on.
+  - **Username and password.** There is no default `pi` user any more; the
+    Imager makes you create one. These docs write `pi` and `raspberrypi`
+    for concreteness — substitute your own. No script depends on either.
   - **Wi-Fi credentials**, if you are not using Ethernet.
   - **Locale and timezone.**
 
@@ -81,11 +90,17 @@ reboots itself once.
 From another computer on the same network:
 
 ```bash
-ssh pi@rpi
+ssh <your-user>@raspberrypi          # or your chosen hostname
 ```
 
-If the hostname does not resolve, find the Pi's IP address from your router's
-device list and use that instead.
+Two things commonly go wrong here:
+
+- **"Connection refused"** — SSH was not enabled in the Imager. There is no
+  way around this remotely; attach a keyboard and monitor and run
+  `sudo raspi-config` → Interface Options → SSH.
+- **"Name or service not known"** — mDNS is not resolving. Try
+  `<user>@raspberrypi.local`, or find the Pi's IP in your router's device
+  list and use that.
 
 The rest of this guide is done over SSH. You do not need a keyboard attached
 to the Pi.
@@ -199,14 +214,20 @@ Run the menu and pick:
 ./install.sh
 ```
 
-…or name them directly:
+…or name the ones you want, in order. **These are examples, not a script to
+run top to bottom** — install only the modules you actually want:
 
 ```bash
-./install.sh 10-kodi 15-kodi-iptv 20-kodi-addons
-./install.sh 50-ui-rotation 60-gpio
-./install.sh 70-nordvpn 75-port-forwarding
-./install.sh 90-speech
+./install.sh 00-base                     # required, first
+./install.sh 10-kodi 15-kodi-iptv        # media centre + live TV
+./install.sh 90-speech                   # before the VPN, so it can talk
+./install.sh 40-desktop                  # only if you want the desktop UI
+./install.sh 50-ui-rotation              # LAST of the UI modules - it checks
+                                         # that the UIs in config.sh exist
 ```
+
+`50-ui-rotation` must come after the UI modules, and `00-base` before
+everything. Otherwise order is up to you.
 
 Recommended order and what each costs you in time:
 

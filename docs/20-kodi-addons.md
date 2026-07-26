@@ -48,7 +48,9 @@ inside Kodi, with no keyboard and no SSH.
 1. Install the zip.
 2. Settings → Add-ons → Install from repository → **Linux Add-on Repository**
    → Program add-ons → **Shell Script Launcher**.
-3. Configure it: point **menu file** at `/home/pi/shell_command_launcher.menu`.
+3. Configure it: point **menu file** at `~/shell_command_launcher.menu`
+   — the full path is printed by the installer, and is your home directory,
+   not necessarily `/home/pi`.
 4. Right-click the add-on → **Add to Favourites**, so it is one press away.
 
 Source: <https://github.com/wastis/LinuxAddonRepo>

@@ -246,6 +246,61 @@ drive is absent — and it will be absent eventually.
 
 ---
 
+## The boot config file
+
+**The path changed.** It is `/boot/firmware/config.txt` on Bookworm and later;
+older guides say `/boot/config.txt`, which is now only a compatibility symlink
+on some releases and absent on others.
+
+```bash
+sudo nano /boot/firmware/config.txt
+sudo reboot                        # nothing here takes effect until you do
+```
+
+### Settings that no longer do anything
+
+Widely-copied lines from older tutorials that are **ignored** on Bookworm and
+later, because the KMS graphics driver (`dtoverlay=vc4-kms-v3d`, the default)
+handles these differently:
+
+| Line | Status |
+|---|---|
+| `gpu_mem=128` | **Ignored.** Video memory is now allocated dynamically through CMA. There is no fixed split to tune. |
+| `decode_MPG2=`, `decode_WVC1=` | **Obsolete.** The paid MPEG-2 and VC-1 licence keys were discontinued, and the KMS driver does not use them. Empty values do nothing regardless. |
+| `hdmi_group`, `hdmi_mode` | Ignored under KMS. Set the resolution in the desktop's Screen Configuration, or with `video=` on the kernel command line. |
+
+Harmless to leave in place, but they are not achieving anything — if you added
+them expecting smoother video, that is not where the win is.
+
+### Settings that do still matter
+
+```
+# Overscan: removes black borders on some TVs
+disable_overscan=1
+
+# Force HDMI output even when the TV is off at boot, so a headless Pi still
+# produces a picture when you switch the TV on later
+hdmi_force_hotplug=1
+
+# Analogue audio out of the 3.5 mm jack (needed for module 85-bluetooth)
+dtparam=audio=on
+```
+
+### What actually helps video on a Pi 3B
+
+Not `gpu_mem`. In order of effect:
+
+1. **A 2.5 A+ power supply.** Under-voltage throttles the CPU silently.
+   Check with `vcgencmd get_throttled` — anything but `0x0` means it happened.
+2. **Wired Ethernet** rather than Wi-Fi for streaming.
+3. **Lower the desktop resolution** (`REC_DESKTOP_MODE` in `config.sh`) — a
+   Pi 3B cannot play video in a browser at 1080p whatever you configure.
+4. **Accept the hardware limits.** A Pi 3B decodes H.264 in hardware and has
+   no HEVC/H.265 block at all, so 4K and most HEVC content is software-decoded
+   and will stutter regardless of settings.
+
+---
+
 ## Temperature
 
 ```bash

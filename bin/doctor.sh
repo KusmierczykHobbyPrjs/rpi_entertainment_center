@@ -7,7 +7,8 @@
 #
 #   doctor.sh              check everything
 #   doctor.sh vpn          check one section
-#                          (base|kodi|ui|gpio|vpn|net|web|audio|bluetooth|weather)
+#                          (base|autostart|kodi|ui|gpio|vpn|net|web|audio|
+#                           bluetooth|weather)
 #
 # Every failure line says what to do about it.
 # ---------------------------------------------------------------------------
@@ -89,6 +90,54 @@ if (( nonexec == 0 )); then
 else
     warn "$nonexec script(s) in bin/ are not executable" \
          "chmod +x $REC_BIN/*.sh $REC_BIN/*.py"
+fi
+fi
+
+# ===========================================================================
+if run_section autostart; then
+section "Autostart"
+
+REC_LOG="$HOME/.local/state/rec/autostart.log"
+
+if [[ -f "$REC_LOG" ]]; then
+    pass "Autostart log exists: $REC_LOG"
+    last="$(grep -- '--- autostart invoked' "$REC_LOG" | tail -1 | cut -d' ' -f1-2)"
+    [[ -n "$last" ]] && pass "Last ran: $last"
+
+    # The single most common failure: it ran, but not on the console, so it
+    # exited immediately without starting anything.
+    if tail -30 "$REC_LOG" | grep -q "Not the console"; then
+        if tail -30 "$REC_LOG" | grep -q "On the console - proceeding"; then
+            pass "It has run on the console at least once"
+        else
+            bad "Autostart only ever ran off-console, so nothing was started" \
+                "The Pi is booting to the desktop. Run: ./install.sh 00-base"
+        fi
+    fi
+
+    if grep -q "^.*SKIP " "$REC_LOG" 2>/dev/null; then
+        warn "Some services were skipped - see the log" "tail -30 $REC_LOG"
+    fi
+else
+    warn "No autostart log yet ($REC_LOG)" \
+         "It is written on the first console boot. Normal before a reboot."
+fi
+
+# A display manager beats the console to the screen even with the right
+# boot target, and the symptom is identical to autostart never running.
+for dm in lightdm gdm3 sddm greetd; do
+    if systemctl is-enabled --quiet "$dm" 2>/dev/null; then
+        bad "Display manager '$dm' is enabled and will take the screen" \
+            "sudo systemctl disable $dm"
+    fi
+done
+
+# Wayland vs X11 changes which UI start command works.
+if [[ -n "${WAYLAND_DISPLAY:-}" ]]; then
+    pass "Wayland session detected"
+elif rec_has labwc || rec_has wayfire; then
+    warn "A Wayland compositor is installed" \
+         "REC_UI_START must use it (labwc/wayfire), not 'startx' - see docs/40-desktop.md"
 fi
 fi
 
