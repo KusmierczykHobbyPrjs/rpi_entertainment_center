@@ -8,8 +8,8 @@ if [ -z "$ALREADY_RUNNING" ]; then
     python3 gpio2command.py 3 "shutdown" "now" &    
     python3 gpio2command.py 4 "bash" "stop_current_ui.sh" &     
     python3 gpio2command.py 17 "bash" "nordvpn_rotate.sh" &   
-    # python3 gpio2command.py 17 "kodi-send" "-a" "PlayerControl(Play)" &
-    # python3 gpio2command.py 27 "kodi-send" "-a" "Action(VolumeUp)" &    
+    python3 gpio2command.py 22 "kodi-send" "-a" "PlayerControl(Play)" &
+    python3 gpio2command.py 27 "kodi-send" "-a" "PlayPvrRadio" &    
     # python3 gpio2command.py 22 "kodi-send" "-a" "Action(VolumeDown)" &
 fi
 
