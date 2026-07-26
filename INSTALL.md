@@ -327,15 +327,33 @@ keeping from the old system, and where they belong on the new one:
 | Web server content | `/var/www/html/` | same |
 | Tvheadend config | `/home/hts/.hts/` | same |
 
-Back them up before wiping the card:
+`bin/backup.sh` collects all of this into one archive — run it **before**
+wiping the card:
 
 ```bash
-# from another machine
-rsync -av pi@rpi:~/.kodi/userdata/     ./backup/kodi-userdata/
-rsync -av pi@rpi:~/RetroPie/roms/      ./backup/roms/
-rsync -av pi@rpi:/opt/retropie/configs/ ./backup/retropie-configs/
-scp pi@rpi:~/config.sh                 ./backup/
+bin/backup.sh                                  # settings, ~10 MB
+scp pi@rpi:~/rec-backups/rec-backup-*.tar.gz . # copy it somewhere safe
 ```
+
+ROMs are excluded by default because they are usually gigabytes. Take them
+separately, or use `bin/backup.sh --with-content`:
+
+```bash
+rsync -av --info=progress2 pi@rpi:~/RetroPie/roms/ ./roms-backup/
+```
+
+Afterwards, **install the modules first, then restore** — RetroPie's setup
+recreates `/opt/retropie/configs` and the installers rewrite `config.sh`, so
+restoring first would be undone:
+
+```bash
+./install.sh 00-base 10-kodi 30-retropie
+bin/restore.sh rec-backup-settings-*.tar.gz
+bin/doctor.sh
+```
+
+Full details, including restoring only part of an archive:
+**[docs/BACKUP.md](docs/BACKUP.md)**.
 
 If you are moving from the older version of this project — where every script
 sat loose in the home directory — read

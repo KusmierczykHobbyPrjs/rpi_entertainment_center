@@ -162,6 +162,7 @@ Install them in this order; each is a separate `./install.sh <name>` run.
 - **[docs/CONFIGURATION.md](docs/CONFIGURATION.md)** — every setting in `config.sh`
 - **[docs/HARDWARE.md](docs/HARDWARE.md)** — GPIO wiring, the case, the parts list
 - **[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)** — symptom-first fixes
+- **[docs/BACKUP.md](docs/BACKUP.md)** — saving and restoring everything a reinstall would lose
 - **[docs/SOURCES.md](docs/SOURCES.md)** — the tutorials this is built on, credited and grouped by module
 - **[docs/MIGRATION.md](docs/MIGRATION.md)** — moving from the old flat-home-directory layout
 
@@ -185,6 +186,8 @@ Install them in this order; each is a separate `./install.sh <name>` run.
 │   ├── speech.sh               spoken messages
 │   ├── signal_action.sh        the confirmation beep
 │   ├── clipboard2chromium.sh   open the phone's clipboard URL on the TV
+│   ├── backup.sh               save settings before a reinstall
+│   ├── restore.sh              put them back afterwards
 │   ├── doctor.sh               health check
 │   └── ...
 │
