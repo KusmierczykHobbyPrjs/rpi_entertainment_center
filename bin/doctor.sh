@@ -221,7 +221,37 @@ for i in "${!REC_UI_NAMES[@]}"; do
         bad "${REC_UI_NAMES[$i]} -> $binary is not installed" \
             "Install it, or remove index $i from all four arrays in config.sh"
     fi
+
+    # The two start commands that are commonly wrong rather than missing.
+    case "$binary" in
+        kodi)
+            if rec_has kodi-standalone || rec_has kodi-gbm; then
+                bad "REC_UI_START uses plain 'kodi', which needs an X server" \
+                    "From a console use kodi-standalone (or kodi-gbm) instead"
+            fi
+            ;;
+        startx)
+            if rec_has labwc || rec_has wayfire; then
+                bad "REC_UI_START uses 'startx' but this system runs Wayland" \
+                    "Use 'labwc &' (or 'wayfire &') - see docs/40-desktop.md"
+            fi
+            ;;
+    esac
 done
+
+# Kodi from a console reaches the GPU and input devices directly, so it needs
+# these groups. They used to be granted only by the RetroPie module.
+missing_groups=()
+for grp in video render input tty; do
+    getent group "$grp" >/dev/null 2>&1 || continue
+    id -nG "$USER" | grep -qw "$grp" || missing_groups+=("$grp")
+done
+if (( ${#missing_groups[@]} == 0 )); then
+    pass "$USER is in the groups a console UI needs"
+else
+    bad "$USER is not in: ${missing_groups[*]}" \
+        "Kodi will exit immediately from a console. Run: ./install.sh 10-kodi, then reboot"
+fi
 
 if (( REC_UI_DEFAULT_INDEX >= 0 && REC_UI_DEFAULT_INDEX < n )); then
     pass "Default UI is ${REC_UI_NAMES[$REC_UI_DEFAULT_INDEX]}"

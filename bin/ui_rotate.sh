@@ -34,7 +34,7 @@ rec_log "UI watchdog started. Managing: ${REC_UI_NAMES[*]}"
 any_ui_running() {
     local proc
     for proc in "${REC_UI_PROCESSES[@]}"; do
-        if pgrep -x "$proc" >/dev/null 2>&1; then
+        if rec_ui_running "$proc"; then
             return 0
         fi
     done
@@ -56,12 +56,30 @@ while true; do
             index="${REC_UI_DEFAULT_INDEX:-0}"
         fi
 
+        # Check the binary exists before trying, so the log says something
+        # useful instead of the same failure repeating forever.
+        start_binary="${REC_UI_START[$index]%% *}"
+        if ! rec_has "$start_binary"; then
+            rec_error "Cannot start ${REC_UI_NAMES[$index]}: '$start_binary' not found."
+            rec_error "Fix REC_UI_START in config.sh - see docs/50-ui-rotation.md."
+            sleep 30
+            continue
+        fi
+
         rec_log "No UI running. Starting ${REC_UI_NAMES[$index]}: ${REC_UI_START[$index]}"
         eval "${REC_UI_START[$index]}"
 
         # Give the UI time to claim the framebuffer before polling again,
         # otherwise a slow-starting Kodi gets started a second time.
         sleep 10
+
+        # If it still is not visible, say so rather than silently looping.
+        if ! rec_ui_running "${REC_UI_PROCESSES[$index]}"; then
+            rec_warn "${REC_UI_NAMES[$index]} did not appear as process '${REC_UI_PROCESSES[$index]}'."
+            rec_warn "Either it failed to start, or REC_UI_PROCESSES has the wrong name."
+            rec_warn "Check with: ps -A | grep -i ${REC_UI_PROCESSES[$index]:0:6}"
+            sleep 20
+        fi
     fi
     sleep 1
 done

@@ -141,6 +141,24 @@ rec_online() {
     ping -c1 -W2 1.1.1.1 >/dev/null 2>&1
 }
 
+# True when a UI process is running.
+#
+# Matching on the exact process name is not enough: what a UI is called in
+# `ps` frequently differs from the command that started it. kodi-standalone
+# ends up as kodi.bin or kodi-gbm; EmulationStation is truncated to 15
+# characters. If the watchdog cannot see a running UI it starts another one
+# every few seconds, which looks exactly like "the UI will not start".
+#
+# So: exact name first (cheap, precise), then a whole-command-line match.
+rec_ui_running() {
+    local name="$1"
+    pgrep -x "$name" >/dev/null 2>&1 && return 0
+    # -f matches the full command line; anchor loosely so kodi matches
+    # kodi.bin and kodi-gbm, but not an unrelated process merely mentioning it.
+    pgrep -f "(^|/)${name}" >/dev/null 2>&1 && return 0
+    return 1
+}
+
 # Convert a 0-100 volume percentage into the 0-32768 scale mpg123 -f expects.
 rec_volume_scale() {
     local pct="${VOLUME:-100}"

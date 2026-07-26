@@ -32,13 +32,27 @@
 # Process names as they appear in `ps -A` (used to detect what is running).
 # NOTE: Linux truncates process names at 15 characters, which is why
 # EmulationStation appears as "emulationstatio" - this is not a typo.
+# Under Wayland the desktop is "labwc" or "wayfire", not "Xorg".
 REC_UI_PROCESSES=("kodi" "emulationstatio" "Xorg")
 
 # Human-readable names, used in log lines and spoken messages.
 REC_UI_NAMES=("Kodi" "RetroPie" "Desktop")
 
 # Command that starts each UI.
-REC_UI_START=("kodi &" "emulationstation &" "startx &")
+#
+# IMPORTANT - two of these defaults are wrong on many systems:
+#
+#   Kodi: the bare "kodi" command is a wrapper that prefers the X11 build and
+#         CANNOT start from a console with no desktop. Use "kodi-standalone"
+#         (or "kodi-gbm"). Module 10-kodi detects which you have and prints
+#         the right one.
+#
+#   Desktop: "startx" only exists under X11. Bookworm and later default to
+#         Wayland, where the command is "labwc" (or "wayfire"). Module
+#         40-desktop prints the right one for your session.
+#
+# Getting these wrong gives a black screen at boot with no explanation.
+REC_UI_START=("kodi-standalone &" "emulationstation &" "startx &")
 
 # Command that cleanly stops each UI.
 REC_UI_STOP=("kodi-send --action=\"Quit\"" "pkill emulationstatio" "killall Xorg")
@@ -141,11 +155,15 @@ export REC_WEATHER_UNITS="metric"
 # ===========================================================================
 # Desktop
 # ===========================================================================
-# Fixed resolution for the LXDE desktop session. The desktop otherwise uses
-# the maximum mode the TV reports, which is often too slow for a Pi 3B when
+# Fixed resolution for the desktop session. The desktop otherwise uses the
+# maximum mode the TV reports, which is often too slow for a Pi 3B when
 # playing video in a browser.
 #
-# Find your output name and available modes with: xrandr
+# Find your output name and available modes FROM INSIDE a desktop session:
+#     wlr-randr             Wayland (Bookworm and later - the default)
+#     DISPLAY=:0 xrandr     X11
+# Over SSH with no session both fail; xrandr also fails under Wayland
+# entirely, which is what "Can't open display" usually means.
 export REC_DESKTOP_OUTPUT="HDMI-1"
 export REC_DESKTOP_MODE="1360x768"
 export REC_DESKTOP_RATE="60"

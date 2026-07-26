@@ -28,7 +28,7 @@ bash "$REC_BIN/signal_action.sh" &
 # Find which UI is currently running.
 current_index=-1
 for i in "${!REC_UI_PROCESSES[@]}"; do
-    if pgrep -x "${REC_UI_PROCESSES[$i]}" >/dev/null 2>&1; then
+    if rec_ui_running "${REC_UI_PROCESSES[$i]}"; then
         current_index=$i
         break
     fi
@@ -60,7 +60,7 @@ eval "${REC_UI_STOP[$current_index]}"
 # grace period, escalate - otherwise the watchdog sees a UI running and never
 # starts the next one, which looks like the button did nothing.
 for _ in {1..10}; do
-    pgrep -x "${REC_UI_PROCESSES[$current_index]}" >/dev/null 2>&1 || exit 0
+    rec_ui_running "${REC_UI_PROCESSES[$current_index]}" || exit 0
     sleep 1
 done
 
