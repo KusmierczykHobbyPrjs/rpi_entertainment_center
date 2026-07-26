@@ -38,18 +38,19 @@ log "--- autostart invoked on $(tty 2>/dev/null || echo 'no tty') (pid $$) ---"
 # screen, so only the physical console proceeds.
 # Set REC_FORCE_AUTOSTART=1 to override (useful when testing).
 if [[ "${REC_FORCE_AUTOSTART:-0}" != "1" ]]; then
-    current_tty="$(tty 2>/dev/null || echo '')"
-    case "$current_tty" in
-        /dev/tty1) log "On the console - proceeding." ;;
-        *)
-            log "Not the console (tty='$current_tty') - exiting without starting anything."
-            log "This is normal for SSH. If you see this on the TV, the Pi is not"
-            log "booting to a console: check 'systemctl get-default' is multi-user.target."
-            exit 0
-            ;;
-    esac
+    ctty="$(rec_controlling_tty)"
+    log "Controlling terminal: '${ctty:-none}'  XDG_VTNR='${XDG_VTNR:-unset}'  SSH='${SSH_CONNECTION:+yes}'"
+    if rec_on_console; then
+        log "On the console - proceeding."
+    else
+        log "Not the console - exiting without starting anything."
+        log "This is normal for SSH. If you see this after a console boot, check:"
+        log "  systemctl get-default        (want multi-user.target)"
+        log "  ls /etc/systemd/system/getty@tty1.service.d/autologin.conf"
+        exit 0
+    fi
 else
-    log "REC_FORCE_AUTOSTART=1 - proceeding regardless of tty."
+    log "REC_FORCE_AUTOSTART=1 - proceeding regardless of terminal."
 fi
 
 log "Repository: $REC_ROOT"

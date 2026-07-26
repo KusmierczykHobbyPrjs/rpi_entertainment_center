@@ -141,6 +141,43 @@ rec_online() {
     ping -c1 -W2 1.1.1.1 >/dev/null 2>&1
 }
 
+# Name of the controlling terminal, e.g. "tty1" or "pts/1"; empty if none.
+#
+# Deliberately NOT `tty`, which reports the terminal of *stdin*. autostart.sh
+# is launched from .bashrc with `&`, and bash redirects an asynchronous
+# command's stdin to /dev/null whenever job control is off - which it is while
+# startup files are being processed. `tty` therefore prints "not a tty" (in
+# the system language, so not even reliably that string) on a perfectly normal
+# console login, which made the old console check impossible to satisfy.
+#
+# The controlling terminal survives that redirection, so ask ps for it. Walk
+# up to the parent when this process has none of its own.
+rec_controlling_tty() {
+    local t
+    t="$(ps -o tty= -p "$$" 2>/dev/null | tr -d '[:space:]')"
+    if [[ -z "$t" || "$t" == "?" ]]; then
+        t="$(ps -o tty= -p "${PPID:-1}" 2>/dev/null | tr -d '[:space:]')"
+    fi
+    [[ "$t" == "?" ]] && t=""
+    printf '%s' "$t"
+}
+
+# True when we are running on the physical console rather than over SSH.
+rec_on_console() {
+    # SSH sets these; cheapest and most reliable negative test.
+    [[ -n "${SSH_CONNECTION:-}${SSH_TTY:-}${SSH_CLIENT:-}" ]] && return 1
+
+    # systemd/pam set XDG_VTNR to the virtual terminal number on a console
+    # login. Trust it when present.
+    [[ "${XDG_VTNR:-}" == "1" ]] && return 0
+
+    case "$(rec_controlling_tty)" in
+        tty1) return 0 ;;
+        tty[0-9]*) return 0 ;;   # any VT counts as console
+        *) return 1 ;;
+    esac
+}
+
 # True when a UI process is running.
 #
 # Matching on the exact process name is not enough: what a UI is called in

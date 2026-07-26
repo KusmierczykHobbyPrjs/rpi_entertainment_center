@@ -48,8 +48,26 @@ cat ~/.local/state/rec/autostart.log
 | What the log says | Meaning |
 |---|---|
 | *(file does not exist)* | It has never run at all — the boot target is wrong, see below |
-| `Not the console (tty='')` only | It ran from SSH but never on the console — same cause |
+| `Not the console` only | It ran, but never on a console — see below |
 | `On the console - proceeding` | It ran; the problem is further down (a UI failing to start) |
+
+The log records the controlling terminal it detected:
+
+```
+Controlling terminal: 'tty1'  XDG_VTNR='1'  SSH=''
+```
+
+`tty1` (or any `ttyN`) with no SSH marker means console. `pts/N`, or an SSH
+marker, means a remote login and autostart correctly declines.
+
+> **Historical note.** Versions before this used `tty` to make that decision,
+> which reports the terminal of *stdin*. `.bashrc` starts autostart with `&`,
+> and bash redirects an async command's stdin to `/dev/null` while job control
+> is off — which it is during startup files. `tty` therefore printed "not a
+> tty" (localised, so not even reliably that string) on a perfectly normal
+> console boot, and autostart refused to run every single time. If your log is
+> full of `Not the console (tty='not a tty')` or its translation, you are on
+> that version: `git pull`.
 
 **Check the boot target:**
 
