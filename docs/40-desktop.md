@@ -55,11 +55,29 @@ start an X server that is not there and you get a black screen.** The
 installer prints the correct values for your system; `./bin/doctor.sh ui`
 checks them.
 
-Which are you on?
+### Which are you on?
+
+**Both are installed by default** on Raspberry Pi OS — `rpd-wayland-core`
+ships labwc and `rpd-x-core` ships X — so "labwc exists" tells you nothing
+about what is in use. Check what is actually configured:
 
 ```bash
-echo "$XDG_SESSION_TYPE"     # from inside a desktop session
+raspi-config nonint get_wayland    # 0 = Wayland, 1 = X11
+echo "$XDG_SESSION_TYPE"           # definitive, from inside a desktop session
 ```
+
+Or change it:
+
+> `sudo raspi-config` → Advanced Options → Wayland
+
+`./bin/doctor.sh ui` reports the detected server and only complains when your
+`REC_UI_START` genuinely contradicts it.
+
+### If you chose X11
+
+Then `startx &` and process name `Xorg` are correct, and you can ignore
+anything that says otherwise — including older versions of this project's own
+health check, which warned whenever labwc was merely present.
 
 ---
 

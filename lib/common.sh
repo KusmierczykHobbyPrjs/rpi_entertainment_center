@@ -178,6 +178,41 @@ rec_on_console() {
     esac
 }
 
+# Which display server this machine will actually use: "wayland", "x11", or
+# "unknown".
+#
+# Note what this does NOT do: infer from installed packages. Raspberry Pi OS
+# ships both labwc (rpd-wayland-core) and X (rpd-x-core) by default, so
+# "labwc exists" says nothing about what is configured - an earlier version of
+# this check warned about Wayland on correctly configured X11 systems.
+#
+# Order of evidence, most to least reliable.
+rec_display_server() {
+    # 1. A running session is definitive.
+    [[ -n "${WAYLAND_DISPLAY:-}" ]] && { echo wayland; return; }
+    case "${XDG_SESSION_TYPE:-}" in
+        wayland) echo wayland; return ;;
+        x11)     echo x11;     return ;;
+    esac
+
+    # 2. A running compositor or X server.
+    pgrep -x labwc   >/dev/null 2>&1 && { echo wayland; return; }
+    pgrep -x wayfire >/dev/null 2>&1 && { echo wayland; return; }
+    pgrep -x Xorg    >/dev/null 2>&1 && { echo x11;     return; }
+
+    # 3. What raspi-config has been told to use. The getter is readable
+    #    without sudo on current releases; 0 means Wayland is in use.
+    if command -v raspi-config >/dev/null 2>&1; then
+        case "$(raspi-config nonint get_wayland 2>/dev/null)" in
+            0) echo wayland; return ;;
+            1) echo x11;     return ;;
+        esac
+    fi
+
+    # 4. Give up rather than guess from what happens to be installed.
+    echo unknown
+}
+
 # True when a UI process is running.
 #
 # Matching on the exact process name is not enough: what a UI is called in

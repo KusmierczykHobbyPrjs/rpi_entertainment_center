@@ -153,13 +153,18 @@ for dm in lightdm gdm3 sddm greetd; do
     fi
 done
 
-# Wayland vs X11 changes which UI start command works.
-if [[ -n "${WAYLAND_DISPLAY:-}" ]]; then
-    pass "Wayland session detected"
-elif rec_has labwc || rec_has wayfire; then
-    warn "A Wayland compositor is installed" \
-         "REC_UI_START must use it (labwc/wayfire), not 'startx' - see docs/40-desktop.md"
-fi
+# Which display server is actually configured, not merely installed.
+case "$(rec_display_server)" in
+    wayland) pass "Display server: Wayland (UI start command must be labwc/wayfire)" ;;
+    x11)     pass "Display server: X11 (UI start command must be startx)" ;;
+    *)
+        note_avail=""
+        rec_has startx && note_avail="startx"
+        rec_has labwc  && note_avail="${note_avail:+$note_avail, }labwc"
+        warn "Could not determine the display server (installed: ${note_avail:-none})" \
+             "Check from a desktop session: echo \$XDG_SESSION_TYPE"
+        ;;
+esac
 fi
 
 # ===========================================================================
@@ -231,9 +236,18 @@ for i in "${!REC_UI_NAMES[@]}"; do
             fi
             ;;
         startx)
-            if rec_has labwc || rec_has wayfire; then
-                bad "REC_UI_START uses 'startx' but this system runs Wayland" \
+            # Only complain on positive evidence that Wayland is in use.
+            # Both are installed by default on Raspberry Pi OS, so presence
+            # of labwc proves nothing.
+            if [[ "$(rec_display_server)" == "wayland" ]]; then
+                bad "REC_UI_START uses 'startx' but this session is Wayland" \
                     "Use 'labwc &' (or 'wayfire &') - see docs/40-desktop.md"
+            fi
+            ;;
+        labwc|wayfire)
+            if [[ "$(rec_display_server)" == "x11" ]]; then
+                bad "REC_UI_START uses '$binary' but this session is X11" \
+                    "Use 'startx &' with process name 'Xorg'"
             fi
             ;;
     esac
