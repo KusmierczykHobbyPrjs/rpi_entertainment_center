@@ -129,12 +129,21 @@ REC_PORT_FORWARDS=(
 # Physical buttons wired between a GPIO pin and GND. Each entry maps a BCM
 # pin number to the command run when the button is pressed.
 #
-# Format: "BCM_PIN:command with arguments"
+# Format: "BCM_PIN:command"  or  "BCM_PIN@HOLD_MS:command"
+#
+# HOLD_MS is how long the pin must stay low before the press is believed.
+# Default 50 ms. This rejects electrical crosstalk between adjacent header
+# pins - without it, pressing one button can fire its neighbour, and with
+# shutdown on GPIO 3 that is memorable.
+#
+# Give destructive actions a longer hold: 1500 ms means shutdown needs a
+# deliberate press-and-hold rather than a brush.
+#
 # See docs/HARDWARE.md for the wiring diagram and the pin numbering scheme.
 #
 # $REC_BIN is expanded at runtime and points at this repository's bin/ folder.
 REC_GPIO_BUTTONS=(
-    "3:sudo shutdown now"
+    "3@1500:sudo shutdown now"
     "4:bash $REC_BIN/stop_current_ui.sh"
     "17:bash $REC_BIN/nordvpn_rotate.sh"
     "22:kodi-send -a PlayerControl(Play)"

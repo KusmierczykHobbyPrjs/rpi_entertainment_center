@@ -59,9 +59,26 @@ circuit:
                  button
 ```
 
-**No resistor is needed.** The listener enables the Pi's internal pull-up, so
-the pin idles high (3.3 V) and pressing the button pulls it to 0 V. The script
-triggers on that falling edge.
+**No resistor is strictly needed.** The listener enables the Pi's internal
+pull-up, so the pin idles high (3.3 V) and pressing the button pulls it to
+0 V.
+
+> **With more than two or three buttons, fit 10 kΩ pull-ups anyway.** The
+> internal ones are about 50 kΩ — weak enough that pressing one button can
+> couple a transient into a neighbouring pin and fire *its* command. Adjacent
+> header pins and unshielded wire make this easy; with shutdown on GPIO 3 the
+> result is memorable.
+>
+> ```
+>     3.3V ──[10k]──┬── GPIO pin
+>                   │
+>                   o  o ── GND
+>                  button
+> ```
+>
+> A 100 nF capacitor across the switch helps further. The software rejects
+> most of it by requiring the pin to stay low (see
+> [60-gpio.md](60-gpio.md)), but a stiffer pull-up fixes the cause.
 
 ### Pin numbering
 

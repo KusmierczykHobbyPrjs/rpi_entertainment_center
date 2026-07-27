@@ -216,7 +216,13 @@ REC_GPIO_BUTTONS=(
 )
 ```
 
-Format: `BCM_PIN:command with arguments`.
+Format: `BCM_PIN:command` or `BCM_PIN@HOLD_MS:command`.
+
+`HOLD_MS` is how long the pin must stay low before the press is believed
+(default 50 ms). It rejects electrical crosstalk between adjacent header pins
+— without it, pressing one button can fire its neighbour. Give destructive
+actions a longer hold: `"3@1500:sudo shutdown now"` requires a deliberate
+press-and-hold.
 
 - Pin numbers are **BCM** numbering, not physical header positions. See
   [HARDWARE.md](HARDWARE.md).

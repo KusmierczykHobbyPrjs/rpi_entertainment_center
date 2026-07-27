@@ -37,20 +37,50 @@ BOUNCE_MS = 300
 # within this window is almost always an accident.
 REPEAT_GUARD_S = 1.0
 
+# Milliseconds the pin must STAY low before we believe it.
+#
+# An edge alone is not a press. The internal pull-ups are weak (~50k), header
+# pins are physically adjacent, and button wiring is usually unshielded - so
+# pressing one button couples a transient into its neighbours and produces a
+# perfectly real falling edge on a pin nobody touched. Acting on the edge
+# alone made other buttons fire, most alarmingly the shutdown one.
+#
+# Re-reading after a short settle rejects those: a genuine press holds the pin
+# low for tens of milliseconds at least, a crosstalk glitch does not.
+DEFAULT_HOLD_MS = 50
+
 
 def parse_button(spec):
-    """Turn "17:bash foo.sh --flag" into (17, ["bash", "foo.sh", "--flag"])."""
+    """Parse a button spec into (pin, hold_ms, command).
+
+    Accepted forms:
+        "17:bash foo.sh"        hold for DEFAULT_HOLD_MS
+        "3@1500:sudo shutdown"  hold the pin low for 1500 ms first
+
+    The @HOLD suffix is optional, so existing "PIN:COMMAND" entries keep
+    working unchanged. It is worth using on destructive actions: requiring a
+    deliberate press makes an accidental shutdown far less likely.
+    """
     pin_text, _, command_text = spec.partition(":")
     if not command_text.strip():
         raise ValueError(f"missing command in {spec!r} (expected 'PIN:COMMAND')")
+
+    hold_ms = DEFAULT_HOLD_MS
+    if "@" in pin_text:
+        pin_text, _, hold_text = pin_text.partition("@")
+        try:
+            hold_ms = int(hold_text.strip())
+        except ValueError:
+            raise ValueError(f"invalid hold time in {spec!r}") from None
+
     try:
         pin = int(pin_text.strip())
     except ValueError:
         raise ValueError(f"invalid BCM pin number in {spec!r}") from None
-    return pin, shlex.split(command_text)
+    return pin, hold_ms, shlex.split(command_text)
 
 
-def make_handler(pin, command):
+def make_handler(pin, hold_ms, command):
     """Build the edge callback for one button, with its own repeat guard."""
     state = {"last": 0.0}
 
@@ -58,8 +88,18 @@ def make_handler(pin, command):
         now = time.monotonic()
         if now - state["last"] < REPEAT_GUARD_S:
             return
-        state["last"] = now
 
+        # Confirm the press is real. Buttons pull the pin to ground, so a held
+        # button reads LOW throughout; a crosstalk transient has already gone.
+        deadline = now + (hold_ms / 1000.0)
+        while time.monotonic() < deadline:
+            if GPIO.input(pin) != GPIO.LOW:
+                print(f"[gpio] GPIO{pin} edge ignored - not held "
+                      f"({hold_ms}ms); likely crosstalk", flush=True)
+                return
+            time.sleep(0.005)
+
+        state["last"] = time.monotonic()
         print(f"[gpio] GPIO{pin} pressed -> {' '.join(command)}", flush=True)
         try:
             # shell=False: the command was already tokenised by shlex, so a
@@ -85,15 +125,16 @@ def main(argv):
     GPIO.setmode(GPIO.BCM)
     GPIO.setwarnings(False)
 
-    for pin, command in buttons:
+    for pin, hold_ms, command in buttons:
         GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
         GPIO.add_event_detect(
             pin,
             GPIO.FALLING,
-            callback=make_handler(pin, command),
+            callback=make_handler(pin, hold_ms, command),
             bouncetime=BOUNCE_MS,
         )
-        print(f"[gpio] GPIO{pin} -> {' '.join(command)}", flush=True)
+        print(f"[gpio] GPIO{pin} (hold {hold_ms}ms) -> {' '.join(command)}",
+              flush=True)
 
     print(f"[gpio] Listening on {len(buttons)} button(s). Ctrl-C to stop.", flush=True)
     try:

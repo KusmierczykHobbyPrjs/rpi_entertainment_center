@@ -56,7 +56,7 @@ and give you the only safe way to power it off while it is showing a game.
 
 | BCM pin | Physical pin | Function |
 |---|---|---|
-| 3 | 5 | Power off — and power **on** again |
+| 3 | 5 | Power off (hold 1.5 s) — and power **on** again |
 | 4 | 7 | Switch UI |
 | 17 | 11 | Next VPN country |
 | 22 | 15 | Play / pause |
@@ -66,7 +66,7 @@ Change them in `REC_GPIO_BUTTONS` in `config.sh`:
 
 ```bash
 REC_GPIO_BUTTONS=(
-    "3:sudo shutdown now"
+    "3@1500:sudo shutdown now"
     "4:bash $REC_BIN/stop_current_ui.sh"
     "17:bash $REC_BIN/nordvpn_rotate.sh"
     "22:kodi-send -a PlayerControl(Play)"
@@ -74,8 +74,12 @@ REC_GPIO_BUTTONS=(
 )
 ```
 
-Format: `BCM_PIN:command with arguments`. `$REC_BIN` expands to this
-repository's `bin/` directory.
+Format: `BCM_PIN:command` or `BCM_PIN@HOLD_MS:command`. `$REC_BIN` expands to
+this repository's `bin/` directory.
+
+`HOLD_MS` is how long the pin must stay low before the press is believed —
+50 ms by default, which rejects crosstalk from a neighbouring button. Shutdown
+gets 1500 ms so it needs a deliberate press-and-hold.
 
 A list of useful commands to bind is in
 [CONFIGURATION.md](CONFIGURATION.md#gpio-buttons).
@@ -120,15 +124,18 @@ character in `config.sh` cannot turn into shell injection. The trade-off is
 that shell syntax (pipes, `&&`, redirection) does not work — wrap it in a
 script if you need that.
 
-### Debouncing
+### Debouncing and glitch rejection
 
-Mechanical buttons bounce for a few milliseconds; without handling, one press
-fires several times. Two layers:
+Three layers, because a falling edge on its own means very little:
 
-- **300 ms hardware debounce** in `RPi.GPIO` itself.
-- **1 second repeat guard** in the handler, because the actions here are
-  heavyweight (shutdown, UI switch, VPN reconnect) and a second press that
-  soon is almost always an accident.
+- **300 ms hardware debounce** in `RPi.GPIO` — mechanical contacts bounce for
+  a few milliseconds, and without this one press fires several times.
+- **A hold check.** The pin must still read LOW after `HOLD_MS` (50 ms by
+  default). This is what rejects electrical crosstalk: a neighbouring button
+  can induce a genuine edge, but not hold the line down.
+- **1 second repeat guard** in the handler, because the actions are heavyweight
+  (shutdown, UI switch, VPN reconnect) and a second press that soon is almost
+  always an accident.
 
 `stop_current_ui.sh` and `nordvpn_rotate.sh` additionally rate-limit
 themselves to one run per 5 seconds, since they are also reachable from Kodi
@@ -188,6 +195,48 @@ If that prints nothing, the problem is wiring or permissions:
   `sudo usermod -a -G gpio $USER`, then log out and back in.
 
 If that *does* print, the problem is the configured command — see below.
+
+**Pressing one button fires a different one — often shutdown**
+
+Electrical crosstalk, not a software mix-up. Two things make it likely:
+
+- the internal pull-ups are weak (~50 kΩ), so a line is easily disturbed
+- header pins are physically adjacent — **GPIO 3 is pin 5, GPIO 4 is pin 7** —
+  and button wiring is usually unshielded
+
+Pressing one button couples a transient into its neighbour and produces a
+genuine falling edge on a pin nobody touched.
+
+**The software now rejects these.** An edge is not a press: the pin must stay
+low for `HOLD_MS` (default 50 ms) before the command runs. A real press holds
+it low far longer; a glitch has already gone. Rejections are logged rather
+than silent:
+
+```
+[gpio] GPIO3 edge ignored - not held (50ms); likely crosstalk
+```
+
+**Require a deliberate hold for anything destructive.** The shipped config
+gives shutdown 1.5 seconds:
+
+```bash
+REC_GPIO_BUTTONS=(
+    "3@1500:sudo shutdown now"              # press and hold
+    "4:bash $REC_BIN/stop_current_ui.sh"    # default 50 ms
+)
+```
+
+**If it still happens**, the remaining fixes are electrical:
+
+| Fix | Why |
+|---|---|
+| **10 kΩ pull-up** from the pin to 3.3 V | Five times stiffer than the internal one, so a transient moves the line far less |
+| **100 nF capacitor** across the switch | Shunts the transient to ground |
+| **Shorter wires**, button runs kept apart | Coupling scales with length and proximity |
+| **Avoid GPIO 2 and 3** for anything but power | They carry permanent on-board pull-ups and are the I²C pins — if I²C is enabled the kernel drives them too |
+
+Raising `HOLD_MS` further (`"4@200:..."`) works as a stopgap, but it trades
+responsiveness for tolerance; a pull-up resistor is the real answer.
 
 **One press triggers several times**
 
