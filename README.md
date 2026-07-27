@@ -16,7 +16,7 @@ maps to a module you can install or skip.
 - **Three full-screen environments on the same device**, one running at a time
   - **Kodi** — films, live TV, radio, streaming services
   - **EmulationStation / RetroPie** — retro gaming
-  - **LXDE Desktop** — a real browser for everything the others cannot do
+  - **Desktop** — the shipped Raspberry Pi desktop; a real browser for everything the others cannot do
   - a **UI watchdog** that keeps exactly one of them alive, so the TV is never
     left on a black screen
 - **Physical buttons on the GPIO header** — switch UI, play/pause, rotate the
