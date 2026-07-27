@@ -313,6 +313,30 @@ if [[ -n "$running" ]]; then
 else
     warn "No UI is running right now" "Expected if you are only using SSH"
 fi
+
+# The exact-name check is what the watchdog relies on. If a UI is running but
+# its configured name does not match exactly, the watchdog cannot see it and
+# will start another - which is how one Kodi becomes five. Catch that here
+# rather than after it has happened.
+for i in "${!REC_UI_PROCESSES[@]}"; do
+    cfg_name="${REC_UI_PROCESSES[$i]}"
+    start_base="${REC_UI_START[$i]%% *}"; start_base="${start_base##*/}"
+
+    # Only meaningful when this UI is actually up.
+    rec_ui_running "$cfg_name" || rec_ui_running "$start_base" || continue
+
+    if pgrep -x "$cfg_name" >/dev/null 2>&1; then
+        pass "${REC_UI_NAMES[$i]} matches REC_UI_PROCESSES exactly ('$cfg_name')"
+    else
+        # Find what it is really called, so we can name the right value.
+        actual="$(pgrep -f "(^|/)${start_base}" 2>/dev/null | head -1)"
+        [[ -n "$actual" ]] && actual="$(ps -o comm= -p "$actual" 2>/dev/null)"
+        if [[ -n "$actual" && "$actual" != "$cfg_name" ]]; then
+            bad "${REC_UI_NAMES[$i]} is running as '$actual', not '$cfg_name'" \
+                "Set REC_UI_PROCESSES[$i]=\"$actual\" in config.sh, or the watchdog will start duplicates"
+        fi
+    fi
+done
 fi
 
 # ===========================================================================
