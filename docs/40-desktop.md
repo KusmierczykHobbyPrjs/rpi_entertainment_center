@@ -3,6 +3,13 @@
 The third UI. Kodi covers media and RetroPie covers games, but some things
 need a real browser: web-only video players, webmail, a bank, a shopping site.
 
+**It is also the fallback for DRM streaming.** Netflix, Disney+ and similar
+rely on third-party Kodi add-ons that reverse-engineer private APIs and break
+without warning — and for Netflix there is only one add-on, so when it breaks
+there is nothing to switch to. Chromium on Raspberry Pi OS ships with
+Widevine, so those services play in the browser here. See
+[20-kodi-addons.md](20-kodi-addons.md#the-fallback-netflix-in-the-browser).
+
 ```bash
 ./install.sh 40-desktop
 ```

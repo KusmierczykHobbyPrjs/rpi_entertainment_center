@@ -71,6 +71,12 @@ repository.
 The Pi beeps to confirm, closes any existing Chromium, and opens the link
 full-screen.
 
+This is also how you watch **Netflix or Disney+ when their Kodi add-on is
+broken** — send `https://www.netflix.com` and sign in with the on-screen
+keyboard, or send a direct link to what you want. Chromium on Raspberry Pi OS
+includes Widevine, so DRM playback works. See
+[20-kodi-addons.md](20-kodi-addons.md#the-fallback-netflix-in-the-browser).
+
 ### What the script does
 
 ```bash

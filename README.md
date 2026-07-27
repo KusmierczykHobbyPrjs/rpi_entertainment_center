@@ -24,8 +24,11 @@ maps to a module you can install or skip.
 - **For Kodi**
   - remote control from a phone using [Kore](https://play.google.com/store/apps/details?id=org.xbmc.kore)
   - internet TV and radio via IPTV, with bundled playlists
-  - streaming from YouTube, BBC iPlayer, Netflix, Disney+, Finnish Yle,
-    Polish TVP VOD and Polsat, and others
+  - streaming from YouTube, BBC iPlayer, Finnish Yle, Polish TVP VOD and
+    Polsat, and others
+  - DRM services (Netflix, Disney+) via third-party add-ons — these depend on
+    reverse-engineered private APIs and **break periodically**; the desktop
+    browser is the documented fallback
   - broadcast TV, recording and a proper EPG via Tvheadend, if you have a tuner
   - a **shell launcher menu** inside Kodi, so VPN and UI controls are reachable
     without leaving the sofa
@@ -142,7 +145,7 @@ Install them in this order; each is a separate `./install.sh <name>` run.
 | `00-base` | Core packages, `config.sh`, console autologin, autostart hook | [docs](docs/00-base.md) |
 | `10-kodi` | Kodi with streaming, joystick and command-line control | [docs](docs/10-kodi.md) |
 | `15-kodi-iptv` | Live TV and radio from IPTV playlists | [docs](docs/15-kodi-iptv.md) |
-| `20-kodi-addons` | YouTube, Netflix, TVP VOD, Yle, Shell Script Launcher | [docs](docs/20-kodi-addons.md) |
+| `20-kodi-addons` | YouTube, TVP VOD, Yle, Shell Script Launcher, and the DRM services | [docs](docs/20-kodi-addons.md) |
 | `25-tvheadend` | DVB tuner backend, recording and EPG | [docs](docs/25-tvheadend.md) |
 | `30-retropie` | EmulationStation and emulators | [docs](docs/30-retropie.md) |
 | `40-desktop` | LXDE and Chromium at a TV-friendly resolution | [docs](docs/40-desktop.md) |
