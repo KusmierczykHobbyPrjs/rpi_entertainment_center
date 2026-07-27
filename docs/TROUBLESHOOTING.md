@@ -493,6 +493,11 @@ bash bin/nordvpn_connect.sh pl
 **DRM content** (Netflix, Disney+) additionally needs Widevine — see
 [20-kodi-addons.md](20-kodi-addons.md#netflix-disney-and-other-drm-services).
 
+**An HTTP error on a `netflix.com` API URL** in `kodi.log` is an upstream
+break, not your configuration — Netflix changed its API and the add-on has not
+caught up. See [when it
+breaks](20-kodi-addons.md#when-it-breaks-netflix-api-changes).
+
 **Read the actual error:**
 
 ```bash

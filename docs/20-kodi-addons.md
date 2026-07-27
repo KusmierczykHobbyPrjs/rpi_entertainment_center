@@ -243,27 +243,72 @@ advertised elsewhere — many are piracy front-ends that break constantly.
 
 ---
 
-### Known breakage: `preferredLocale`
+### When it breaks: Netflix API changes
 
-A Netflix API change has, in the past, caused the add-on to crash on login
-with a `KeyError` for `preferredLocale`, raised in:
+**Expect this add-on to break periodically, and to stay broken until upstream
+patches it.** Netflix changes its internal "Shakti" API without notice. This is
+the least stable component in the whole project, and nothing about your
+configuration causes or fixes it.
+
+The signature in `~/.kodi/temp/kodi.log` is an HTTP error on a `netflix.com`
+API URL:
 
 ```
-~/.kodi/addons/plugin.video.netflix/resources/lib/utils/website.py
+requests.exceptions.HTTPError: 404 Client Error: Not Found for url:
+  https://www.netflix.com/api/shakti/mre/profilehub
 ```
 
-The fix is to make that lookup tolerate a missing key — read it with a default
-instead of indexing directly — so the add-on falls back to a default locale
-when Netflix omits the field.
+A **404 is server-side**: that endpoint does not exist. Note the path segment
+before the endpoint (`mre` above) — that is normally a Netflix build
+identifier the add-on scrapes from the page. When it looks like a placeholder,
+the add-on has failed to parse Netflix's current page layout and is building
+URLs that could never resolve.
 
-Before patching anything by hand, **check whether upstream has already fixed
-it**: this class of breakage is normally resolved within days.
+Reported repeatedly over the years, and open again through 2026:
+[#1438](https://github.com/CastagnaIT/plugin.video.netflix/issues/1438),
+[#1781](https://github.com/CastagnaIT/plugin.video.netflix/issues/1781),
+[#1792](https://github.com/CastagnaIT/plugin.video.netflix/issues/1792).
 
-- Issues: <https://github.com/CastagnaIT/plugin.video.netflix/issues>
-- Read the actual traceback first: `~/.kodi/temp/kodi.log`
+### What actually helps
 
-Any local edit you make here is overwritten by the next add-on update, which
-is the desired outcome.
+1. **Update the add-on**, and make sure it came from the CastagnaIT
+   *repository* rather than a one-off zip — a zip never updates itself, so you
+   can sit on a broken version indefinitely.
+2. **Check the tracker** for the exact endpoint from your log:
+   <https://github.com/CastagnaIT/plugin.video.netflix/issues>
+3. **Use a different add-on meanwhile.** The [SlyGuy
+   add-ons](https://slyguy.uk/) cover Netflix, Disney+ and Prime Video through
+   a separate implementation; the two rarely break at the same time. This is
+   the practical answer when CastagnaIT's is mid-break.
+4. **Wait.** If the issue is open and untriaged, there is nothing local to do.
+
+### What does not help
+
+- **Leaving the password prompt blank.** The failing call is guarded by
+  `if password and ...` in `resources/lib/utils/api_requests.py`, which looks
+  like it would skip it — but the add-on simply returns to the login-method
+  chooser. Tested; it does not work.
+- **Regenerating the authentication key.** A 404 means the request never
+  reached an authenticating endpoint, so the key is not the problem. If the
+  key were wrong you would see 401 or 403.
+- **Reinstalling Widevine.** DRM is not involved until playback starts; this
+  fails during login.
+
+### Patching by hand
+
+Only worth it if you can see the fix in the traceback and cannot wait. Any edit
+under `~/.kodi/addons/plugin.video.netflix/` is overwritten by the next add-on
+update — which is the outcome you want, since the real fix comes from upstream.
+
+```bash
+tail -100 ~/.kodi/temp/kodi.log
+```
+
+A past example: a Netflix response stopped including `preferredLocale` and the
+add-on raised `KeyError` in `resources/lib/utils/website.py`. The fix was to
+read that key with a default rather than indexing it directly. A missing-key
+crash is patchable that way; a 404 is not — there is no local edit that brings
+back a deleted endpoint.
 
 ---
 
