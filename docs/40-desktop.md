@@ -67,6 +67,48 @@ desktop is started on demand by the UI switcher.
 
 ---
 
+## A compositor is not a desktop
+
+> **This is the most likely reason your desktop comes up black with no
+> taskbar.**
+
+`labwc` and `startx` on their own do not give you the Raspberry Pi desktop:
+
+| Command | What you get |
+|---|---|
+| `labwc` | A bare Wayland compositor. Black screen, no panel, no file manager. |
+| `startx` (no `~/.xinitrc`) | Falls through to `Xsession`, which picks whatever default session remains — often not the Pi desktop. |
+| `rpd-labwc` session | labwc **plus** `wf-panel-pi`, `pcmanfm --desktop`, autostart |
+| `rpd-x` session | X **plus** `lxpanel-pi`, `pcmanfm --desktop`, autostart |
+
+The desktop is a **session**, defined by a `.desktop` file:
+
+```bash
+ls /usr/share/wayland-sessions/    # rpd-labwc.desktop
+ls /usr/share/xsessions/           # rpd-x.desktop
+```
+
+Read the command out of the one for your display server:
+
+```bash
+grep '^Exec=' /usr/share/wayland-sessions/rpd-labwc.desktop   # Wayland
+grep '^Exec=' /usr/share/xsessions/rpd-x.desktop              # X11
+```
+
+and use **that** in `REC_UI_START`, not the bare compositor. `./install.sh
+40-desktop` does this lookup for you and prints the result.
+
+If the desktop starts but has no panel, you are running the compositor rather
+than the session. Check what is actually running:
+
+```bash
+pgrep -a wf-panel-pi lxpanel-pi pcmanfm
+```
+
+Nothing there confirms it.
+
+---
+
 ## Wayland changes the UI entries
 
 Bookworm and later default to Wayland (labwc on Trixie). That matters because

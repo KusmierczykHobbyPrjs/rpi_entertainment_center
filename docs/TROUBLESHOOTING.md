@@ -282,11 +282,30 @@ More detail: [90-speech.md](90-speech.md).
 
 ## The desktop is black, with no taskbar
 
-`pcmanfm` is drawing the desktop (you see the wallpaper and a wastebasket) but
-no panel started — the session is half-assembled.
+Two different causes, and they look identical.
 
-The usual cause on Bookworm and later is that something removed Raspberry Pi
-OS's own desktop packages. **An early version of this project's `40-desktop`
+### 1. You are starting the compositor, not the session
+
+**Check this first.** `labwc` on its own is a bare Wayland compositor, and
+`startx` with no `~/.xinitrc` falls through to whatever default session
+remains. Neither starts the Pi's panel or file manager.
+
+```bash
+pgrep -a wf-panel-pi lxpanel-pi pcmanfm     # nothing? this is your cause
+```
+
+The desktop is a *session*. Take the command from its `.desktop` file:
+
+```bash
+grep '^Exec=' /usr/share/wayland-sessions/rpd-labwc.desktop   # Wayland
+grep '^Exec=' /usr/share/xsessions/rpd-x.desktop              # X11
+```
+
+and put that in `REC_UI_START`. `./install.sh 40-desktop` looks it up for you.
+
+### 2. The desktop packages were removed
+
+`pcmanfm` draws the wallpaper and wastebasket but no panel appears. **An early version of this project's `40-desktop`
 module did exactly that**, installing `lxde-core` and letting apt remove
 `rpd-common`, `rpd-x-core` and `rpd-wayland-core`. Repair:
 

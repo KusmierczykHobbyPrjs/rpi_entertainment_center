@@ -150,16 +150,49 @@ else
     fi
 fi
 
-# --- Tell the user what to put in config.sh --------------------------------
-step "Settings for config.sh"
+# --- Work out the real session command --------------------------------------
+step "Finding the desktop session command"
+# A bare compositor is not a desktop. Running `labwc` alone gives a black
+# screen with no panel and no file manager, because the Raspberry Pi desktop
+# is a *session* - rpd-labwc / rpd-x - which starts the compositor plus
+# wf-panel-pi (or lxpanel-pi), pcmanfm and the autostart entries.
+#
+# So read the Exec= line out of the session's .desktop file rather than
+# guessing a binary name.
+session_exec=""
+session_file=""
 
 if [[ "$session_type" == "wayland" ]]; then
-    ui_process="$compositor"
-    ui_start="$compositor &"
-    ui_stop="pkill -x $compositor"
+    for f in /usr/share/wayland-sessions/rpd-labwc.desktop \
+             /usr/share/wayland-sessions/rpd-wayfire.desktop \
+             /usr/share/wayland-sessions/labwc.desktop; do
+        [[ -f "$f" ]] && { session_file="$f"; break; }
+    done
 else
+    for f in /usr/share/xsessions/rpd-x.desktop \
+             /usr/share/xsessions/LXDE-pi.desktop; do
+        [[ -f "$f" ]] && { session_file="$f"; break; }
+    done
+fi
+
+if [[ -n "$session_file" ]]; then
+    session_exec="$(grep -m1 '^Exec=' "$session_file" | cut -d= -f2-)"
+    ok "Session: $(basename "$session_file" .desktop) -> $session_exec"
+else
+    fail "No desktop session file found"
+    note "Looked in /usr/share/wayland-sessions/ and /usr/share/xsessions/"
+fi
+
+if [[ "$session_type" == "wayland" ]]; then
+    ui_start="${session_exec:-labwc} &"
+    # The process to watch is the compositor itself, whatever wrapper starts it.
+    ui_process="$compositor"
+    ui_stop="pkill -x ${compositor:-labwc}"
+else
+    # startx with no ~/.xinitrc falls through to Xsession and picks a default
+    # that may not be the Pi desktop at all. Name the session explicitly.
+    ui_start="startx ${session_exec:-} &"
     ui_process="Xorg"
-    ui_start="startx &"
     ui_stop="killall Xorg"
 fi
 
