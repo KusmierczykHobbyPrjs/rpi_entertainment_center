@@ -11,6 +11,8 @@ the source that explains it.
 
 ## Bluetooth (the Pi as a speaker)
 
+- [Using a Raspberry Pi as a Bluetooth speaker with PipeWire and WirePlumber](https://www.collabora.com/news-and-blog/blog/2022/09/02/using-a-raspberry-pi-as-a-bluetooth-speaker-with-pipewire-wireplumber/)
+  — Collabora; the reference for the PipeWire path used on Bookworm and later.
 - [Bluetooth audio on the Raspberry Pi](https://howchoo.com/pi/bluetooth-raspberry-pi)
   — pairing and the bluez side.
 - [Bluetooth assigned numbers](https://www.bluetooth.com/specifications/assigned-numbers/)

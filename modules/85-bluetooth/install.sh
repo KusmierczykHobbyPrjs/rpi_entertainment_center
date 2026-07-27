@@ -3,16 +3,19 @@
 # 85-bluetooth - turn the Pi into a Bluetooth speaker.
 #
 # A phone, laptop or tablet connects to the Pi and its music comes out of the
-# Pi's 3.5 mm jack, into whatever hi-fi or powered speakers are plugged in.
-# The Pi is the A2DP *sink*; the phone is the source.
+# Pi's 3.5 mm jack. The Pi is the A2DP *sink*; the phone is the source.
 #
-# Three things have to be true, and most tutorials only cover the first:
+# Handles both audio stacks:
 #
-#   1. bluez must advertise the Pi as an audio device, stay discoverable, and
-#      accept pairing from a device with no keyboard attached
-#   2. PulseAudio must bridge the incoming Bluetooth stream to the jack
-#   3. that has to keep working under Kodi and the console, which have no
-#      login session and therefore no per-user PulseAudio
+#   PipeWire     Bookworm and later. WirePlumber links the incoming Bluetooth
+#                stream to the output by itself, so there is no loopback to
+#                configure. The only real problem is that PipeWire is a user
+#                service and Kodi runs with no login session - solved with
+#                `loginctl enable-linger`.
+#
+#   PulseAudio   Bullseye and earlier. Needs system mode, plus the Bluetooth
+#                modules added to system.pa, which default.pa loads but
+#                system.pa does not.
 #
 # See docs/85-bluetooth.md.
 # ---------------------------------------------------------------------------
@@ -25,13 +28,13 @@ source "$(dirname "$(readlink -f "$0")")/../../lib/install_helpers.sh"
 require_not_root
 
 BT_CONF=/etc/bluetooth/main.conf
+AGENT_UNIT=/etc/systemd/system/bt-agent.service
 PA_SYSTEM=/etc/pulse/system.pa
 PA_UNIT=/etc/systemd/system/pulseaudio.service
-AGENT_UNIT=/etc/systemd/system/bt-agent.service
 
 # Set key=value inside a named [Section] of an INI file, adding either if
-# missing. sed alone cannot do this safely: it has no notion of which section
-# it is in, and bluez ignores keys placed under the wrong heading.
+# missing. sed cannot do this safely: it has no notion of which section it is
+# in, and bluez ignores keys placed under the wrong heading.
 ini_set() {
     local file="$1" section="$2" key="$3" value="$4"
     sudo python3 - "$file" "$section" "$key" "$value" <<'PY'
@@ -39,66 +42,74 @@ import sys, pathlib
 path, section, key, value = sys.argv[1:5]
 p = pathlib.Path(path)
 lines = p.read_text().splitlines() if p.exists() else []
-
-out, in_section, done, seen_section = [], False, False, False
+out, in_section, done, seen = [], False, False, False
 for line in lines:
-    stripped = line.strip()
-    if stripped.startswith("[") and stripped.endswith("]"):
-        if in_section and not done:      # leaving our section: write it here
-            out.append(f"{key} = {value}")
-            done = True
-        in_section = stripped.lower() == f"[{section}]".lower()
-        seen_section = seen_section or in_section
+    t = line.strip()
+    if t.startswith("[") and t.endswith("]"):
+        if in_section and not done:
+            out.append(f"{key} = {value}"); done = True
+        in_section = t.lower() == f"[{section}]".lower()
+        seen = seen or in_section
     elif in_section and not done:
-        bare = stripped.lstrip("#").strip()   # replace commented-out keys too
+        bare = t.lstrip("#").strip()
         if bare.split("=")[0].strip().lower() == key.lower():
-            out.append(f"{key} = {value}")
-            done = True
-            continue
+            out.append(f"{key} = {value}"); done = True; continue
     out.append(line)
-
 if in_section and not done:
-    out.append(f"{key} = {value}")
-    done = True
-if not seen_section:
+    out.append(f"{key} = {value}"); done = True
+if not seen:
     out += [f"[{section}]", f"{key} = {value}"]
-
 p.write_text("\n".join(out) + "\n")
 PY
 }
 
-# --- Packages --------------------------------------------------------------
-step "Installing Bluetooth and audio packages"
-apt_install bluez pulseaudio pulseaudio-module-bluetooth pulseaudio-utils || exit 1
+# --- Which audio stack? ----------------------------------------------------
+step "Detecting the audio stack"
+AUDIO_STACK="none"
+if rec_has pipewire || systemctl --user list-unit-files pipewire.service >/dev/null 2>&1; then
+    AUDIO_STACK="pipewire"
+    ok "PipeWire (Bookworm and later)"
+elif rec_has pulseaudio; then
+    AUDIO_STACK="pulseaudio"
+    ok "PulseAudio (Bullseye and earlier)"
+else
+    fail "Neither PipeWire nor PulseAudio found."
+    note "Install one first: sudo apt install pipewire pipewire-pulse wireplumber"
+    exit 1
+fi
 
-step "Installing the pairing agent"
-# Without an agent the Pi cannot complete a pairing at all - there is no
-# keyboard on it to confirm anything with.
-apt_install bluez-tools || exit 1
+# --- Packages --------------------------------------------------------------
+step "Installing Bluetooth support"
+apt_install bluez bluez-tools || exit 1
+
+if [[ "$AUDIO_STACK" == "pipewire" ]]; then
+    # libspa-0.2-bluetooth is the SPA plugin that gives PipeWire its Bluetooth
+    # support. Without it a phone pairs and connects but no audio node appears.
+    apt_install pipewire pipewire-pulse wireplumber libspa-0.2-bluetooth || exit 1
+    apt_install pipewire-audio-client-libraries 2>/dev/null || true
+else
+    apt_install pulseaudio pulseaudio-module-bluetooth pulseaudio-utils || exit 1
+fi
 
 # --- Groups ----------------------------------------------------------------
-step "Adding $USER to the audio groups"
-for grp in bluetooth audio pulse-access; do
-    ensure_group "$grp" || true
-done
+step "Group membership"
+ensure_group bluetooth || true
+ensure_group audio || true
 
 # --- Advertise as a speaker ------------------------------------------------
+# This part is identical on both stacks: it is bluez, not the audio system.
 step "Advertising the Pi as an audio device"
 backup_file "$BT_CONF"
 
-# Class 0x200414 = Audio/Video major class, "portable audio" minor, audio
-# service bit set. Phones decide whether to offer "connect for media audio"
-# from this; left as the default computer class many simply will not.
+# Class 0x200414 = Audio/Video major class, "portable audio" minor, with the
+# audio service bit set. Phones decide whether to offer "connect for media
+# audio" from this; left as the default computer class, many will not.
 ini_set "$BT_CONF" General Class 0x200414
-ok "Device class set to 0x200414 (portable audio)"
-
-# 0 means no timeout: stay discoverable and pairable indefinitely, which is
-# what an appliance with no screen needs.
 ini_set "$BT_CONF" General DiscoverableTimeout 0
 ini_set "$BT_CONF" General PairableTimeout 0
 ini_set "$BT_CONF" General AlwaysPairable true
 ini_set "$BT_CONF" Policy AutoEnable true
-ok "Discoverable and pairable with no timeout"
+ok "Class 0x200414, discoverable and pairable with no timeout"
 
 default_name="$(hostname)"
 if [[ "${REC_ASSUME_YES:-0}" == "1" ]]; then
@@ -112,13 +123,12 @@ ok "Advertised name: $bt_name"
 
 sudo systemctl enable --now bluetooth >/dev/null 2>&1
 sudo systemctl restart bluetooth
-ok "bluetooth.service restarted with the new settings"
+ok "bluetooth.service restarted"
 
 # --- Pairing agent ---------------------------------------------------------
-step "Installing the pairing agent service"
-# NoInputNoOutput means "just works" pairing - no PIN on a device with no
-# keyboard. Anyone in Bluetooth range can pair while it is discoverable, which
-# is the trade-off an appliance speaker makes. See docs/85-bluetooth.md.
+step "Installing the pairing agent"
+# There is no keyboard on the Pi to confirm a PIN, so an agent with
+# NoInputNoOutput capability accepts "just works" pairing.
 sudo tee "$AGENT_UNIT" >/dev/null <<'EOF'
 [Unit]
 Description=Bluetooth pairing agent (accepts pairing without a keyboard)
@@ -137,60 +147,85 @@ WantedBy=multi-user.target
 EOF
 sudo systemctl daemon-reload
 sudo systemctl enable --now bt-agent >/dev/null 2>&1
-if systemctl is-active --quiet bt-agent; then
-    ok "bt-agent is running - the Pi will accept pairing requests"
-else
-    fail "bt-agent did not start. Check: sudo journalctl -u bt-agent -n 30"
-fi
+systemctl is-active --quiet bt-agent \
+    && ok "bt-agent is running - the Pi accepts pairing requests" \
+    || fail "bt-agent did not start. Check: sudo journalctl -u bt-agent -n 30"
 
-# --- Output to the jack ----------------------------------------------------
-step "Routing audio to the 3.5 mm jack"
-if rec_has raspi-config; then
-    # do_audio: 0 = auto, 1 = headphones/jack, 2 = HDMI
-    if sudo raspi-config nonint do_audio 1; then
-        ok "Analogue jack selected as the output"
-    else
-        skip "Could not set it automatically"
-        note "sudo raspi-config -> System Options -> Audio -> Headphones"
-    fi
-else
-    skip "raspi-config not found - select the jack output by hand"
-fi
+# --- Keep audio alive without a login session ------------------------------
+if [[ "$AUDIO_STACK" == "pipewire" ]]; then
+    step "Making PipeWire run without a login session"
+    cat <<EOF
 
-# --- PulseAudio ------------------------------------------------------------
-step "Bridging Bluetooth through to the jack"
-cat <<EOF
+  PipeWire and WirePlumber are per-user services, started when you log in.
+  Kodi and EmulationStation run from a console with no graphical session, so
+  without this the speaker works on the desktop and goes silent everywhere
+  else.
 
-  When a phone connects, PulseAudio sees the incoming stream as a *source*
-  and has to loop it through to the jack. module-bluetooth-policy does that
-  automatically - but only if it is loaded.
-
-  Per-user PulseAudio loads it from /etc/pulse/default.pa, so this works on
-  the desktop out of the box. Kodi and the console have no login session and
-  so no PulseAudio at all, and the music stops when you leave the desktop.
-
-  System mode runs one PulseAudio for the whole machine, started at boot.
-  The trade-off is that upstream discourages it and all users share one
-  audio session.
-
-  Say no if you only use the Pi as a speaker while the desktop is up.
+  Lingering keeps your user's systemd instance - and therefore PipeWire -
+  running from boot, whether or not anyone is logged in. This is the modern
+  replacement for PulseAudio's system mode, and is far less invasive.
 
 EOF
-if confirm "Enable system-mode PulseAudio (recommended for this use case)?"; then
-    backup_file "$PA_SYSTEM"
-
-    # The bit almost every guide misses: /etc/pulse/system.pa does NOT load
-    # the Bluetooth modules, unlike default.pa. Switching to system mode
-    # without adding them leaves a phone able to pair and connect while no
-    # sound ever reaches the jack.
-    if grep -q "module-bluetooth-discover" "$PA_SYSTEM" 2>/dev/null; then
-        skip "system.pa already loads the Bluetooth modules"
+    if confirm "Enable lingering for $USER? (recommended)"; then
+        if sudo loginctl enable-linger "$USER"; then
+            ok "Lingering enabled - PipeWire will run from boot"
+        else
+            fail "Could not enable lingering"
+        fi
     else
-        sudo tee -a "$PA_SYSTEM" >/dev/null <<'EOF'
+        skip "Left disabled - Bluetooth audio will only work in a desktop session"
+    fi
+
+    step "Enabling the PipeWire services"
+    systemctl --user enable --now pipewire.socket pipewire.service \
+        wireplumber.service pipewire-pulse.socket 2>/dev/null \
+        && ok "PipeWire and WirePlumber enabled" \
+        || skip "Could not enable them from here (normal over SSH with no session)"
+
+    step "Configuring the Bluetooth audio role"
+    # WirePlumber already enables the a2dp_sink role by default, so this is
+    # only about quality: SBC-XQ is a higher-bitrate SBC variant that every
+    # A2DP source supports, and is a clear improvement over baseline SBC.
+    WP_DIR="$HOME/.config/wireplumber/wireplumber.conf.d"
+    mkdir -p "$WP_DIR"
+    cat > "$WP_DIR/51-rec-bluetooth.conf" <<'EOF'
+# Installed by rpi-entertainment-center (module 85-bluetooth).
+#
+# a2dp_sink is what lets this machine RECEIVE audio from a phone. It is on by
+# default; listed explicitly so the intent is visible.
+#
+# SBC-XQ is a higher-bitrate SBC profile supported by essentially every
+# source device, and sounds noticeably better than baseline SBC.
+monitor.bluez.properties = {
+  bluez5.roles = [ a2dp_sink a2dp_source ]
+  bluez5.enable-sbc-xq = true
+}
+EOF
+    ok "Wrote $WP_DIR/51-rec-bluetooth.conf"
+    systemctl --user restart wireplumber 2>/dev/null || true
+else
+    # --- PulseAudio (Bullseye) --------------------------------------------
+    step "PulseAudio system mode"
+    cat <<EOF
+
+  Bluetooth audio is routed through PulseAudio, which normally runs once per
+  login session. Kodi and the console have none, so the speaker would work on
+  the desktop only.
+
+  System mode runs one PulseAudio for the whole machine. Upstream discourages
+  it, but it is the standard answer for an appliance.
+
+EOF
+    if confirm "Enable system-mode PulseAudio?"; then
+        backup_file "$PA_SYSTEM"
+        # system.pa does NOT load the Bluetooth modules that default.pa does.
+        # Without them a phone pairs and connects and no sound ever arrives.
+        if grep -q "module-bluetooth-discover" "$PA_SYSTEM" 2>/dev/null; then
+            skip "system.pa already loads the Bluetooth modules"
+        else
+            sudo tee -a "$PA_SYSTEM" >/dev/null <<'EOF'
 
 ### Added by rpi-entertainment-center (module 85-bluetooth)
-### system.pa does not load these by default, unlike default.pa. Without them
-### a phone can pair and connect but no sound ever reaches the jack.
 .ifexists module-bluetooth-discover.so
 load-module module-bluetooth-discover
 .endif
@@ -198,13 +233,11 @@ load-module module-bluetooth-discover
 load-module module-bluetooth-policy
 .endif
 EOF
-        ok "Added the Bluetooth modules to $PA_SYSTEM"
-    fi
-
-    sudo tee "$PA_UNIT" >/dev/null <<'EOF'
+            ok "Added the Bluetooth modules to $PA_SYSTEM"
+        fi
+        sudo tee "$PA_UNIT" >/dev/null <<'EOF'
 [Unit]
 Description=PulseAudio system server
-Documentation=man:pulseaudio(1)
 After=bluetooth.service
 Wants=bluetooth.service
 
@@ -216,34 +249,35 @@ Restart=on-failure
 [Install]
 WantedBy=multi-user.target
 EOF
-    ok "Wrote $PA_UNIT"
-
-    # In system mode the daemon runs as the 'pulse' user, which needs to reach
-    # bluez over D-Bus and to open the sound card.
-    for grp in bluetooth audio; do
-        if getent group "$grp" >/dev/null 2>&1 && ! id -nG pulse 2>/dev/null | grep -qw "$grp"; then
-            sudo usermod -a -G "$grp" pulse 2>/dev/null \
-                && ok "Added the 'pulse' user to '$grp'"
-        fi
-    done
-
-    # A per-user daemon holding the card would fight the system one.
-    if pgrep -u "$USER" pulseaudio >/dev/null 2>&1; then
-        note "Stopping the per-user PulseAudio first"
-        systemctl --user stop pulseaudio.socket pulseaudio.service 2>/dev/null
-        pulseaudio --kill 2>/dev/null
-        sleep 1
-    fi
-
-    sudo systemctl daemon-reload
-    if sudo systemctl enable --now pulseaudio; then
-        ok "System-mode PulseAudio enabled"
+        for grp in bluetooth audio; do
+            id -nG pulse 2>/dev/null | grep -qw "$grp" || sudo usermod -a -G "$grp" pulse 2>/dev/null
+        done
+        sudo systemctl daemon-reload
+        sudo systemctl enable --now pulseaudio \
+            && ok "System-mode PulseAudio enabled" \
+            || fail "It did not start. Check: sudo journalctl -u pulseaudio -n 30"
     else
-        fail "It did not start. Check: sudo journalctl -u pulseaudio -n 30"
+        skip "Left in per-user mode - desktop only"
     fi
-else
-    skip "Left PulseAudio in per-user mode"
-    note "The Pi will work as a speaker on the desktop, but not under Kodi."
+fi
+
+# --- Output to the jack ----------------------------------------------------
+step "Routing audio to the 3.5 mm jack"
+if rec_has raspi-config; then
+    sudo raspi-config nonint do_audio 1 \
+        && ok "Analogue jack selected" \
+        || skip "Set it by hand: raspi-config -> System Options -> Audio"
+fi
+
+if [[ "$AUDIO_STACK" == "pipewire" ]] && rec_has wpctl; then
+    analog="$(wpctl status 2>/dev/null | grep -i 'analog' | grep -oE '^\s*[│├└─ ]*[0-9]+' | grep -oE '[0-9]+' | head -1)"
+    if [[ -n "$analog" ]]; then
+        wpctl set-default "$analog" 2>/dev/null \
+            && ok "Default output set to the analogue jack" \
+            || skip "Could not set the default sink"
+    else
+        skip "No analogue sink visible from here (normal over SSH)"
+    fi
 fi
 
 echo
@@ -253,24 +287,23 @@ cat <<EOF
 ${REC_C_BOLD}Connect a phone${REC_C_OFF}
 
   1. Phone > Settings > Bluetooth
-  2. Pick "${bt_name}" from the list and pair - there is no PIN to enter
-  3. Play something; the sound comes out of the Pi's 3.5 mm jack
+  2. Pick "${bt_name}" and pair - there is no PIN
+  3. Play something; sound comes out of the Pi's 3.5 mm jack
 
-  The Pi stays discoverable, so it appears without anything being pressed
-  on it.
+  The Pi stays discoverable, so it appears without anything being pressed.
 
-${REC_C_BOLD}Check it is working${REC_C_OFF}
+${REC_C_BOLD}Check it${REC_C_OFF}
 
     $REC_BIN/doctor.sh bluetooth
-    pactl list sources short | grep bluez     # the phone, once connected
-    pactl list sinks short                    # the jack
+    wpctl status                    # the phone appears once connected
+    bluetoothctl devices
 
-${REC_C_BOLD}If there is no sound${REC_C_OFF}
+${REC_C_BOLD}If it is quiet${REC_C_OFF}
 
-  Confirm the jack is the default output, and turn it up:
+    wpctl set-volume @DEFAULT_AUDIO_SINK@ 100%
 
-    pactl set-default-sink \$(pactl list sinks short | awk '/analog/{print \$2; exit}')
-    alsamixer
+  Set volume with wpctl, never amixer - WirePlumber overwrites ALSA at every
+  boot. See docs/TROUBLESHOOTING.md.
 
-Full walkthrough and troubleshooting: docs/85-bluetooth.md
+Full walkthrough: docs/85-bluetooth.md
 EOF

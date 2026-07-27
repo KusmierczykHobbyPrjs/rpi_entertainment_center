@@ -678,77 +678,78 @@ if rec_has bluetoothctl; then
         && pass "bluetooth.service is running" \
         || bad "bluetooth.service is not running" "sudo systemctl enable --now bluetooth"
 
-    if dpkg-query -W -f='${Status}' pulseaudio-module-bluetooth 2>/dev/null | grep -q "ok installed"; then
-        pass "pulseaudio-module-bluetooth is installed"
-    else
-        bad "pulseaudio-module-bluetooth is missing" "./install.sh 85-bluetooth"
-    fi
-
     btshow="$(bluetoothctl show 2>/dev/null)"
 
-    # Phones decide whether to offer "media audio" from the device class. The
-    # Pi ships as a computer (0x000c/0x002c...), and many phones will then
-    # pair but never route audio.
+    # Phones decide whether to offer "media audio" from the device class. A Pi
+    # ships as a computer class, and many phones then pair but never route
+    # audio to it.
     class="$(grep -i '^\s*Class:' <<<"$btshow" | awk '{print $2}')"
     case "$class" in
-        0x2*|0x24*)  pass "Advertised as an audio device ($class)" ;;
-        "")          warn "Could not read the device class" "Is the adapter powered?" ;;
-        *)           bad "Device class is $class, not an audio device" \
-                         "Phones may refuse to send audio. Run: ./install.sh 85-bluetooth" ;;
+        0x2*|0x24*) pass "Advertised as an audio device ($class)" ;;
+        "")         warn "Could not read the device class" "Is the adapter powered?" ;;
+        *)          bad "Device class is $class, not an audio device" \
+                        "Phones may refuse to send audio: ./install.sh 85-bluetooth" ;;
     esac
 
     grep -qi 'Discoverable: yes' <<<"$btshow" \
-        && pass "Discoverable (phones can find it)" \
-        || warn "Not discoverable - already-paired devices still work" \
-                "sudo systemctl restart bt-agent"
+        && pass "Discoverable" \
+        || warn "Not discoverable - paired devices still work" "sudo systemctl restart bt-agent"
 
     grep -qi 'Audio Sink' <<<"$btshow" \
-        && pass "Audio Sink profile is advertised (can receive audio)" \
-        || bad "No Audio Sink profile" "The Pi cannot act as a speaker: ./install.sh 85-bluetooth"
+        && pass "Audio Sink profile advertised (can receive audio)" \
+        || bad "No Audio Sink profile" "./install.sh 85-bluetooth"
 
     if rec_has bt-agent; then
-        pass "bt-agent is installed"
         systemctl is-active --quiet bt-agent \
             && pass "bt-agent is running (pairing needs no keyboard)" \
             || bad "bt-agent is not running" "sudo systemctl enable --now bt-agent"
     else
-        bad "bt-agent is not installed" \
-            "Pairing cannot be confirmed without it: ./install.sh 85-bluetooth"
+        bad "bt-agent is not installed" "Pairing cannot complete: ./install.sh 85-bluetooth"
     fi
 
     paired="$(bluetoothctl devices 2>/dev/null | grep -c '^Device')"
     (( paired > 0 )) && pass "$paired device(s) paired" \
-                     || warn "No paired devices yet" "Pair a phone - see docs/85-bluetooth.md"
+                     || warn "No paired devices yet" "See docs/85-bluetooth.md"
 
-    # System mode is what keeps this working outside a desktop session.
-    if systemctl is-enabled --quiet pulseaudio 2>/dev/null; then
-        pass "System-mode PulseAudio is enabled (works under Kodi and the console)"
-        systemctl is-active --quiet pulseaudio \
-            && pass "System-mode PulseAudio is running" \
-            || bad "Enabled but not running" "sudo journalctl -u pulseaudio -n 30"
+    # --- audio stack ------------------------------------------------------
+    if rec_has wpctl || rec_has pipewire; then
+        pass "Audio stack: PipeWire"
 
-        # The classic silent failure: system.pa omits the Bluetooth modules
-        # that default.pa loads, so audio pairs but never reaches the jack.
-        if grep -q "module-bluetooth-discover" /etc/pulse/system.pa 2>/dev/null; then
-            pass "system.pa loads the Bluetooth modules"
+        # The SPA Bluetooth plugin is what makes a Bluetooth audio node exist
+        # at all. Without it a phone connects and nothing appears.
+        if dpkg-query -W -f='${Status}' libspa-0.2-bluetooth 2>/dev/null | grep -q "ok installed"; then
+            pass "libspa-0.2-bluetooth is installed"
         else
-            bad "system.pa does NOT load the Bluetooth modules" \
-                "Phones will connect but no sound will play. Run: ./install.sh 85-bluetooth"
+            bad "libspa-0.2-bluetooth is missing" \
+                "PipeWire cannot handle Bluetooth audio without it: ./install.sh 85-bluetooth"
         fi
-    elif pgrep -u "$USER" pulseaudio >/dev/null 2>&1; then
-        warn "PulseAudio is per-user: works on the desktop, silent under Kodi" \
-             "For console and Kodi audio: ./install.sh 85-bluetooth"
-    else
-        warn "No PulseAudio daemon is running" "Normal over SSH with no desktop session"
-    fi
 
-    # Output should be the analogue jack, not HDMI.
-    sinks="$(pactl list sinks short 2>/dev/null)"
-    if [[ -n "$sinks" ]]; then
-        grep -qi 'analog' <<<"$sinks" \
-            && pass "An analogue (jack) output is available" \
-            || warn "No analogue sink found - audio may be routed to HDMI" \
-                    "sudo raspi-config nonint do_audio 1"
+        # PipeWire is a user service. Kodi runs with no login session, so
+        # without lingering the speaker works on the desktop only.
+        if loginctl show-user "$USER" -p Linger 2>/dev/null | grep -q 'Linger=yes'; then
+            pass "Lingering enabled - PipeWire runs without a login session"
+        else
+            bad "Lingering is not enabled for $USER" \
+                "Bluetooth audio will be silent under Kodi: sudo loginctl enable-linger $USER"
+        fi
+
+        if pgrep -x wireplumber >/dev/null 2>&1; then
+            pass "WirePlumber is running"
+        else
+            warn "WirePlumber is not running" "Normal over SSH with no session"
+        fi
+    elif rec_has pulseaudio; then
+        pass "Audio stack: PulseAudio"
+        if systemctl is-enabled --quiet pulseaudio 2>/dev/null; then
+            pass "System-mode PulseAudio enabled"
+            grep -q "module-bluetooth-discover" /etc/pulse/system.pa 2>/dev/null \
+                && pass "system.pa loads the Bluetooth modules" \
+                || bad "system.pa does NOT load the Bluetooth modules" \
+                       "Phones connect but no sound plays: ./install.sh 85-bluetooth"
+        else
+            warn "PulseAudio is per-user: desktop only, silent under Kodi" \
+                 "./install.sh 85-bluetooth"
+        fi
     fi
 else
     warn "Bluetooth tools are not installed" "./install.sh 85-bluetooth"

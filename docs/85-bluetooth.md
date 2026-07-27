@@ -1,8 +1,8 @@
 # 85-bluetooth — the Pi as a Bluetooth speaker
 
-Let a phone, laptop or tablet connect to the Pi and play its music through
-whatever is plugged into the Pi's **3.5 mm jack** — a hi-fi, powered speakers,
-an old amplifier.
+Let a phone, laptop or tablet connect to the Pi and play through whatever is
+wired to the Pi's **3.5 mm jack** — a hi-fi, powered speakers, an old
+amplifier.
 
 ```bash
 ./install.sh 85-bluetooth
@@ -14,47 +14,86 @@ an old amplifier.
 
 ## Which direction this is
 
-Bluetooth audio has two ends, and they need completely different setups:
-
 | | |
 |---|---|
 | **The Pi is the sink** ← *this module* | A phone connects **to** the Pi. Sound leaves via the Pi's jack. The Pi behaves like a Bluetooth speaker. |
-| The Pi is the source | The Pi connects **to** a Bluetooth speaker. Not what this module does. |
-
-If you want the second one, pair a speaker from the desktop with **blueman**
-and set it as the default sink — nothing here is needed for that.
+| The Pi is the source | The Pi connects **to** a Bluetooth speaker. Not what this module does — pair one from the desktop and set it as the default output. |
 
 ---
 
 ## Why it needs more than pairing
 
-Getting a phone to pair is the easy part. Three things have to line up, and
-most guides only cover the first:
+Getting a phone to pair is the easy part. Three things have to line up:
 
-**1. The Pi has to look like a speaker.** By default bluez advertises a
-Raspberry Pi with the *computer* device class (`0x002c0000` out of the box).
-Many phones will pair with it happily and then never offer "connect for media
-audio", because they do not believe it is an audio device. This module sets
-the class to `0x200414` — Audio/Video, portable audio.
-
-It also sets `DiscoverableTimeout = 0` and `PairableTimeout = 0`, so the Pi
-stays visible indefinitely instead of for three minutes after a reboot. An
-appliance with no screen needs to be findable whenever someone walks in.
+**1. The Pi has to look like a speaker.** bluez advertises a Raspberry Pi with
+the *computer* device class. Many phones pair happily and then never offer
+"connect for media audio", because they do not believe it is an audio device.
+This module sets the class to `0x200414` — Audio/Video, portable audio — and
+sets `DiscoverableTimeout = 0` so it stays findable rather than for three
+minutes after a reboot.
 
 **2. Something has to accept the pairing request.** There is no keyboard on
-the Pi to confirm a PIN. `bt-agent` runs as a service with
-`--capability=NoInputNoOutput`, which means "just works" pairing — the phone
-shows no PIN prompt and the Pi accepts.
+the Pi. `bt-agent` runs as a service with `--capability=NoInputNoOutput`,
+giving "just works" pairing with no PIN.
 
-**3. PulseAudio has to carry the stream to the jack.** When a phone connects,
-PulseAudio sees it as a *source*, and `module-bluetooth-policy` loops it
-through to the default sink. That module is loaded from
-`/etc/pulse/default.pa` — a **per-user** config.
+**3. The audio stack has to be running when Kodi is.** This is the part that
+differs between releases, and the part that catches people out.
 
-That last point is the one that bites. Per-user PulseAudio only exists inside
-a login session, so the Pi works as a speaker on the desktop and goes silent
-the moment you switch to Kodi or the console. System-mode PulseAudio — one
-daemon for the whole machine, started at boot — fixes it.
+---
+
+## PipeWire (Bookworm and later)
+
+Good news: **WirePlumber links the incoming Bluetooth stream to the output by
+itself.** There is no loopback to configure — a phone connects and the audio
+appears at the default sink.
+
+The one real problem is *when* PipeWire runs. PipeWire and WirePlumber are
+**per-user services**, started at login. Kodi and EmulationStation run from a
+console with no graphical session, so without help the speaker works on the
+desktop and goes silent everywhere else.
+
+The fix is lingering:
+
+```bash
+sudo loginctl enable-linger $USER
+```
+
+That keeps your user's systemd instance — and therefore PipeWire — running
+from boot whether or not anyone is logged in. It replaces PulseAudio's old
+system mode and is far less invasive: no shared audio session, nothing running
+as a system daemon, no upstream disapproval.
+
+### Packages that matter
+
+```bash
+sudo apt install pipewire pipewire-pulse wireplumber libspa-0.2-bluetooth
+```
+
+**`libspa-0.2-bluetooth` is the one to check.** It is the SPA plugin that
+gives PipeWire its Bluetooth support; without it a phone pairs, connects, and
+no audio node ever appears.
+
+### Sound quality
+
+The module writes `~/.config/wireplumber/wireplumber.conf.d/51-rec-bluetooth.conf`:
+
+```
+monitor.bluez.properties = {
+  bluez5.roles = [ a2dp_sink a2dp_source ]
+  bluez5.enable-sbc-xq = true
+}
+```
+
+`a2dp_sink` is already the default; it is listed so the intent is visible.
+**SBC-XQ** is the useful part — a higher-bitrate SBC profile that essentially
+every source supports and which sounds clearly better than baseline SBC.
+
+---
+
+## PulseAudio (Bullseye and earlier)
+
+PulseAudio also runs per session, and the answer there is system mode — one
+daemon for the whole machine, started by systemd.
 
 > ### The trap in system mode
 >
@@ -63,39 +102,20 @@ daemon for the whole machine, started at boot — fixes it.
 > confusing possible failure: the phone pairs, connects, shows itself as
 > playing — and no sound ever reaches the jack.
 >
-> The installer appends them. If you set this up by hand, do not skip it.
-
----
-
-## What the installer does
-
-1. Installs `bluez`, `bluez-tools`, `pulseaudio`, `pulseaudio-module-bluetooth`.
-2. Adds you to `bluetooth`, `audio` and `pulse-access`.
-3. Rewrites `/etc/bluetooth/main.conf`:
-   `Class = 0x200414`, `DiscoverableTimeout = 0`, `PairableTimeout = 0`,
-   `AlwaysPairable = true`, and the name phones will show.
-4. Installs `bt-agent.service` to accept pairing without a keyboard.
-5. Routes output to the analogue jack (`raspi-config nonint do_audio 1`).
-6. Offers system-mode PulseAudio, **with** the Bluetooth modules added to
-   `system.pa` and the `pulse` user put in the `bluetooth` and `audio` groups.
-
-Every file it edits is backed up once to `<file>.rec-backup`.
+> The module appends them. If you set this up by hand, do not skip it.
 
 ---
 
 ## Connecting a phone
 
 1. Phone → Settings → Bluetooth.
-2. Pick the Pi from the list (the name you chose at install; the hostname by
-   default) and pair. **There is no PIN.**
-3. Play something. Sound comes out of the Pi's 3.5 mm jack.
-
-The Pi stays discoverable, so it appears without anyone touching it.
-
-Check what is paired:
+2. Pick the Pi (the name you chose at install; the hostname by default) and
+   pair. **There is no PIN.**
+3. Play something.
 
 ```bash
-bluetoothctl devices
+bluetoothctl devices        # what is paired
+wpctl status                # the phone appears here once connected
 ```
 
 ---
@@ -106,122 +126,101 @@ bluetoothctl devices
 ./bin/doctor.sh bluetooth
 ```
 
-With a phone connected and playing:
-
-```bash
-pactl list sources short | grep bluez    # the phone as an audio source
-pactl list sinks short                   # the jack
-pactl list modules short | grep blue     # discover + policy must be loaded
-```
+It checks the device class, the Audio Sink profile, the pairing agent,
+`libspa-0.2-bluetooth`, and — on PipeWire — whether lingering is enabled,
+which is the difference between working under Kodi and not.
 
 ---
 
 ## Security
 
 `NoInputNoOutput` pairing means **anyone within Bluetooth range (~10 m) can
-pair and play audio** while the Pi is discoverable. There is no PIN to stop
-them. For a living room that is usually the point — guests can put music on
-without being handed a password.
+pair and play audio** while the Pi is discoverable. There is no PIN. For a
+living room that is usually the point — guests can put music on without being
+handed a password.
 
 If that is not what you want:
 
 ```bash
-# stop advertising; already-paired devices still reconnect
-sudo systemctl disable --now bt-agent
+sudo systemctl disable --now bt-agent      # already-paired devices still work
 sudo bluetoothctl discoverable off
 ```
 
-Then pair new devices deliberately by re-enabling it for a minute.
-
-Note that pairing grants audio only. It gives no access to files, the network
-or a shell.
+Pairing grants audio only: no files, no network, no shell.
 
 ---
 
 ## Troubleshooting
 
-**The Pi does not appear on the phone at all**
+**The Pi does not appear on the phone**
 
 ```bash
 bluetoothctl show          # want: Powered: yes, Discoverable: yes
 systemctl status bluetooth bt-agent
 ```
 
-If `Discoverable: no`, the agent service is not running — it is what turns
+`Discoverable: no` means the agent service is not running — it is what turns
 discoverability on at boot.
 
 **It pairs, but the phone offers no "media audio" option**
 
-The device class is wrong — the phone thinks the Pi is a computer. Check:
+The device class is wrong; the phone thinks the Pi is a computer.
 
 ```bash
 bluetoothctl show | grep Class     # want 0x200414
+sudo systemctl restart bluetooth   # if main.conf was edited but not applied
 ```
-
-If it still shows `0x002c0000`, `/etc/bluetooth/main.conf` was not applied:
-`sudo systemctl restart bluetooth`.
 
 **It connects but there is no sound**
 
-The most common case, and usually one of these:
-
 ```bash
-# 1. Are the Bluetooth modules loaded at all?
-pactl list modules short | grep blue
-
-# 2. Is the phone showing up as a source?
-pactl list sources short | grep bluez
-
-# 3. Is the jack the default sink, and turned up?
-pactl list sinks short
-alsamixer
+wpctl status                       # does the phone appear as a source?
+wpctl get-volume @DEFAULT_AUDIO_SINK@
+dpkg -l libspa-0.2-bluetooth       # installed?
 ```
 
-If (1) is empty **and** you enabled system mode, `system.pa` is missing the
-module lines — see the trap above. Re-run `./install.sh 85-bluetooth`.
+If the phone does not appear at all, `libspa-0.2-bluetooth` is missing.
 
 **Sound works on the desktop but stops under Kodi**
 
-Exactly what system mode is for. Re-run the module and say yes this time.
+Lingering is not enabled — the single most common cause on Bookworm and later:
+
+```bash
+loginctl show-user $USER -p Linger      # want Linger=yes
+sudo loginctl enable-linger $USER
+```
+
+**It is quiet**
+
+```bash
+wpctl set-volume @DEFAULT_AUDIO_SINK@ 100%
+```
+
+Use `wpctl`, **never** `amixer` — WirePlumber overwrites ALSA at every boot.
+See [TROUBLESHOOTING.md](TROUBLESHOOTING.md#sound-is-too-quiet-even-at-maximum-volume).
+
+The Pi's jack is PWM rather than a DAC and is quiet by construction; HDMI or a
+USB DAC is a large improvement.
 
 **Audio is choppy**
 
-- Wi-Fi and Bluetooth share the same 2.4 GHz radio on a Pi 3B. Wired Ethernet
-  makes a large difference.
-- Move the phone closer, or the Pi away from other 2.4 GHz sources.
-- The analogue jack on a Pi 3B is noisy by design; a USB DAC is a real
-  improvement if quality matters.
+Wi-Fi and Bluetooth share the 2.4 GHz radio on a Pi 3B. Wired Ethernet helps
+considerably. Moving the phone closer helps too.
 
-**The phone reconnects but audio goes to HDMI**
+**It does not reconnect after a reboot**
 
-```bash
-sudo raspi-config nonint do_audio 1     # force the jack
-pactl set-default-sink $(pactl list sinks short | awk '/analog/{print $2; exit}')
-```
-
-**`pactl` says "Connection refused"**
-
-No PulseAudio daemon is reachable. In system mode check
-`systemctl status pulseaudio`; otherwise you are on a console with no session
-— which is the problem system mode solves.
-
-**Bluetooth broke after enabling system mode**
-
-Log out and back in so your new group membership applies:
-
-```bash
-sudo usermod -a -G pulse-access $USER
-```
+Run `bluetoothctl` and `trust <MAC>`. Without trust, a device pairs but will
+not reconnect on its own.
 
 ---
 
 ## Sources
 
+- [Using a Raspberry Pi as a Bluetooth speaker with PipeWire and WirePlumber](https://www.collabora.com/news-and-blog/blog/2022/09/02/using-a-raspberry-pi-as-a-bluetooth-speaker-with-pipewire-wireplumber/)
+  — Collabora; the reference for the PipeWire path.
 - [Bluetooth audio on the Raspberry Pi](https://howchoo.com/pi/bluetooth-raspberry-pi)
   — pairing and the bluez side.
 - [How can I make PulseAudio run as root?](https://stackoverflow.com/questions/66775654/how-can-i-make-pulseaudio-run-as-root)
-  — the system-mode question, and why it is needed for console and Kodi audio.
-- [PulseAudio: what is wrong with system mode](https://www.freedesktop.org/wiki/Software/PulseAudio/Documentation/User/WhatIsWrongWithSystemWide/)
-  — upstream's own account of the trade-offs. Read before committing to it.
-- [Bluetooth assigned numbers: baseband device classes](https://www.bluetooth.com/specifications/assigned-numbers/)
-  — where `0x200414` comes from.
+  — the PulseAudio system-mode question, for Bullseye.
+- [Bluetooth assigned numbers](https://www.bluetooth.com/specifications/assigned-numbers/)
+  — where the `0x200414` device class comes from.
