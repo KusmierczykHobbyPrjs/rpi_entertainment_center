@@ -224,11 +224,30 @@ rec_display_server() {
 # So: exact name first (cheap, precise), then a whole-command-line match.
 rec_ui_running() {
     local name="$1"
-    pgrep -x "$name" >/dev/null 2>&1 && return 0
+    # stderr is suppressed deliberately: pgrep prints an advisory when the
+    # pattern exceeds 15 characters ("pattern that searches for process name
+    # longer than 15 characters will not match"), because that is the kernel's
+    # comm limit. We already handle that case with the -f fallback below, so
+    # the warning is noise - and it would otherwise be printed once per second
+    # by the watchdog loop.
+    pgrep -x "$name" 2>/dev/null | grep -q . && return 0
     # -f matches the full command line; anchor loosely so kodi matches
     # kodi.bin and kodi-gbm, but not an unrelated process merely mentioning it.
     pgrep -f "(^|/)${name}" >/dev/null 2>&1 && return 0
     return 1
+}
+
+# Stop a UI by process name, coping with names longer than 15 characters.
+#
+# `pkill -x` matches against the kernel's comm field, which is truncated to 15
+# characters - so `pkill -x kodi-standalone-x` silently matches nothing and the
+# force-kill escalation does nothing at all. Fall back to a command-line match.
+rec_ui_kill() {
+    local name="$1" sig="${2:-}"
+    if (( ${#name} <= 15 )); then
+        pkill ${sig:+"$sig"} -x "$name" 2>/dev/null && return 0
+    fi
+    pkill ${sig:+"$sig"} -f "(^|/)${name}" 2>/dev/null
 }
 
 # Convert a 0-100 volume percentage into the 0-32768 scale mpg123 -f expects.

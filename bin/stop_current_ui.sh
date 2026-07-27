@@ -65,6 +65,6 @@ for _ in {1..10}; do
 done
 
 rec_warn "${REC_UI_NAMES[$current_index]} did not exit cleanly - forcing."
-pkill -x "${REC_UI_PROCESSES[$current_index]}" 2>/dev/null
+rec_ui_kill "${REC_UI_PROCESSES[$current_index]}"
 sleep 2
-pkill -9 -x "${REC_UI_PROCESSES[$current_index]}" 2>/dev/null
+rec_ui_kill "${REC_UI_PROCESSES[$current_index]}" -9

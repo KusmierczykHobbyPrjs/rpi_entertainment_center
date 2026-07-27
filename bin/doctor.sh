@@ -270,6 +270,16 @@ else
         "Kodi will exit immediately from a console. Run: ./install.sh 10-kodi, then reboot"
 fi
 
+# The kernel truncates process names to 15 characters, so a longer entry can
+# never be matched exactly - and the force-kill escalation would do nothing.
+for i in "${!REC_UI_PROCESSES[@]}"; do
+    pname="${REC_UI_PROCESSES[$i]}"
+    if (( ${#pname} > 15 )); then
+        warn "REC_UI_PROCESSES[$i]='$pname' is ${#pname} chars (limit is 15)" \
+             "Linux truncates process names; use the truncated form, e.g. '${pname:0:15}'"
+    fi
+done
+
 if (( REC_UI_DEFAULT_INDEX >= 0 && REC_UI_DEFAULT_INDEX < n )); then
     pass "Default UI is ${REC_UI_NAMES[$REC_UI_DEFAULT_INDEX]}"
 else
@@ -286,7 +296,7 @@ fi
 
 running=""
 for i in "${!REC_UI_PROCESSES[@]}"; do
-    if pgrep -x "${REC_UI_PROCESSES[$i]}" >/dev/null 2>&1; then
+    if rec_ui_running "${REC_UI_PROCESSES[$i]}"; then
         running="${REC_UI_NAMES[$i]}"
         break
     fi

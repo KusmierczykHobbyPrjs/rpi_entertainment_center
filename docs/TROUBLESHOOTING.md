@@ -280,6 +280,37 @@ More detail: [90-speech.md](90-speech.md).
 
 ---
 
+## Messages printed by `labwc-pi` — which matter?
+
+Starting the desktop prints several warnings. Most are not from this project
+and not faults.
+
+| Message | Source | Action |
+|---|---|---|
+| `<snapping><range> is deprecated` | labwc reading Raspberry Pi OS's shipped `rc.xml` | None. Cosmetic; goes away when the OS config catches up with labwc 0.9.8. |
+| `<windowSwitcher show=""> is deprecated` | same | None |
+| `<windowSwitcher allWorkspaces=""> is deprecated` | same | None |
+| `no profile matched` | the display-profile manager finding no rule for your monitor layout | None on a single screen. |
+| `pgrep: pattern that searches for process names longer than 15 characters will not match` | **this project** (fixed) | `git pull` |
+
+### The pgrep one was ours
+
+Linux truncates process names to 15 characters in the kernel's `comm` field,
+so `pgrep -x` and `pkill -x` cannot match anything longer. That advisory was
+printed by the UI watchdog, once per second.
+
+It mattered for more than noise: `stop_current_ui.sh` used `pkill -x` for its
+force-kill escalation, so with a name over 15 characters **the escalation
+silently did nothing** — a UI that refused to quit would never be killed.
+
+Both now fall back to a command-line match, and `./bin/doctor.sh ui` warns if
+any `REC_UI_PROCESSES` entry is too long, suggesting the truncated form.
+
+This is also why the default is `emulationstatio` and not
+`emulationstation` — 15 characters exactly.
+
+---
+
 ## The desktop is black, with no taskbar
 
 Two different causes, and they look identical.
