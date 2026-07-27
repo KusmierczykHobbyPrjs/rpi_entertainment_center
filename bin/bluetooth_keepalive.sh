@@ -56,11 +56,33 @@ if [[ -z "$state" ]]; then
     exit 1
 fi
 
-grep -qi 'Powered: yes' <<<"$state" || {
+if ! grep -qi 'Powered: yes' <<<"$state"; then
     rec_warn "Adapter was powered off - powering on."
     timeout 10 bluetoothctl power on >/dev/null 2>&1
     fixed=1
-}
+    sleep 2
+
+    # If it still will not power on, the controller itself is wedged rather
+    # than merely switched off. On a Pi this shows in dmesg as
+    #   Bluetooth: hci0: Frame reassembly failed (-84)
+    #   Bluetooth: hci0: Opcode 0x0c03 failed: -110
+    # meaning the HCI serial link desynchronised and even HCI_Reset timed out.
+    # No amount of bluetoothctl will recover that.
+    if ! timeout 10 bluetoothctl show 2>/dev/null | grep -qi 'Powered: yes'; then
+        rec_warn "Adapter will not power on - restarting bluetooth.service."
+        sudo systemctl restart bluetooth 2>/dev/null
+        sleep 3
+        if ! timeout 10 bluetoothctl show 2>/dev/null | grep -qi 'Powered: yes'; then
+            rec_error "The Bluetooth controller is not responding."
+            rec_error "Check for a firmware-level failure:"
+            rec_error "  dmesg | grep -iE 'hci0|Frame reassembly'"
+            rec_error "'Frame reassembly failed' means the HCI link corrupted;"
+            rec_error "only a module reload or reboot recovers it. See"
+            rec_error "docs/85-bluetooth.md for the config.txt mitigations."
+            exit 1
+        fi
+    fi
+fi
 
 grep -qi 'Pairable: yes' <<<"$state" || {
     rec_warn "Adapter was not pairable - enabling."

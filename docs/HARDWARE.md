@@ -274,6 +274,18 @@ them expecting smoother video, that is not where the win is.
 
 ### Settings that do still matter
 
+If you use the Pi as a **Bluetooth speaker**, add this one:
+
+```
+# Pin the VPU core clock. Bluetooth on a Pi 3B talks over an on-board UART
+# whose baud rate derives from this clock - when it moves with load the HCI
+# stream corrupts, which appears in dmesg as
+#   Bluetooth: hci0: Frame reassembly failed (-84)
+# and eventually kills the controller mid-playback.
+core_freq=250
+```
+
+
 ```
 # Overscan: removes black borders on some TVs
 disable_overscan=1

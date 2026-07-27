@@ -160,6 +160,10 @@ sudo tee "$AGENT_UNIT" >/dev/null <<'EOF'
 Description=Bluetooth pairing agent (accepts pairing without a keyboard)
 After=bluetooth.service
 Requires=bluetooth.service
+# StartLimit* belong in [Unit]. Placed in [Service] systemd ignores them with
+# "Unknown key ... in section [Service]" and the limit silently does nothing.
+StartLimitIntervalSec=120
+StartLimitBurst=5
 
 [Service]
 Type=simple
@@ -186,11 +190,6 @@ KillSignal=SIGKILL
 KillMode=mixed
 TimeoutStopSec=5
 SendSIGKILL=yes
-
-# Give up rather than restarting forever if it cannot run at all - an endless
-# 5-second restart loop is hard to notice and clutters the journal.
-StartLimitIntervalSec=120
-StartLimitBurst=5
 
 [Install]
 WantedBy=multi-user.target

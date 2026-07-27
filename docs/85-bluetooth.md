@@ -155,7 +155,54 @@ Pairing grants audio only: no files, no network, no shell.
 The Pi stops being visible to phones and does not come back on its own.
 Discoverability is not as permanent as `DiscoverableTimeout = 0` suggests.
 
-**What knocks it down:**
+### First: is it the controller itself?
+
+```bash
+dmesg | grep -iE 'hci0|Frame reassembly' | tail -20
+```
+
+```
+Bluetooth: hci0: Frame reassembly failed (-84)
+Bluetooth: hci0: Opcode 0x0c03 failed: -110
+```
+
+That pair is decisive and means something different from everything below.
+`-84` is `EILSEQ`: the **HCI serial link to the Bluetooth controller
+corrupted**. `0x0c03` is `HCI_Reset`, and `-110` is a timeout — the controller
+stopped answering even a reset. `bluetoothctl show` then reports
+`Powered: no` with `Class: 0x00000000`.
+
+No amount of `bluetoothctl` recovers this; the chip is gone until the driver
+is reloaded.
+
+```bash
+sudo systemctl stop bluetooth
+sudo modprobe -r hci_uart && sudo modprobe hci_uart
+sudo systemctl start bluetooth
+```
+
+If that does not work, reboot.
+
+**Why it happens on a Pi 3B.** Bluetooth is not on USB — it is a BCM43438
+sharing one chip with Wi-Fi, connected over an on-board UART. Two things
+upset that link:
+
+| Cause | Mitigation |
+|---|---|
+| The UART baud rate is derived from the VPU core clock, which moves with load | Pin it: add `core_freq=250` to `/boot/firmware/config.txt` |
+| Wi-Fi and Bluetooth share one radio and one antenna | Use wired Ethernet and disable Wi-Fi: `sudo rfkill block wifi` |
+
+A2DP streaming is sustained, latency-sensitive traffic, so it provokes this
+far more than idle pairing does — which is why it survived setup and died
+during playback.
+
+Check power too, though it is less often the cause here:
+
+```bash
+vcgencmd get_throttled        # want 0x0
+```
+
+**Other things that knock it down:**
 
 | Cause | Why |
 |---|---|
