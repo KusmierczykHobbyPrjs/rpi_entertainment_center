@@ -118,8 +118,19 @@ else
     read -r -p "  Name to show on phones [$default_name]: " bt_name
     bt_name="${bt_name:-$default_name}"
 fi
-ini_set "$BT_CONF" General Name "$bt_name"
-ok "Advertised name: $bt_name"
+# NOT main.conf. Modern bluez ignores [General] Name entirely - the adapter
+# name comes from the system's *pretty hostname*, which is why setting it in
+# main.conf silently left the name as the plain hostname.
+if sudo timeout 10 hostnamectl set-hostname --pretty "$bt_name" 2>/dev/null; then
+    ok "Pretty hostname set to '$bt_name' (this is what phones show)"
+else
+    skip "Could not set the pretty hostname"
+fi
+# Belt and braces: set the adapter alias directly too. Harmless if the pretty
+# hostname already covers it.
+sudo timeout 10 bluetoothctl system-alias "$bt_name" >/dev/null 2>&1 \
+    && ok "Adapter alias set to '$bt_name'" \
+    || skip "Could not set the adapter alias (bluetoothctl unavailable?)"
 
 sudo systemctl enable --now bluetooth >/dev/null 2>&1
 # Bound this: a bluetoothd that will not stop would otherwise hang the whole
@@ -157,6 +168,10 @@ RestartSec=5
 # Bound both ends so a stuck agent cannot delay boot or shutdown.
 TimeoutStartSec=15
 TimeoutStopSec=10
+# Give up rather than restarting forever if it cannot run at all - an endless
+# 5-second restart loop is hard to notice and clutters the journal.
+StartLimitIntervalSec=120
+StartLimitBurst=5
 
 [Install]
 WantedBy=multi-user.target

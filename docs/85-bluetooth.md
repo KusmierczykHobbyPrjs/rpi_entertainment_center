@@ -176,6 +176,20 @@ systemctl status bluetooth bt-agent
 `Discoverable: no` means the agent service is not running — it is what turns
 discoverability on at boot.
 
+**The phone shows the hostname instead of the name I chose**
+
+`[General] Name` in `/etc/bluetooth/main.conf` is **ignored by modern bluez**.
+The adapter name comes from the system's *pretty hostname*:
+
+```bash
+hostnamectl set-hostname --pretty "Living Room"
+bluetoothctl system-alias "Living Room"     # applies immediately
+bluetoothctl show | grep Alias              # confirm
+```
+
+Note this is separate from the network hostname — `hostnamectl --pretty` sets a
+free-text label and does not affect `ssh pi@raspberrypi`.
+
 **It pairs, but the phone offers no "media audio" option**
 
 The device class is wrong; the phone thinks the Pi is a computer.
