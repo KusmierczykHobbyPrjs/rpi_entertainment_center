@@ -305,14 +305,20 @@ EOF
 # a2dp_sink is what lets this machine RECEIVE audio from a phone. It is on by
 # default; listed explicitly so the intent is visible.
 #
-# SBC-XQ is a higher-bitrate SBC profile supported by essentially every
-# source device, and sounds noticeably better than baseline SBC.
+# SBC-XQ is a higher-bitrate SBC profile and does sound better - but it needs
+# more airtime, and a Pi 3B shares one antenna between Bluetooth and 2.4 GHz
+# Wi-Fi. On a marginal link the extra bandwidth buys audible dropouts rather
+# than audible quality, so it is OFF by default here.
+#
+# Turn it on only once playback is reliably stable, and be ready to turn it
+# back off:
+#   bluez5.enable-sbc-xq = true
 monitor.bluez.properties = {
   bluez5.roles = [ a2dp_sink a2dp_source ]
-  bluez5.enable-sbc-xq = true
+  bluez5.enable-sbc-xq = false
 }
 EOF
-    ok "Wrote $WP_DIR/51-rec-bluetooth.conf"
+    ok "Wrote $WP_DIR/51-rec-bluetooth.conf (SBC-XQ off - stability first)"
     systemctl --user restart wireplumber 2>/dev/null || true
 else
     # --- PulseAudio (Bullseye) --------------------------------------------

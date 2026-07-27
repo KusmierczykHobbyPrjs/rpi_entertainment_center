@@ -150,6 +150,52 @@ Pairing grants audio only: no files, no network, no shell.
 
 ---
 
+## Music plays, cuts out, resumes
+
+Intermittent dropouts, as opposed to the controller dying outright. This is
+almost always **radio contention**, and the fixes are in order of effect:
+
+**1. Stop Wi-Fi competing.** Bluetooth and 2.4 GHz Wi-Fi share one chip and
+one antenna on a Pi 3B. Use Ethernet and turn Wi-Fi off:
+
+```bash
+sudo rfkill block wifi        # test it
+```
+
+If that fixes it, make it permanent by adding `dtoverlay=disable-wifi` to
+`/boot/firmware/config.txt`.
+
+**2. Turn off SBC-XQ.** It is a higher-bitrate codec — better sounding, but it
+needs more airtime than a contended link can reliably carry. Newer versions of
+this module leave it **off** for exactly this reason; if you installed an
+earlier one, check:
+
+```bash
+grep sbc-xq ~/.config/wireplumber/wireplumber.conf.d/51-rec-bluetooth.conf
+```
+
+Set `bluez5.enable-sbc-xq = false`, then:
+
+```bash
+systemctl --user restart wireplumber
+```
+
+**3. Move the Pi.** Distance, walls, and other 2.4 GHz sources (microwaves,
+neighbours' Wi-Fi) all matter more than they should on this hardware.
+
+**4. Check it is not CPU starvation** rather than radio. If Kodi is playing
+video at the same time, a Pi 3B may simply not keep up:
+
+```bash
+top -b -n1 | head -15
+```
+
+**5. A USB Bluetooth dongle** bypasses the on-board chip and its shared
+antenna entirely. About £5, and the definitive fix if the above is not enough
+— a Pi 3B's built-in radio is genuinely marginal for sustained A2DP.
+
+---
+
 ## It was working, then disappeared
 
 The Pi stops being visible to phones and does not come back on its own.
@@ -189,8 +235,9 @@ upset that link:
 
 | Cause | Mitigation |
 |---|---|
-| The UART baud rate is derived from the VPU core clock, which moves with load | Pin it: add `core_freq=250` to `/boot/firmware/config.txt` |
-| Wi-Fi and Bluetooth share one radio and one antenna | Use wired Ethernet and disable Wi-Fi: `sudo rfkill block wifi` |
+| Wi-Fi and Bluetooth share one radio and one antenna | Wired Ethernet, and `sudo rfkill block wifi`. **The single most effective change.** |
+| A higher-bitrate codec needs more airtime than the link can carry | Keep SBC-XQ **off** — see below |
+| The UART baud rate follows the core clock — **only if `dtoverlay=miniuart-bt` is set** | `core_freq=250`. Check first: `grep miniuart-bt /boot/firmware/config.txt`. On a stock Pi this does nothing and only slows the GPU. |
 
 A2DP streaming is sustained, latency-sensitive traffic, so it provokes this
 far more than idle pairing does — which is why it survived setup and died

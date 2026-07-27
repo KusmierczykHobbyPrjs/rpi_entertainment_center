@@ -274,16 +274,19 @@ them expecting smoother video, that is not where the win is.
 
 ### Settings that do still matter
 
-If you use the Pi as a **Bluetooth speaker**, add this one:
-
-```
-# Pin the VPU core clock. Bluetooth on a Pi 3B talks over an on-board UART
-# whose baud rate derives from this clock - when it moves with load the HCI
-# stream corrupts, which appears in dmesg as
-#   Bluetooth: hci0: Frame reassembly failed (-84)
-# and eventually kills the controller mid-playback.
-core_freq=250
-```
+> **`core_freq=250` is widely recommended for Bluetooth. On a stock Pi it does
+> nothing.** That advice applies only when Bluetooth has been moved to the
+> mini-UART with `dtoverlay=miniuart-bt`, whose baud rate follows the VPU core
+> clock. By default a Pi 3B puts Bluetooth on the PL011, which is unaffected —
+> so pinning the clock does not help the link and only lowers GPU performance.
+>
+> Check before adding it:
+>
+> ```bash
+> grep -E 'miniuart-bt|core_freq' /boot/firmware/config.txt
+> ```
+>
+> If `miniuart-bt` is absent, leave `core_freq` alone.
 
 
 ```
