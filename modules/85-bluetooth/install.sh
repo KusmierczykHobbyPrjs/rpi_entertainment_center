@@ -111,16 +111,24 @@ ini_set "$BT_CONF" General AlwaysPairable true
 ini_set "$BT_CONF" Policy AutoEnable true
 ok "Class 0x200414, discoverable and pairable with no timeout"
 
-default_name="$(hostname)"
+# Default to whatever is currently advertised, not the hostname - otherwise
+# re-running the module shows "[raspberrypi]" and looks as though the name you
+# chose last time did not stick.
+default_name="$(timeout 5 bluetoothctl show 2>/dev/null | grep -oP '^\s*Alias:\s*\K.*' | head -1)"
+[[ -n "$default_name" ]] || default_name="$(hostnamectl --pretty 2>/dev/null)"
+[[ -n "$default_name" ]] || default_name="$(grep -oP '^\s*Name\s*=\s*\K.*' "$BT_CONF" 2>/dev/null | head -1)"
+[[ -n "$default_name" ]] || default_name="$(hostname)"
 if [[ "${REC_ASSUME_YES:-0}" == "1" ]]; then
     bt_name="$default_name"
 else
     read -r -p "  Name to show on phones [$default_name]: " bt_name
     bt_name="${bt_name:-$default_name}"
 fi
-# NOT main.conf. Modern bluez ignores [General] Name entirely - the adapter
-# name comes from the system's *pretty hostname*, which is why setting it in
-# main.conf silently left the name as the plain hostname.
+# Belt and braces, because which mechanism applies varies by bluez version:
+#   main.conf [General] Name   works on current Raspberry Pi OS
+#   pretty hostname            what newer bluez derives the name from
+#   bluetoothctl system-alias  applies immediately, no restart needed
+ini_set "$BT_CONF" General Name "$bt_name"
 if sudo timeout 10 hostnamectl set-hostname --pretty "$bt_name" 2>/dev/null; then
     ok "Pretty hostname set to '$bt_name' (this is what phones show)"
 else

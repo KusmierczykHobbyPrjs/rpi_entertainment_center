@@ -684,12 +684,21 @@ if rec_has bluetoothctl; then
     # ships as a computer class, and many phones then pair but never route
     # audio to it.
     class="$(grep -i '^\s*Class:' <<<"$btshow" | awk '{print $2}')"
-    case "$class" in
-        0x2*|0x24*) pass "Advertised as an audio device ($class)" ;;
-        "")         warn "Could not read the device class" "Is the adapter powered?" ;;
-        *)          bad "Device class is $class, not an audio device" \
-                        "Phones may refuse to send audio: ./install.sh 85-bluetooth" ;;
-    esac
+    if [[ -z "$class" ]]; then
+        warn "Could not read the device class" "Is the adapter powered?"
+    else
+        # Only the MAJOR device class matters, and it is bits 8-12. bluez ORs
+        # service-class bits into the top of the value as profiles register, so
+        # a configured 0x200414 legitimately becomes 0x4c0414 at runtime -
+        # matching on the leading digits reports a false failure.
+        major=$(( (class >> 8) & 0x1F ))
+        if (( major == 4 )); then
+            pass "Advertised as an audio device (class $class, major 0x04 Audio/Video)"
+        else
+            bad "Device class $class has major class $major, not Audio/Video (4)" \
+                "Phones may refuse to send audio: ./install.sh 85-bluetooth"
+        fi
+    fi
 
     grep -qi 'Discoverable: yes' <<<"$btshow" \
         && pass "Discoverable" \

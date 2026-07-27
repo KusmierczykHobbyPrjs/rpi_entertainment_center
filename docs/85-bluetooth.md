@@ -178,17 +178,26 @@ discoverability on at boot.
 
 **The phone shows the hostname instead of the name I chose**
 
-`[General] Name` in `/etc/bluetooth/main.conf` is **ignored by modern bluez**.
-The adapter name comes from the system's *pretty hostname*:
+Which mechanism sets the adapter name varies by bluez version, so the module
+sets all three. Check what is actually advertised:
 
 ```bash
-hostnamectl set-hostname --pretty "Living Room"
-bluetoothctl system-alias "Living Room"     # applies immediately
-bluetoothctl show | grep Alias              # confirm
+bluetoothctl show | grep -E 'Name|Alias'
 ```
 
-Note this is separate from the network hostname — `hostnamectl --pretty` sets a
-free-text label and does not affect `ssh pi@raspberrypi`.
+To change it by hand:
+
+```bash
+bluetoothctl system-alias "Living Room"      # immediate, no restart
+sudo hostnamectl set-hostname --pretty "Living Room"
+```
+
+`hostnamectl --pretty` sets a free-text label only — it does not affect
+`ssh pi@raspberrypi`.
+
+> Re-running the module offers the **currently advertised** name as the
+> default, not the hostname. Earlier versions offered the hostname, which made
+> it look as though a previously chosen name had not stuck when it had.
 
 **It pairs, but the phone offers no "media audio" option**
 
