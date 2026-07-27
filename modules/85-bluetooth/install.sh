@@ -79,14 +79,7 @@ apt_install bluez-tools || exit 1
 # --- Groups ----------------------------------------------------------------
 step "Adding $USER to the audio groups"
 for grp in bluetooth audio pulse-access; do
-    if getent group "$grp" >/dev/null 2>&1; then
-        if id -nG "$USER" | grep -qw "$grp"; then
-            skip "$USER is already in '$grp'"
-        else
-            sudo usermod -a -G "$grp" "$USER"
-            ok "Added $USER to '$grp' (takes effect after the next login)"
-        fi
-    fi
+    ensure_group "$grp" || true
 done
 
 # --- Advertise as a speaker ------------------------------------------------

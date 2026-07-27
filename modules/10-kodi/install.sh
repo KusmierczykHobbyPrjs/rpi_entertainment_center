@@ -45,18 +45,10 @@ step "Granting the access Kodi needs to run from a console"
 # These were previously only granted by the RetroPie module, so a Kodi-only
 # install silently lacked them.
 for grp in video render input audio tty; do
-    if getent group "$grp" >/dev/null 2>&1; then
-        if id -nG "$USER" | grep -qw "$grp"; then
-            skip "$USER is already in '$grp'"
-        else
-            sudo usermod -a -G "$grp" "$USER"
-            ok "Added $USER to '$grp'"
-            REC_NEED_RELOGIN=1
-        fi
-    fi
+    ensure_group "$grp" || true
 done
-[[ "${REC_NEED_RELOGIN:-0}" == "1" ]] && \
-    note "Group changes take effect at your next login - reboot before testing."
+(( REC_GROUP_PENDING == 1 )) && \
+    fail "Reboot before testing Kodi - it will exit immediately without these."
 
 step "Working out how to start Kodi without a desktop"
 # Debian ships several Kodi front-ends. The bare "kodi" command is a wrapper

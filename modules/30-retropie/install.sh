@@ -40,22 +40,12 @@ step "Granting the console access it needs"
 # EmulationStation starts X-less on tty1 and needs the calling user to own the
 # terminal. Without this, `emulationstation` exits immediately with a
 # permissions error that gives no hint about the cause.
-if id -nG "$USER" | grep -qw tty; then
-    skip "$USER is already in the 'tty' group"
-else
-    sudo usermod -a -G tty "$USER"
-    ok "Added $USER to the 'tty' group (takes effect after the next login)"
-fi
+ensure_group tty || true
 
 # input/video/audio groups are what let a plain user reach the gamepad, the
 # framebuffer and the sound card from the console.
 for grp in input video audio; do
-    if id -nG "$USER" | grep -qw "$grp"; then
-        skip "$USER is already in the '$grp' group"
-    else
-        sudo usermod -a -G "$grp" "$USER"
-        ok "Added $USER to the '$grp' group"
-    fi
+    ensure_group "$grp" || true
 done
 
 echo

@@ -166,6 +166,44 @@ confirm() {
     [[ "$reply" =~ ^[Yy]$ ]]
 }
 
+# --- Groups ----------------------------------------------------------------
+
+# Set to 1 by ensure_group when a membership only applies after re-login.
+REC_GROUP_PENDING=0
+
+# Make $USER a member of a group and report honestly whether it is usable yet.
+#
+# Returns 0 when the CURRENT session already has it, 1 when it will only take
+# effect after logging out and back in. Callers should skip steps that would
+# fail in that case rather than emitting a wall of permission errors.
+ensure_group() {
+    local grp="$1"
+
+    if ! getent group "$grp" >/dev/null 2>&1; then
+        skip "Group '$grp' does not exist on this system"
+        return 0
+    fi
+
+    if rec_in_group "$grp"; then
+        skip "$USER is in '$grp' (active in this session)"
+        return 0
+    fi
+
+    if rec_group_configured "$grp"; then
+        skip "$USER is in '$grp' in the group database"
+    else
+        sudo usermod -a -G "$grp" "$USER" \
+            && ok "Added $USER to '$grp'" \
+            || { fail "Could not add $USER to '$grp'"; return 1; }
+    fi
+
+    fail "...but this session does not have '$grp' yet."
+    note "Group membership only applies at the next login. Log out and back in"
+    note "(or reboot), then re-run this module."
+    REC_GROUP_PENDING=1
+    return 1
+}
+
 # --- Config bootstrap ------------------------------------------------------
 
 # Creates config.sh from the template on first run.

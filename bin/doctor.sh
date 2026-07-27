@@ -268,13 +268,21 @@ done
 missing_groups=()
 for grp in video render input tty; do
     getent group "$grp" >/dev/null 2>&1 || continue
-    id -nG "$USER" | grep -qw "$grp" || missing_groups+=("$grp")
+    rec_in_group "$grp" || missing_groups+=("$grp")
 done
 if (( ${#missing_groups[@]} == 0 )); then
     pass "$USER is in the groups a console UI needs"
 else
-    bad "$USER is not in: ${missing_groups[*]}" \
-        "Kodi will exit immediately from a console. Run: ./install.sh 10-kodi, then reboot"
+    # Distinguish "not configured" from "configured but needs a re-login" -
+    # the fixes are different and the second is invisible to `id $USER`.
+    pending=() absent=()
+    for grp in "${missing_groups[@]}"; do
+        if rec_group_configured "$grp"; then pending+=("$grp"); else absent+=("$grp"); fi
+    done
+    (( ${#absent[@]} )) && bad "$USER is not in: ${absent[*]}" \
+        "Run: ./install.sh 10-kodi, then reboot"
+    (( ${#pending[@]} )) && bad "${pending[*]}: configured but NOT active in this session" \
+        "Log out and back in, or reboot - commands needing them fail until you do"
 fi
 
 # The kernel truncates process names to 15 characters, so a longer entry can
@@ -416,11 +424,14 @@ if rec_has nordvpn; then
         bad "nordvpnd is not running" "sudo systemctl start nordvpnd"
     fi
 
-    if id -nG "$USER" | grep -qw nordvpn; then
-        pass "$USER is in the 'nordvpn' group"
+    if rec_in_group nordvpn; then
+        pass "$USER is in the 'nordvpn' group (active in this session)"
+    elif rec_group_configured nordvpn; then
+        bad "'nordvpn' group is configured but NOT active in this session" \
+            "Reboot. Every nordvpn command fails with 'Permission denied' until you do"
     else
         bad "$USER is not in the 'nordvpn' group" \
-            "sudo usermod -aG nordvpn $USER, then log out and back in"
+            "sudo usermod -aG nordvpn $USER, then reboot"
     fi
 
     if nordvpn account >/dev/null 2>&1; then

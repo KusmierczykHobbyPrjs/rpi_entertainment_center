@@ -37,19 +37,32 @@ else
 fi
 
 step "Adding $USER to the nordvpn group"
-# Without this every nordvpn command needs sudo, which the button scripts and
-# the Kodi menu cannot supply.
-if id -nG "$USER" | grep -qw nordvpn; then
-    skip "$USER is already in the 'nordvpn' group"
-else
-    sudo usermod -aG nordvpn "$USER"
-    ok "Added $USER to 'nordvpn' (takes effect after the next login)"
-    note "Until you log out and back in, nordvpn commands may fail with a permission error."
-fi
+# Without this every nordvpn command fails with "Permission denied", which the
+# button scripts and the Kodi menu cannot work around.
+ensure_group nordvpn || true
 
 step "Starting the NordVPN daemon"
 sudo systemctl enable --now nordvpnd 2>/dev/null || skip "Could not enable nordvpnd via systemd"
 sleep 2
+
+# Everything below talks to the daemon, and all of it fails with "Permission
+# denied" until the group applies. Stop here rather than printing that error
+# five times.
+if (( REC_GROUP_PENDING == 1 )); then
+    echo
+    fail "Cannot continue until the 'nordvpn' group is active in your session."
+    cat <<EOT
+
+  Log out and back in, or reboot, then run this module again:
+
+      sudo reboot
+      ./install.sh 70-nordvpn
+
+  Everything from here - login, allowlist, Meshnet - needs that group.
+
+EOT
+    exit 1
+fi
 
 step "Logging in"
 if nordvpn account >/dev/null 2>&1; then

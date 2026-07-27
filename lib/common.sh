@@ -234,6 +234,22 @@ rec_display_server() {
     echo unknown
 }
 
+# Is the CURRENT process a member of this group?
+#
+# Note `id -nG` with NO argument. Given a username, id queries the group
+# database instead of the running process, so it reports success the instant
+# usermod returns - while every command that actually needs the group keeps
+# failing until the next login. That mismatch produced installers reporting
+# "already in the group" directly above a wall of "Permission denied".
+rec_in_group() {
+    id -nG 2>/dev/null | tr ' ' '\n' | grep -qx "$1"
+}
+
+# Is the user recorded in the group database? (May still need a re-login.)
+rec_group_configured() {
+    id -nG "${2:-$USER}" 2>/dev/null | tr ' ' '\n' | grep -qx "$1"
+}
+
 # True when a UI process is running.
 #
 # Matching on the exact process name is not enough: what a UI is called in

@@ -94,12 +94,7 @@ fi
 
 step "Checking GPIO access"
 if [[ -e /dev/gpiomem ]]; then
-    if id -nG "$USER" | grep -qw gpio; then
-        ok "$USER is in the 'gpio' group"
-    else
-        sudo usermod -a -G gpio "$USER"
-        ok "Added $USER to the 'gpio' group (takes effect after the next login)"
-    fi
+    ensure_group gpio || true
 else
     skip "/dev/gpiomem not present - not a Raspberry Pi, or GPIO is disabled"
 fi
