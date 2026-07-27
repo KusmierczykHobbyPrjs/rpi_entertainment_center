@@ -22,7 +22,8 @@ unattended compiling if you install RetroPie.
 10. [First real boot](#10-first-real-boot)
 11. [Finishing touches inside Kodi](#11-finishing-touches-inside-kodi)
 12. [Set the audio levels](#12-set-the-audio-levels)
-13. [Restoring a previous installation](#13-restoring-a-previous-installation)
+13. [Pair a Bluetooth device](#13-pair-a-bluetooth-device)
+14. [Restoring a previous installation](#14-restoring-a-previous-installation)
 
 ---
 
@@ -246,8 +247,10 @@ Recommended order and what each costs you in time:
 | 10 | `60-gpio` | 2 min | Only with buttons wired. |
 | 11 | `70-nordvpn` | 5 min | Needs a subscription. |
 | 12 | `75-port-forwarding` | 2 min | Needs `70-nordvpn` to be useful. |
-| 13 | `25-tvheadend` | 5 min | Only with a TV tuner. |
-| 14 | `80-webserver` | 15 min | **Exposes the Pi to the internet** — read the doc first. |
+| 13 | `85-bluetooth` | 5 min | Use the Pi as a Bluetooth speaker. Needs `90-speech`'s audio setup. |
+| 14 | `95-weather` | 2 min | Spoken weather. Needs a free OpenWeatherMap key. |
+| 15 | `25-tvheadend` | 5 min | Only with a TV tuner. |
+| 16 | `80-webserver` | 15 min | **Exposes the Pi to the internet** — read the doc first. |
 
 `50-ui-rotation` deliberately comes late: it checks that the UIs listed in
 `config.sh` are actually installed, which it can only do once they are.
@@ -412,7 +415,57 @@ Full detail in
 
 ---
 
-## 13. Restoring a previous installation
+## 13. Pair a Bluetooth device
+
+Only if you installed `85-bluetooth`. The Pi acts as a **Bluetooth speaker**:
+a phone connects to it and plays through the 3.5 mm jack.
+
+1. Phone → Settings → Bluetooth.
+2. Pick the Pi — the name you chose during install, shown by
+   `bluetoothctl show | grep Alias`.
+3. Pair. **There is no PIN** — the agent uses "just works" pairing.
+
+Then, from the Pi:
+
+```bash
+bluetoothctl trust AA:BB:CC:DD:EE:FF
+```
+
+**`trust` is a separate step from pairing**, and the one people miss — without
+it the phone will not reconnect after a reboot.
+
+Check the audio actually arrives:
+
+```bash
+wpctl status        # the phone appears as a source while playing
+```
+
+### If pairing fails with "incorrect PIN or passkey"
+
+There is no PIN, so that message means something else — almost always a stale
+bond left by an earlier failed attempt. Clear it on **both** sides:
+
+```bash
+bluetoothctl devices
+bluetoothctl remove AA:BB:CC:DD:EE:FF
+```
+
+and "Forget this device" on the phone, then pair again. Other causes and the
+`btmon` diagnostics are in
+[docs/85-bluetooth.md](docs/85-bluetooth.md#troubleshooting).
+
+### If it works on the desktop but is silent under Kodi
+
+PipeWire is a per-user service and Kodi runs with no login session:
+
+```bash
+loginctl show-user $USER -p Linger      # want Linger=yes
+sudo loginctl enable-linger $USER
+```
+
+---
+
+## 14. Restoring a previous installation
 
 Reinstalling and want your old settings back? These are the things worth
 keeping from the old system, and where they belong on the new one:

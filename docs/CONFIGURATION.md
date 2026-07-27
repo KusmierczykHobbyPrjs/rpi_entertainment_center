@@ -21,6 +21,7 @@ them in step when you add a setting.
 | `REC_GPIO_BUTTONS` | next reboot, or restart `gpio_buttons.sh` |
 | `REC_PORT_FORWARDS` | next reboot, or restart `port_forwarding.sh` |
 | `REC_DESKTOP_*` | next desktop session |
+| `REC_WEATHER_*`, `OPENWEATHER_API_KEY` | immediately (read per invocation) |
 
 Verify any change with `./bin/doctor.sh`.
 
@@ -270,6 +271,30 @@ output and tells you what to set.
 
 ---
 
+## Weather
+
+```bash
+export REC_WEATHER_LOCATION="auto"
+export REC_WEATHER_UNITS="metric"
+export OPENWEATHER_API_KEY=""
+```
+
+| Setting | Meaning |
+|---|---|
+| `REC_WEATHER_LOCATION` | `"auto"` (detect from the public IP), a city (`"Helsinki"`, or `"Cambridge,GB"` to disambiguate), or `"60.17,24.94"` coordinates. |
+| `REC_WEATHER_UNITS` | `metric` for Celsius, `imperial` for Fahrenheit. |
+| `OPENWEATHER_API_KEY` | Free key from <https://openweathermap.org/api>. A new key can take a couple of hours to activate. |
+
+The spoken language follows `SPEECH_LANG` — there is nothing separate to set.
+
+> **`"auto"` follows your VPN.** IP geolocation reports where your traffic
+> leaves the internet, so with the tunnel up it reports the exit country. Set a
+> fixed city if you use the VPN. `doctor.sh weather` warns when it sees both.
+
+See [95-weather.md](95-weather.md).
+
+---
+
 ## Secrets
 
 `config.sh` contains your NordVPN token, which is why:
@@ -284,6 +309,7 @@ these should ever be committed**:
 | Secret | Where it goes |
 |---|---|
 | NordVPN token | `config.sh` → `NORDVPN_TOKEN` |
+| OpenWeatherMap key | `config.sh` → `OPENWEATHER_API_KEY` |
 | YouTube add-on API key | entered in the Kodi add-on's own settings |
 | Netflix authentication key | `~/.kodi/userdata/addon_data/plugin.video.netflix/` |
 | No-IP account credentials | `/usr/local/etc/no-ip2.conf` (written by `noip2 -C`) |
