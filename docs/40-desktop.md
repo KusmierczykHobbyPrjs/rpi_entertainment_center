@@ -78,16 +78,16 @@ desktop is started on demand by the UI switcher.
 |---|---|
 | `labwc` | A bare Wayland compositor. Black screen, no panel, no file manager. |
 | `startx` (no `~/.xinitrc`) | Falls through to `Xsession`, which picks whatever default session remains — often not the Pi desktop. |
-
-What you actually want is the **session**, which starts the compositor *plus*
-`wf-panel-pi` (or `lxpanel-pi`), `pcmanfm --desktop` and the autostart entries.
+| **`labwc-pi`** | ✅ The full Wayland session: labwc **+** `wf-panel-pi` + `pcmanfm --desktop` + autostart |
+| **`startx-rpd`** | ✅ The full X11 session: X **+** `lxpanel-pi` + `pcmanfm --desktop` + autostart |
 
 > **`rpd-labwc` and `rpd-x` are session *names*, not commands.** There is no
 > executable called `rpd-labwc` — typing it gets you `command not found`. They
-> are the filenames of `.desktop` files, and the command to run is inside
-> them, on the `Exec=` line.
+> are the filenames of the `.desktop` files; the commands they contain are
+> `labwc-pi` and `startx-rpd`.
 
-The desktop is a **session**, defined by a `.desktop` file:
+Those two names are what belong in `REC_UI_START`. If yours differ, read them
+from the session file:
 
 ```bash
 ls /usr/share/wayland-sessions/    # rpd-labwc.desktop
@@ -120,12 +120,15 @@ Nothing there confirms it.
 Bookworm and later default to Wayland (labwc on Trixie). That matters because
 the defaults in `config.example.sh` assume X11:
 
-| | X11 | Wayland |
+| | Wayland (default) | X11 |
 |---|---|---|
-| `REC_UI_PROCESSES` | `Xorg` | `labwc` (or `wayfire`) |
-| `REC_UI_START` | `startx &` | `labwc &` |
-| `REC_UI_STOP` | `killall Xorg` | `pkill -x labwc` |
-| Resolution tool | `xrandr` | `wlr-randr` |
+| `REC_UI_PROCESSES` | `labwc` | `Xorg` |
+| `REC_UI_START` | `labwc-pi &` | `startx-rpd &` |
+| `REC_UI_STOP` | `pkill -x labwc-pi; pkill -x labwc` | `killall Xorg` |
+| Resolution tool | `wlr-randr` | `xrandr` |
+
+Note `REC_UI_PROCESSES` is **`labwc`**, not `labwc-pi` — the wrapper may `exec`
+the compositor and disappear, leaving only `labwc` in the process list.
 
 **If you are on Wayland and leave the X11 defaults, the watchdog tries to
 start an X server that is not there and you get a black screen.** The

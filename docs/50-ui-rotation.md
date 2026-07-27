@@ -71,10 +71,10 @@ Kodi → RetroPie → Desktop → Kodi → …
 Four parallel arrays — index 0 of each describes the same UI:
 
 ```bash
-REC_UI_PROCESSES=("kodi" "emulationstatio" "Xorg")
+REC_UI_PROCESSES=("kodi" "emulationstatio" "labwc")
 REC_UI_NAMES=("Kodi" "RetroPie" "Desktop")
-REC_UI_START=("kodi-standalone &" "emulationstation &" "startx &")
-REC_UI_STOP=("kodi-send --action=\"Quit\"" "pkill emulationstatio" "killall Xorg")
+REC_UI_START=("kodi-standalone &" "emulationstation &" "labwc-pi &")
+REC_UI_STOP=("kodi-send --action=\"Quit\"" "pkill emulationstatio" "pkill -x labwc")
 REC_UI_DEFAULT_INDEX=0
 ```
 
@@ -87,11 +87,15 @@ REC_UI_DEFAULT_INDEX=0
 > **The desktop.** `startx`/`Xorg` are correct only under X11. Bookworm and
 > later default to **Wayland**, where the command is `labwc` (or `wayfire`):
 >
-> | | X11 | Wayland |
+> | | Wayland (default) | X11 |
 > |---|---|---|
-> | `REC_UI_PROCESSES` | `Xorg` | `labwc` |
-> | `REC_UI_START` | `startx &` | `labwc &` |
-> | `REC_UI_STOP` | `killall Xorg` | `pkill -x labwc` |
+> | `REC_UI_PROCESSES` | `labwc` | `Xorg` |
+> | `REC_UI_START` | `labwc-pi &` | `startx-rpd &` |
+> | `REC_UI_STOP` | `pkill -x labwc-pi; pkill -x labwc` | `killall Xorg` |
+>
+> **Start the session, not the compositor.** `labwc` and `startx` alone give a
+> black screen with no panel; `labwc-pi` and `startx-rpd` are the Raspberry Pi
+> OS session wrappers that also start the panel and file manager.
 >
 > Both are installed as standard on Raspberry Pi OS, so what is *present* tells
 > you nothing. Check what is *configured*:

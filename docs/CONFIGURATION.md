@@ -47,10 +47,10 @@ Four **parallel arrays** — index 0 of each describes the same UI. They must
 always have the same number of entries; `doctor.sh` checks this.
 
 ```bash
-REC_UI_PROCESSES=("kodi" "emulationstatio" "Xorg")
+REC_UI_PROCESSES=("kodi" "emulationstatio" "labwc")
 REC_UI_NAMES=("Kodi" "RetroPie" "Desktop")
-REC_UI_START=("kodi-standalone &" "emulationstation &" "startx &")
-REC_UI_STOP=("kodi-send --action=\"Quit\"" "pkill emulationstatio" "killall Xorg")
+REC_UI_START=("kodi-standalone &" "emulationstation &" "labwc-pi &")
+REC_UI_STOP=("kodi-send --action=\"Quit\"" "pkill emulationstatio" "pkill -x labwc")
 REC_UI_DEFAULT_INDEX=0
 ```
 
@@ -60,7 +60,7 @@ REC_UI_DEFAULT_INDEX=0
 | `REC_UI_NAMES` | Human-readable name, used in logs and spoken messages. |
 | `REC_UI_START` | Command that starts the UI. Keep the trailing `&`. |
 | | **Kodi:** use `kodi-standalone`, not `kodi` — the bare wrapper needs an X server and cannot start from a console. |
-| | **Desktop:** `startx` under X11, `labwc` under Wayland (the default from Bookworm). Check with `raspi-config nonint get_wayland`. |
+| | **Desktop:** start the *session*, not the compositor — `labwc-pi` under Wayland (default) or `startx-rpd` under X11. Plain `labwc`/`startx` gives a black screen with no panel. Check which you have with `raspi-config nonint get_wayland`. |
 | `REC_UI_STOP` | Command that cleanly stops it. |
 | `REC_UI_DEFAULT_INDEX` | Which UI starts on boot (`0` = the first). |
 

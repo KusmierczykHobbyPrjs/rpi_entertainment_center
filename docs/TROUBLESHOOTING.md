@@ -294,9 +294,16 @@ remains. Neither starts the Pi's panel or file manager.
 pgrep -a wf-panel-pi lxpanel-pi pcmanfm     # nothing? this is your cause
 ```
 
-The desktop is a *session*. **`rpd-labwc` and `rpd-x` are session names, not
-commands** — there is no executable by those names. Take the real command from
-the `Exec=` line of the corresponding `.desktop` file:
+The desktop is a *session*. On Raspberry Pi OS the session commands are:
+
+| Display server | Command |
+|---|---|
+| Wayland (default) | `labwc-pi` |
+| X11 | `startx-rpd` |
+
+**`rpd-labwc` and `rpd-x` are session *names*, not commands** — there is no
+executable by those names. If yours differ, read the `Exec=` line from the
+`.desktop` file:
 
 ```bash
 grep '^Exec=' /usr/share/wayland-sessions/rpd-labwc.desktop   # Wayland

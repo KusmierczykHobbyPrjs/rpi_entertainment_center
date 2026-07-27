@@ -235,19 +235,22 @@ for i in "${!REC_UI_NAMES[@]}"; do
                     "From a console use kodi-standalone (or kodi-gbm) instead"
             fi
             ;;
-        startx)
-            # Only complain on positive evidence that Wayland is in use.
-            # Both are installed by default on Raspberry Pi OS, so presence
-            # of labwc proves nothing.
-            if [[ "$(rec_display_server)" == "wayland" ]]; then
-                bad "REC_UI_START uses 'startx' but this session is Wayland" \
-                    "Use 'labwc &' (or 'wayfire &') - see docs/40-desktop.md"
+        startx|labwc|wayfire)
+            # These are the bare compositor / X starter. They come up with no
+            # panel and no file manager, which reads as a black screen.
+            bad "REC_UI_START uses '$binary', which is not a desktop session" \
+                "Use 'labwc-pi &' (Wayland) or 'startx-rpd &' (X11) - see docs/40-desktop.md"
+            ;;
+        labwc-pi)
+            if [[ "$(rec_display_server)" == "x11" ]]; then
+                bad "REC_UI_START uses 'labwc-pi' but this session is X11" \
+                    "Use 'startx-rpd &' with process name 'Xorg'"
             fi
             ;;
-        labwc|wayfire)
-            if [[ "$(rec_display_server)" == "x11" ]]; then
-                bad "REC_UI_START uses '$binary' but this session is X11" \
-                    "Use 'startx &' with process name 'Xorg'"
+        startx-rpd)
+            if [[ "$(rec_display_server)" == "wayland" ]]; then
+                bad "REC_UI_START uses 'startx-rpd' but this session is Wayland" \
+                    "Use 'labwc-pi &' with process name 'labwc'"
             fi
             ;;
     esac

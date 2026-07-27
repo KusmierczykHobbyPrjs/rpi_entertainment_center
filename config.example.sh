@@ -32,30 +32,44 @@
 # Process names as they appear in `ps -A` (used to detect what is running).
 # NOTE: Linux truncates process names at 15 characters, which is why
 # EmulationStation appears as "emulationstatio" - this is not a typo.
-# Under Wayland the desktop is "labwc" or "wayfire", not "Xorg".
-REC_UI_PROCESSES=("kodi" "emulationstatio" "Xorg")
+#
+# The desktop entry assumes Wayland (the default from Bookworm on). Under X11
+# the process is "Xorg" instead - see REC_UI_START below.
+REC_UI_PROCESSES=("kodi" "emulationstatio" "labwc")
 
 # Human-readable names, used in log lines and spoken messages.
 REC_UI_NAMES=("Kodi" "RetroPie" "Desktop")
 
 # Command that starts each UI.
 #
-# IMPORTANT - two of these defaults are wrong on many systems:
+# IMPORTANT - both of these are easy to get wrong, and both give a black
+# screen at boot with no explanation:
 #
 #   Kodi: the bare "kodi" command is a wrapper that prefers the X11 build and
 #         CANNOT start from a console with no desktop. Use "kodi-standalone"
-#         (or "kodi-gbm"). Module 10-kodi detects which you have and prints
-#         the right one.
+#         (or "kodi-gbm"). Module 10-kodi detects which you have.
 #
-#   Desktop: "startx" only exists under X11. Bookworm and later default to
-#         Wayland, where the command is "labwc" (or "wayfire"). Module
-#         40-desktop prints the right one for your session.
+#   Desktop: you must start the SESSION, not the compositor. Running "labwc"
+#         or "startx" on their own gives a bare compositor - no panel, no file
+#         manager, no autostart. On Raspberry Pi OS the session commands are:
 #
-# Getting these wrong gives a black screen at boot with no explanation.
-REC_UI_START=("kodi-standalone &" "emulationstation &" "startx &")
+#             labwc-pi      Wayland  (the default from Bookworm on)
+#             startx-rpd    X11
+#
+#         Module 40-desktop reads these from the session .desktop files and
+#         tells you which applies. Check which display server you have with:
+#             raspi-config nonint get_wayland     # 0 = Wayland, 1 = X11
+#
+# Defaults below assume Wayland. For X11 use:
+#     REC_UI_PROCESSES=(... "Xorg")
+#     REC_UI_START=(...     "startx-rpd &")
+#     REC_UI_STOP=(...      "killall Xorg")
+REC_UI_START=("kodi-standalone &" "emulationstation &" "labwc-pi &")
 
 # Command that cleanly stops each UI.
-REC_UI_STOP=("kodi-send --action=\"Quit\"" "pkill emulationstatio" "killall Xorg")
+# The desktop entry kills the wrapper and the compositor - labwc-pi may exec
+# labwc and disappear, so the second command is the one that usually does it.
+REC_UI_STOP=("kodi-send --action=\"Quit\"" "pkill emulationstatio" "pkill -x labwc-pi; pkill -x labwc")
 
 # Which UI starts on boot, given as an index into the arrays above (0 = Kodi).
 REC_UI_DEFAULT_INDEX=0

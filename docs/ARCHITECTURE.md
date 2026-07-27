@@ -107,10 +107,10 @@ The UI definitions are four **parallel arrays** — index 0 of each describes
 the same UI:
 
 ```bash
-REC_UI_PROCESSES=("kodi" "emulationstatio" "Xorg")
+REC_UI_PROCESSES=("kodi" "emulationstatio" "labwc")
 REC_UI_NAMES=("Kodi" "RetroPie" "Desktop")
-REC_UI_START=("kodi-standalone &" "emulationstation &" "startx &")
-REC_UI_STOP=("kodi-send --action=\"Quit\"" "pkill emulationstatio" "killall Xorg")
+REC_UI_START=("kodi-standalone &" "emulationstation &" "labwc-pi &")
+REC_UI_STOP=("kodi-send --action=\"Quit\"" "pkill emulationstatio" "pkill -x labwc")
 ```
 
 A parallel-array layout is unusual, but it keeps the file editable by someone

@@ -179,19 +179,29 @@ if [[ -n "$session_file" ]]; then
     session_exec="$(grep -m1 '^Exec=' "$session_file" | cut -d= -f2-)"
     ok "Session: $(basename "$session_file" .desktop) -> $session_exec"
 else
-    fail "No desktop session file found"
-    note "Looked in /usr/share/wayland-sessions/ and /usr/share/xsessions/"
+    skip "No session .desktop file found; falling back to the known names"
 fi
 
 if [[ "$session_type" == "wayland" ]]; then
-    ui_start="${session_exec:-labwc} &"
-    # The process to watch is the compositor itself, whatever wrapper starts it.
-    ui_process="$compositor"
-    ui_stop="pkill -x ${compositor:-labwc}"
+    # labwc-pi is the Raspberry Pi OS session wrapper: it starts labwc plus
+    # wf-panel-pi, pcmanfm --desktop and the autostart entries. Plain `labwc`
+    # is only the compositor and gives a black screen with no panel.
+    if [[ -z "$session_exec" ]] && rec_has labwc-pi; then
+        session_exec="labwc-pi"
+    fi
+    ui_start="${session_exec:-labwc-pi} &"
+    # Watch the compositor, not the wrapper - labwc-pi may exec labwc and
+    # vanish, in which case only labwc remains in the process list.
+    ui_process="${compositor:-labwc}"
+    ui_stop="pkill -x labwc-pi; pkill -x ${compositor:-labwc}"
 else
-    # startx with no ~/.xinitrc falls through to Xsession and picks a default
-    # that may not be the Pi desktop at all. Name the session explicitly.
-    ui_start="startx ${session_exec:-} &"
+    # startx-rpd is the X11 equivalent. Plain `startx` with no ~/.xinitrc falls
+    # through to Xsession and picks whatever default session remains, which
+    # need not be the Pi desktop.
+    if [[ -z "$session_exec" ]] && rec_has startx-rpd; then
+        session_exec="startx-rpd"
+    fi
+    ui_start="${session_exec:-startx-rpd} &"
     ui_process="Xorg"
     ui_stop="killall Xorg"
 fi
