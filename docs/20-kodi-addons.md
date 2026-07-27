@@ -226,7 +226,8 @@ Widevine plus your own account.
 
 | Service | Add-on | Notes |
 |---|---|---|
-| **Disney+, Netflix, Prime Video, and others** | [SlyGuy add-ons](https://slyguy.uk/) | One repository covering many services; the `repository.slyguy` package is the usual entry point. Each needs its own subscription. |
+| **Disney+, HBO Max** | [SlyGuy add-ons](https://github.com/matthuisman/slyguy.addons) | One repository covering several services; `repository.slyguy` is the entry point. **No Netflix add-on** — that is CastagnaIT's only. |
+| **Netflix** | [CastagnaIT](https://github.com/CastagnaIT/plugin.video.netflix) | The only option for Kodi. Breaks periodically — see below. |
 | **BBC iPlayer** | [plugin.video.iplayerwww](https://github.com/Fraser1990/plugin.video.iplayerwww) | UK only — use the VPN: `bash bin/nordvpn_connect.sh uk` |
 | **Yle Areena** (Finland) | [plugin.video.yleareena.jade](https://github.com/aajanki/plugin.video.yleareena.jade) | Bundled in `assets/plugins/`; geo-restricted to Finland |
 | **TVP VOD, Polsat Box Go, Player.pl** (Poland) | [mtr81 repository](https://mtr81.github.io/kodi_addons/) | Bundled as `repository.mtr81.zip` |
@@ -276,11 +277,33 @@ Reported repeatedly over the years, and open again through 2026:
    can sit on a broken version indefinitely.
 2. **Check the tracker** for the exact endpoint from your log:
    <https://github.com/CastagnaIT/plugin.video.netflix/issues>
-3. **Use a different add-on meanwhile.** The [SlyGuy
-   add-ons](https://slyguy.uk/) cover Netflix, Disney+ and Prime Video through
-   a separate implementation; the two rarely break at the same time. This is
-   the practical answer when CastagnaIT's is mid-break.
-4. **Wait.** If the issue is open and untriaged, there is nothing local to do.
+3. **Wait.** If the issue is open and untriaged, there is nothing local to do.
+4. **Watch it in the browser instead** — see below. There is no alternative
+   Kodi add-on to switch to.
+
+> **There is only one Netflix add-on for Kodi.** CastagnaIT's is it. The
+> [SlyGuy add-ons](https://github.com/matthuisman/slyguy.addons) cover Disney+
+> and HBO Max but **not Netflix** — it has been requested and does not exist.
+> When CastagnaIT's is broken, Kodi cannot play Netflix at all.
+
+### The fallback: Netflix in the browser
+
+This project already has what you need — the desktop UI (module `40-desktop`)
+and Chromium. Switch to the Desktop, open <https://www.netflix.com>, and play
+from there. Chromium on Raspberry Pi OS ships with Widevine, so DRM works.
+
+With module `45-kdeconnect` you can send the URL from your phone rather than
+finding a keyboard:
+
+> copy the link → KDE Connect → Send clipboard → Run command → Open clipboard URL
+
+Expect a compromise rather than a fix:
+
+- Netflix in a browser is capped at **720p** on Linux, and lower in practice.
+- A Pi 3B is weak for browser video; it will be smoother on a Pi 4.
+- No Kodi library integration, no remote — it is a browser on a TV.
+
+It is the difference between watching something and not watching it.
 
 ### What does not help
 

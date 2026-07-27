@@ -58,7 +58,10 @@ the source that explains it.
 - [Yle Areena add-on](https://github.com/aajanki/plugin.video.yleareena.jade)
   — Finnish public broadcaster.
   - [Setup thread](https://www.huoltovalikko.com/threads/kodi-yle-areena-2022.15190/)
-- [Netflix add-on](https://github.com/CastagnaIT/plugin.video.netflix)
+- [SlyGuy add-ons](https://github.com/matthuisman/slyguy.addons) — Disney+,
+  HBO Max and others. Note there is **no Netflix add-on** here.
+- [Netflix add-on](https://github.com/CastagnaIT/plugin.video.netflix) — the
+  only Netflix option for Kodi.
   - [Logging in with an authentication key](https://github.com/CastagnaIT/plugin.video.netflix/wiki/Login-with-Authentication-key)
     — the recommended route, since Netflix blocks logins from unusual devices.
 
