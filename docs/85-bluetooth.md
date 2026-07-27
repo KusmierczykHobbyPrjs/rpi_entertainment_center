@@ -152,9 +152,41 @@ Pairing grants audio only: no files, no network, no shell.
 
 ## Troubleshooting
 
-**Shutdown suddenly takes two minutes, or the installer hung**
+**Shutdown hangs on `Job bt-agent.service/stop running (Xs / 1min 30s)`**
 
-A `bt-agent` unit stuck in `activating` does both. Check and recover:
+`bt-agent` does not exit on SIGTERM. With systemd's default 90-second stop
+timeout, every shutdown waits it out.
+
+`1min 30s` in that message is the giveaway: it is the *default* timeout, so the
+unit predates the fix. Update and re-run:
+
+```bash
+cd ~/rpi_entertainment_center && git pull
+./install.sh 85-bluetooth
+```
+
+The unit now uses `KillSignal=SIGKILL` with `TimeoutStopSec=5`. `bt-agent` is
+a D-Bus agent with no state to flush — bluez drops the registration when the
+connection closes — so killing it outright costs nothing and makes shutdown
+immediate.
+
+To patch an existing install without re-running the module:
+
+```bash
+sudo mkdir -p /etc/systemd/system/bt-agent.service.d
+sudo tee /etc/systemd/system/bt-agent.service.d/override.conf >/dev/null <<'EOF'
+[Service]
+KillSignal=SIGKILL
+TimeoutStopSec=5
+EOF
+sudo systemctl daemon-reload
+```
+
+**The installer hung, or the unit sits in `activating`**
+
+A different fault with the same feel. Earlier versions ran `bluetoothctl` as
+`ExecStartPre`; it reads stdin, and under systemd there is no terminal, so it
+waited forever.
 
 ```bash
 systemctl is-active bt-agent            # "activating" = stuck
@@ -162,9 +194,7 @@ sudo systemctl disable --now bt-agent
 sudo systemctl reset-failed bt-agent
 ```
 
-Then `git pull` and re-run the module — earlier versions ran `bluetoothctl` as
-`ExecStartPre`, which blocks on stdin under systemd and never returns. See
-[TROUBLESHOOTING.md](TROUBLESHOOTING.md#shutdown-takes-2-minutes-or-an-install-step-hangs).
+See [TROUBLESHOOTING.md](TROUBLESHOOTING.md#shutdown-takes-2-minutes-or-an-install-step-hangs).
 
 **The Pi does not appear on the phone**
 

@@ -173,9 +173,20 @@ ExecStartPost=-/usr/bin/timeout 5 /usr/bin/bluetoothctl discoverable on
 ExecStart=/usr/bin/bt-agent --capability=NoInputNoOutput
 Restart=always
 RestartSec=5
-# Bound both ends so a stuck agent cannot delay boot or shutdown.
 TimeoutStartSec=15
-TimeoutStopSec=10
+
+# bt-agent does not exit on SIGTERM. Left to systemd's defaults that means
+# every shutdown stalls for the full 90-second stop timeout on
+# "Job bt-agent.service/stop running".
+#
+# It is a D-Bus agent with no state to flush - bluez drops the registration
+# when the connection closes - so there is nothing to lose by killing it
+# outright. SIGKILL makes shutdown immediate; TimeoutStopSec is a backstop.
+KillSignal=SIGKILL
+KillMode=mixed
+TimeoutStopSec=5
+SendSIGKILL=yes
+
 # Give up rather than restarting forever if it cannot run at all - an endless
 # 5-second restart loop is hard to notice and clutters the journal.
 StartLimitIntervalSec=120
@@ -185,6 +196,14 @@ StartLimitBurst=5
 WantedBy=multi-user.target
 EOF
 sudo systemctl daemon-reload
+
+# An earlier version of this unit had no stop bound, and bt-agent ignores
+# SIGTERM - so a machine that ran it stalls ~90s on every shutdown until the
+# new unit is in place. Stop the old one first so the fix applies now rather
+# than after one more slow reboot.
+sudo timeout 20 systemctl stop bt-agent >/dev/null 2>&1
+sudo systemctl reset-failed bt-agent >/dev/null 2>&1
+
 if sudo timeout 30 systemctl enable --now bt-agent >/dev/null 2>&1; then
     systemctl is-active --quiet bt-agent \
         && ok "bt-agent is running - the Pi accepts pairing requests" \

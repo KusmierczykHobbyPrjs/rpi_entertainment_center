@@ -301,7 +301,25 @@ sudo systemctl disable --now bt-agent
 sudo systemctl reset-failed bt-agent
 ```
 
-### The cause, in this project's case
+### Two distinct causes, same symptom
+
+**A unit that will not stop.** `Job <unit>/stop running (Xs / 1min 30s)` means
+the process ignored SIGTERM and systemd is waiting out the stop timeout.
+`1min 30s` is the default, so seeing it means the unit sets no bound of its
+own. Fix by bounding it, and by not asking politely when there is nothing to
+save:
+
+```ini
+[Service]
+KillSignal=SIGKILL
+TimeoutStopSec=5
+```
+
+`bt-agent` needed exactly this — it never exits on SIGTERM.
+
+**A unit that will not start.** Covered below.
+
+### The other cause, in this project's case
 
 An early version of the `bt-agent` unit ran `bluetoothctl discoverable on` as
 `ExecStartPre`. **`bluetoothctl` reads stdin**, and under systemd there is no
