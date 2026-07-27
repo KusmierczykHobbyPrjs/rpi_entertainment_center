@@ -22,7 +22,7 @@ maps to a module you can install or skip.
 - **Physical buttons on the GPIO header** — switch UI, play/pause, rotate the
   VPN, and power the Pi **off *and* back on** from a single button
 - **For Kodi**
-  - remote control from a phone using [Kore](https://kodi.tv/addons/omega/plugin.program.kore/)
+  - remote control from a phone using [Kore](https://play.google.com/store/apps/details?id=org.xbmc.kore)
   - internet TV and radio via IPTV, with bundled playlists
   - streaming from YouTube, BBC iPlayer, Netflix, Disney+, Finnish Yle,
     Polish TVP VOD and Polsat, and others

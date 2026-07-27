@@ -73,10 +73,35 @@ Four parallel arrays — index 0 of each describes the same UI:
 ```bash
 REC_UI_PROCESSES=("kodi" "emulationstatio" "Xorg")
 REC_UI_NAMES=("Kodi" "RetroPie" "Desktop")
-REC_UI_START=("kodi &" "emulationstation &" "startx &")
+REC_UI_START=("kodi-standalone &" "emulationstation &" "startx &")
 REC_UI_STOP=("kodi-send --action=\"Quit\"" "pkill emulationstatio" "killall Xorg")
 REC_UI_DEFAULT_INDEX=0
 ```
+
+> ### Two of these depend on your system
+>
+> **Kodi.** The bare `kodi` command is a wrapper that prefers the X11 build and
+> cannot start from a console. Use `kodi-standalone` (or `kodi-gbm`) — see
+> [10-kodi.md](10-kodi.md#starting-kodi-without-a-desktop).
+>
+> **The desktop.** `startx`/`Xorg` are correct only under X11. Bookworm and
+> later default to **Wayland**, where the command is `labwc` (or `wayfire`):
+>
+> | | X11 | Wayland |
+> |---|---|---|
+> | `REC_UI_PROCESSES` | `Xorg` | `labwc` |
+> | `REC_UI_START` | `startx &` | `labwc &` |
+> | `REC_UI_STOP` | `killall Xorg` | `pkill -x labwc` |
+>
+> Both are installed as standard on Raspberry Pi OS, so what is *present* tells
+> you nothing. Check what is *configured*:
+>
+> ```bash
+> raspi-config nonint get_wayland    # 0 = Wayland, 1 = X11
+> ```
+>
+> `./bin/doctor.sh ui` reports the detected server and flags a mismatch in
+> either direction.
 
 **They must all have the same number of entries.** The installer and
 `doctor.sh` both check this, because a mismatch fails at the worst possible
@@ -145,9 +170,43 @@ REC_FORCE_AUTOSTART=1 bash bin/autostart.sh
 
 ## Troubleshooting
 
+### How autostart decides it is on the console
+
+`autostart.sh` must run only on the physical console, or an SSH login would
+start a second UI on a screen you cannot see. It determines this from the
+**controlling terminal**, reported by `ps`, plus `XDG_VTNR` and an explicit
+SSH check.
+
+It deliberately does *not* use `tty`. `tty` reports the terminal of **stdin**,
+and `.bashrc` starts autostart with `&` — bash redirects an async command's
+stdin to `/dev/null` whenever job control is off, which it is while startup
+files run. `tty` therefore prints "not a tty" (localised, so not even reliably
+that string) on a perfectly normal console boot. An earlier version checked
+`tty` and consequently refused to start on every system, every time.
+
+The decision is logged:
+
+```
+Controlling terminal: 'tty1'  XDG_VTNR='1'  SSH=''
+On the console - proceeding.
+```
+
+```bash
+cat ~/.local/state/rec/autostart.log
+./bin/doctor.sh autostart
+```
+
+---
+
 ### No UI starts — black screen after boot
 
 SSH still works, so this is always recoverable.
+
+0. **Check the log first** — it now records why autostart did or did not run:
+
+   ```bash
+   cat ~/.local/state/rec/autostart.log
+   ```
 
 1. **Is the watchdog running?**
 

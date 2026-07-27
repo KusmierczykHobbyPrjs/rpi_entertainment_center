@@ -28,6 +28,80 @@ interface.
 
 ---
 
+## Starting Kodi without a desktop
+
+> **This is the single most common reason Kodi never appears at boot.**
+
+Debian ships several Kodi front-ends, and the bare `kodi` command is a
+**wrapper that prefers the X11 build**. Started from tty1 with no X server
+running, it cannot work.
+
+| Command | Works from a console? |
+|---|---|
+| `kodi` | **No** — needs an X server already running |
+| `kodi-standalone` | Yes — brings up its own minimal session |
+| `kodi-gbm` | Yes — renders directly through KMS, no X at all |
+
+So `REC_UI_START` must **not** be `kodi &`:
+
+```bash
+REC_UI_START=("kodi-standalone &" ...)
+```
+
+The installer detects which front-ends you have and prints the right value.
+`./bin/doctor.sh ui` fails if `config.sh` names plain `kodi` while a
+console-capable build is present.
+
+### Process name
+
+The watchdog identifies a running UI by process name, and what Kodi is *called*
+often differs from the command that started it — `kodi-standalone` typically
+becomes `kodi.bin`. Check after it starts:
+
+```bash
+ps -A | grep -i kodi
+```
+
+`REC_UI_PROCESSES[0]="kodi"` is the safest value: the matcher falls back to a
+command-line match, so it catches `kodi.bin`, `kodi-gbm` and `kodi-standalone`
+alike. A name that matches nothing makes the watchdog relaunch Kodi every ten
+seconds, which looks exactly like Kodi refusing to start.
+
+---
+
+## Group membership
+
+Kodi started from a console has no desktop session behind it. It reaches the
+GPU through `/dev/dri` directly, opens input devices itself, and must own the
+terminal — so your user needs:
+
+| Group | For |
+|---|---|
+| `video`, `render` | `/dev/dri` — the GPU |
+| `input` | keyboard, remote, gamepad |
+| `tty` | owning the console |
+| `audio` | the sound device |
+
+Without them Kodi exits immediately with a permissions error that explains
+nothing. Module `10-kodi` grants them:
+
+```bash
+./install.sh 10-kodi
+sudo reboot          # group changes only apply at next login
+```
+
+> These used to be granted only by the RetroPie module, so a Kodi-only install
+> silently lacked them. If you installed before that was fixed, re-run
+> `./install.sh 10-kodi`.
+
+Check:
+
+```bash
+id -nG | tr ' ' '\n' | grep -E 'video|render|input|tty|audio'
+```
+
+---
+
 ## Finish the setup inside Kodi
 
 Two settings cannot be scripted from outside a running Kodi. Do these once,
@@ -48,7 +122,7 @@ with a keyboard or through the Kore app:
 
 ## The Kore remote
 
-[Kore](https://kodi.tv/addons/omega/plugin.program.kore/) is Kodi's official
+[Kore](https://play.google.com/store/apps/details?id=org.xbmc.kore) is Kodi's official
 phone remote — full navigation, a virtual keyboard, playlist control and
 library browsing. It is the primary way this system is driven.
 
@@ -102,14 +176,17 @@ USB drives need the filesystem packages from `00-base` and a mount point; see
 ./bin/doctor.sh kodi
 ```
 
-Start Kodi by hand to check it runs:
+Start Kodi by hand to check it runs — **from the physical console**, using the
+console-capable front-end:
 
 ```bash
-kodi
+kodi-standalone
 ```
 
-From SSH this fails with a display error — that is expected. Test from the
-physical console, or just let the watchdog start it after a reboot.
+Over SSH this fails with a display error; that is expected and says nothing
+about whether it works at boot. `bin/diagnose.sh --try` runs the configured
+start command and captures its output, which is the quickest way to see a real
+error.
 
 ---
 
@@ -141,6 +218,15 @@ Then in the add-on's own settings make sure InputStream Adaptive is selected.
 - If the VPN is connected, confirm your LAN subnet is allowlisted — see
   [70-nordvpn.md](70-nordvpn.md). This is the usual cause of a remote that
   worked yesterday.
+
+**Kodi never appears at boot**
+
+Work through, in order:
+
+1. `REC_UI_START` must be `kodi-standalone &`, not `kodi &` — see above.
+2. Your user must be in `video`, `render`, `input`, `tty`.
+3. Check the log: `cat ~/.local/state/rec/autostart.log`
+4. Full picture: `./bin/diagnose.sh` (and `--try` on the console).
 
 **Kodi will not quit when you press the switch-UI button**
 

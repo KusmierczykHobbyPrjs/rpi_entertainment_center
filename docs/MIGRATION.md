@@ -83,7 +83,7 @@ That file was a scratchpad of one-line reminders. For the record:
 | `usermod -a -G tty pi` (needed for startx) | [30-retropie.md](30-retropie.md), done by the installer |
 | `chmod 0744 /dev/tty0` | [40-desktop.md](40-desktop.md) |
 | Joystick vendor/product IDs for EmulationStation | [30-retropie.md](30-retropie.md), [HARDWARE.md](HARDWARE.md) |
-| `pip3 install pycryptodomex win_inet_pton` | [20-kodi-addons.md](20-kodi-addons.md) — Netflix add-on dependencies |
+| `pip3 install pycryptodomex win_inet_pton` | [20-kodi-addons.md](20-kodi-addons.md) — **corrected**: use `apt install python3-pycryptodome`; pip fails under PEP 668, and `win_inet_pton` is Windows-only and was never needed |
 | `wiringpi` is deprecated | [60-gpio.md](60-gpio.md) |
 | Stopping EmulationStation cleanly (forum link) | [30-retropie.md](30-retropie.md) |
 | IPTV and YouTube add-on tutorials | [SOURCES.md](SOURCES.md) |

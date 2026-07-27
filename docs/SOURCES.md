@@ -76,7 +76,7 @@ the source that explains it.
 
 - [KDE Connect](https://kdeconnect.kde.org/) — phone as touchpad, keyboard and
   clipboard for the desktop.
-- [Kore](https://kodi.tv/addons/omega/plugin.program.kore/) — Kodi's official
+- [Kore](https://play.google.com/store/apps/details?id=org.xbmc.kore) — Kodi's official
   phone remote.
 
 → [docs/45-kdeconnect.md](45-kdeconnect.md), [docs/10-kodi.md](10-kodi.md)

@@ -104,19 +104,26 @@ breaks playback, rolling back is the fastest fix.
 **YouTube needs your own Google API key.** The add-on's shared keys are
 routinely exhausted, which shows as "quota exceeded" or an empty home screen.
 
-1. Go to the [Google Cloud Console](https://console.cloud.google.com/).
-2. Create a project.
-3. Enable **YouTube Data API v3**.
-4. Credentials → Create credentials → **API key**, then again →
-   **OAuth client ID** (type: TV and Limited Input devices).
-5. In Kodi: YouTube add-on → Settings → API → enter the API key, client ID and
-   client secret.
-6. Sign in through the add-on when prompted.
+> **Follow the add-on's own walkthrough** — it has screenshots of each Google
+> Cloud Console page and is kept current as Google moves things around:
+>
+> **<https://github.com/anxdpanic/plugin.video.youtube/wiki/Personal-API-Keys>**
 
-Keep those credentials out of this repository — `.gitignore` covers
-`*_api_key.txt`, but the right home for them is the add-on's own settings.
+The short version, for orientation:
 
-Newer releases: <https://github.com/anxdpanic/plugin.video.youtube/releases>
+1. [Google Cloud Console](https://console.cloud.google.com/) → create a project.
+2. **APIs & Services → Library** → enable **YouTube Data API v3**.
+3. **Credentials → Create credentials → API key**.
+4. **Credentials → Create credentials → OAuth client ID**, application type
+   **TVs and Limited Input devices**. This gives you a client ID and secret.
+5. In Kodi: YouTube → Settings → **API** → enter all three.
+6. Sign in through the add-on when prompted (it shows a code to enter at
+   google.com/device).
+
+The OAuth step is the one people skip — an API key alone is not enough to sign
+in to your account.
+
+Keep those credentials in the add-on's settings, not in this repository.
 
 Screenshots: [`photos/youtube/`](../photos/youtube/).
 
@@ -149,17 +156,34 @@ The Netflix add-on comes from the CastagnaIT repository:
 Follow that project's own installation instructions — it is updated far more
 often than this document.
 
-### 2. Install the Python dependencies
+### 2. Install the crypto dependency
 
-The add-on needs two modules that are not pulled in automatically:
+The add-on needs `pycryptodome`. **Install it with apt, not pip:**
 
 ```bash
-pip3 install setuptools wheel
-pip3 install pycryptodomex win_inet_pton
+sudo apt install python3-pycryptodome
 ```
 
-Missing these shows up as an import error in `~/.kodi/temp/kodi.log` rather
-than as anything helpful in the interface.
+> **Do not use `pip3 install`.** On Bookworm and later it fails with:
+>
+> ```
+> error: externally-managed-environment
+> ```
+>
+> That is [PEP 668](https://peps.python.org/pep-0668/) working as intended —
+> Debian protects the system Python from pip. Do **not** work around it with
+> `--break-system-packages`; the apt package is the correct answer and is what
+> Kodi will find.
+
+Older guides (including an earlier version of this one) also told you to
+install **`win_inet_pton`**. Ignore that — it is a compatibility shim that
+provides `inet_pton` on *Windows*, and is meaningless on Linux. It was
+cargo-culted from a Windows install note and should never have been here.
+
+In many cases you need nothing at all: the add-on declares
+`script.module.pycryptodome` in its `addon.xml`, and Kodi installs that from
+its own repository automatically. Only reach for apt if `~/.kodi/temp/kodi.log`
+actually shows a `pycryptodomex`/`Crypto` import error.
 
 ### 3. Install Widevine
 
@@ -192,6 +216,32 @@ The key expires — expect to repeat this every few months.
 
 **Do not commit the key file.** `.gitignore` covers `*.key`; it belongs in
 `~/.kodi/userdata/addon_data/plugin.video.netflix/`.
+
+---
+
+## Other streaming services
+
+Netflix is not the only one, and most work the same way — an add-on plus
+Widevine plus your own account.
+
+| Service | Add-on | Notes |
+|---|---|---|
+| **Disney+, Netflix, Prime Video, and others** | [SlyGuy add-ons](https://slyguy.uk/) | One repository covering many services; the `repository.slyguy` package is the usual entry point. Each needs its own subscription. |
+| **BBC iPlayer** | [plugin.video.iplayerwww](https://github.com/Fraser1990/plugin.video.iplayerwww) | UK only — use the VPN: `bash bin/nordvpn_connect.sh uk` |
+| **Yle Areena** (Finland) | [plugin.video.yleareena.jade](https://github.com/aajanki/plugin.video.yleareena.jade) | Bundled in `assets/plugins/`; geo-restricted to Finland |
+| **TVP VOD, Polsat Box Go, Player.pl** (Poland) | [mtr81 repository](https://mtr81.github.io/kodi_addons/) | Bundled as `repository.mtr81.zip` |
+| **Live TV / radio over IPTV** | PVR IPTV Simple Client | No account needed — see [15-kodi-iptv.md](15-kodi-iptv.md) |
+
+Everything with DRM (Disney+, Prime, Netflix) needs **Widevine** and
+`kodi-inputstream-adaptive`, exactly as described above for Netflix. If one of
+them plays and another does not, the difference is almost always the service,
+not your setup.
+
+A general index of what exists: [Kodi add-on
+directory](https://kodi.tv/addons/). Be sceptical of "all-in-one" add-ons
+advertised elsewhere — many are piracy front-ends that break constantly.
+
+---
 
 ### Known breakage: `preferredLocale`
 

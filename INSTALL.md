@@ -311,7 +311,7 @@ instead of hunting for a keyboard.
 > - **Allow remote control from applications on other systems** → **On**
 > - Set a username and password if the Pi is reachable beyond your LAN
 
-Then install [Kore](https://kodi.tv/addons/omega/plugin.program.kore/) on your
+Then install [Kore](https://play.google.com/store/apps/details?id=org.xbmc.kore) on your
 phone. It finds the Pi automatically on the same network; if not, add it by
 hand with the Pi's IP, port 8080, and those credentials.
 
