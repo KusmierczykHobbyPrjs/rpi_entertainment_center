@@ -18,10 +18,37 @@ rec_load_config
 require_not_root
 warn_if_not_pi
 
-step "Installing the GPIO library"
-# python3-rpi.gpio is the packaged version; installing it with apt rather than
-# pip keeps it working after a system Python upgrade.
-apt_install python3-rpi.gpio || exit 1
+step "Checking the GPIO library"
+# Two packages provide the RPi.GPIO module and they CONFLICT - installing one
+# makes apt remove the other:
+#
+#   python3-rpi.gpio    the original. Talks to the hardware registers directly.
+#                       Works on Pi 2/3/4/Zero; does NOT work on a Pi 5, whose
+#                       RP1 chip needs different drivers.
+#   python3-rpi-lgpio   a drop-in replacement over lgpio, using the modern
+#                       character-device interface. Shipped by default on
+#                       Bookworm and later, and the only option on a Pi 5.
+#
+# So: if the module already imports, leave well alone. An earlier version of
+# this installer unconditionally installed python3-rpi.gpio, which silently
+# uninstalled the OS-provided python3-rpi-lgpio.
+if python3 -c "import RPi.GPIO" 2>/dev/null; then
+    provider="$(dpkg -S "$(python3 -c 'import RPi.GPIO, os; print(os.path.dirname(RPi.GPIO.__file__))' 2>/dev/null)" 2>/dev/null | cut -d: -f1 | head -1)"
+    ok "RPi.GPIO is available${provider:+ (from $provider)}"
+    skip "Not installing anything - the two providers conflict"
+else
+    # Nothing provides it. Pick the right one for this hardware.
+    pi_model="$( { tr -d '\0' < /proc/device-tree/model; } 2>/dev/null )"
+    if [[ "$pi_model" == *"Pi 5"* ]]; then
+        note "Raspberry Pi 5 detected - the original RPi.GPIO does not work here"
+        apt_install python3-rpi-lgpio || exit 1
+    elif grep -qE '^VERSION_ID="1[2-9]"' /etc/os-release 2>/dev/null; then
+        note "Bookworm or later - preferring the lgpio-backed drop-in"
+        apt_install python3-rpi-lgpio || apt_install python3-rpi.gpio || exit 1
+    else
+        apt_install python3-rpi.gpio || exit 1
+    fi
+fi
 
 step "Checking the configured buttons"
 if [[ ${#REC_GPIO_BUTTONS[@]} -eq 0 ]]; then

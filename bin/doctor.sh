@@ -300,7 +300,16 @@ if run_section gpio; then
 section "GPIO buttons"
 
 if python3 -c "import RPi.GPIO" 2>/dev/null; then
-    pass "RPi.GPIO is available"
+    # Two conflicting packages provide this; say which, since they behave
+    # slightly differently and only one works on a Pi 5.
+    gpio_pkg="$(dpkg -S "$(python3 -c 'import RPi.GPIO, os; print(os.path.dirname(RPi.GPIO.__file__))' 2>/dev/null)" 2>/dev/null | cut -d: -f1 | head -1)"
+    pass "RPi.GPIO is available${gpio_pkg:+ (from $gpio_pkg)}"
+
+    model="$( { tr -d '\0' < /proc/device-tree/model; } 2>/dev/null )"
+    if [[ "$model" == *"Pi 5"* && "$gpio_pkg" == "python3-rpi.gpio" ]]; then
+        bad "python3-rpi.gpio does not work on a Raspberry Pi 5" \
+            "sudo apt install python3-rpi-lgpio  (it replaces this package)"
+    fi
 else
     warn "RPi.GPIO is not installed" "./install.sh 60-gpio"
 fi

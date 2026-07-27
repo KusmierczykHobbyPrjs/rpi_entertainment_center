@@ -13,12 +13,38 @@ and give you the only safe way to power it off while it is showing a game.
 
 ## What it does
 
-1. Installs `python3-rpi.gpio`.
+1. Makes sure the `RPi.GPIO` Python module is available — **without
+   replacing whatever already provides it**.
 
-   > Older Raspberry Pi guides tell you to `apt-get install wiringpi`.
-   > **Do not** — WiringPi was deprecated by its author and is no longer
-   > packaged. `RPi.GPIO` is the maintained replacement and is what this
-   > project uses.
+   > **Two packages provide `RPi.GPIO`, and they conflict.** Installing one
+   > makes apt remove the other:
+   >
+   > | Package | Notes |
+   > |---|---|
+   > | `python3-rpi.gpio` | The original. Direct register access. Works on Pi 2/3/4/Zero; **does not work on a Pi 5** (the RP1 chip needs different drivers). |
+   > | `python3-rpi-lgpio` | Drop-in replacement over `lgpio`, using the modern character-device interface. Shipped by default on Bookworm and later; the only option on a Pi 5. |
+   >
+   > If the module already imports, this module installs nothing. Only when
+   > neither is present does it choose — `python3-rpi-lgpio` on a Pi 5 or on
+   > Bookworm and later, otherwise the original.
+   >
+   > An earlier version installed `python3-rpi.gpio` unconditionally, which
+   > silently uninstalled the OS-provided `python3-rpi-lgpio`. Harmless on a
+   > Pi 3B, where both work — but it should not have made that decision for
+   > you. If it happened to you and you want the original back:
+   >
+   > ```bash
+   > sudo apt install python3-rpi-lgpio      # removes python3-rpi.gpio
+   > ```
+   >
+   > Older guides also tell you to install **`wiringpi`**. Do not — it was
+   > deprecated by its author and is no longer packaged.
+
+   Check which one you have:
+
+   ```bash
+   ./bin/doctor.sh gpio
+   ```
 2. Validates the button map in `config.sh`.
 3. Installs a narrowly-scoped sudoers rule so the power button works without a
    password.
