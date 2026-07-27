@@ -148,7 +148,7 @@ Install them in this order; each is a separate `./install.sh <name>` run.
 | `20-kodi-addons` | YouTube, TVP VOD, Yle, Shell Script Launcher, and the DRM services | [docs](docs/20-kodi-addons.md) |
 | `25-tvheadend` | DVB tuner backend, recording and EPG | [docs](docs/25-tvheadend.md) |
 | `30-retropie` | EmulationStation and emulators | [docs](docs/30-retropie.md) |
-| `40-desktop` | LXDE and Chromium at a TV-friendly resolution | [docs](docs/40-desktop.md) |
+| `40-desktop` | The shipped desktop as the third UI, plus Chromium | [docs](docs/40-desktop.md) |
 | `45-kdeconnect` | Phone as touchpad, keyboard and clipboard for the desktop | [docs](docs/45-kdeconnect.md) |
 | `50-ui-rotation` | The one-button UI switcher and its watchdog | [docs](docs/50-ui-rotation.md) |
 | `60-gpio` | Physical push buttons | [docs](docs/60-gpio.md) |
