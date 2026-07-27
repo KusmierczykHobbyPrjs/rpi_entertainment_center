@@ -74,12 +74,18 @@ desktop is started on demand by the UI switcher.
 
 `labwc` and `startx` on their own do not give you the Raspberry Pi desktop:
 
-| Command | What you get |
+| You run | What you get |
 |---|---|
 | `labwc` | A bare Wayland compositor. Black screen, no panel, no file manager. |
 | `startx` (no `~/.xinitrc`) | Falls through to `Xsession`, which picks whatever default session remains — often not the Pi desktop. |
-| `rpd-labwc` session | labwc **plus** `wf-panel-pi`, `pcmanfm --desktop`, autostart |
-| `rpd-x` session | X **plus** `lxpanel-pi`, `pcmanfm --desktop`, autostart |
+
+What you actually want is the **session**, which starts the compositor *plus*
+`wf-panel-pi` (or `lxpanel-pi`), `pcmanfm --desktop` and the autostart entries.
+
+> **`rpd-labwc` and `rpd-x` are session *names*, not commands.** There is no
+> executable called `rpd-labwc` — typing it gets you `command not found`. They
+> are the filenames of `.desktop` files, and the command to run is inside
+> them, on the `Exec=` line.
 
 The desktop is a **session**, defined by a `.desktop` file:
 
