@@ -237,6 +237,8 @@ rest of the system:
 - 16 GB or larger SD card (32 GB if you want a lot of ROMs or recordings)
 - Wired Ethernet is recommended for streaming; Wi-Fi works
 - Optional: USB gamepad, momentary push buttons, a USB DVB tuner
+- Optional: a USB Bluetooth dongle, if you use the Pi as a Bluetooth speaker
+  and the built-in radio (which shares an antenna with Wi-Fi) drops out
 
 ---
 

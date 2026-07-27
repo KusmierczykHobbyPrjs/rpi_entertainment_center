@@ -41,6 +41,7 @@ buttons and tuners are optional extras.
 | 4–5 momentary push buttons | GPIO control. Any normally-open tactile switch. |
 | Female-to-female jumper wires | Wiring buttons to the header. |
 | USB DVB-T/T2 tuner | Tvheadend — live broadcast TV. |
+| USB Bluetooth dongle | Only if you use the Pi as a Bluetooth speaker (`85-bluetooth`) **and** the built-in radio drops out. See [Bluetooth](#bluetooth) below. |
 | Small heatsink or fan | Only if `vcgencmd measure_temp` regularly exceeds 70 °C. |
 | Case with cut-outs | See [the case](#the-case) below. |
 
@@ -193,6 +194,48 @@ input_product_id = "6"
 
 Kodi uses the same gamepad through `kodi-peripheral-joystick`, so one
 controller drives both environments.
+
+---
+
+## Bluetooth
+
+The Pi has Bluetooth built in, and for pairing a remote or occasional use it is
+fine. **Nothing here needs extra hardware.**
+
+The hard case is using the Pi as a **Bluetooth speaker** (module
+`85-bluetooth`): A2DP is continuous, latency-sensitive traffic, and on a Pi 3B
+it strains the built-in radio.
+
+### Why
+
+The built-in Bluetooth is a BCM43438 sharing **one chip and one antenna with
+2.4 GHz Wi-Fi**, connected over an on-board UART. Under sustained load that
+shows up as:
+
+```
+Bluetooth: hci0: Frame reassembly failed (-84)
+Bluetooth: hci0: Opcode 0x0c03 failed: -110
+```
+
+— the HCI link corrupting, and eventually the controller ceasing to respond
+until the driver is reloaded.
+
+### What to do about it, in order
+
+1. **Use wired Ethernet and turn Wi-Fi off** — `sudo rfkill block wifi`, or
+   `dtoverlay=disable-wifi` in `/boot/firmware/config.txt`. Free, and the
+   single most effective change, because it ends the antenna contention.
+2. **Keep SBC-XQ off.** The higher bitrate needs more airtime than a contended
+   link reliably carries. Off by default in this project for that reason.
+3. **A USB Bluetooth dongle**, about £5. Its own radio, antenna and USB link,
+   so none of the above applies. The definitive fix.
+
+Any dongle with a Linux-supported chipset works — CSR8510 and Realtek
+RTL8761B are both common and need no drivers on Raspberry Pi OS.
+
+With a dongle fitted, `./install.sh 85-bluetooth` offers to disable the
+built-in radio so the dongle becomes `hci0` and nothing has to be selected by
+hand. See [85-bluetooth.md](85-bluetooth.md#adapters-built-in-dongle-or-both).
 
 ---
 

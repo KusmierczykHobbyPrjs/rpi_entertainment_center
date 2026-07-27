@@ -48,6 +48,10 @@ Optional, depending on which modules you want:
 - USB gamepad (RetroPie)
 - 4–5 momentary push buttons and some wire (GPIO control)
 - USB DVB-T tuner (Tvheadend)
+- USB Bluetooth dongle — **only if** you want the Pi as a Bluetooth speaker
+  (`85-bluetooth`) and the built-in radio proves unreliable. It shares an
+  antenna with Wi-Fi, which sustained audio strains; a £5 dongle avoids that
+  entirely. Start without one — see [docs/HARDWARE.md](docs/HARDWARE.md#bluetooth)
 - A NordVPN subscription (VPN and Meshnet modules)
 - A free No-IP account (public web server module)
 
