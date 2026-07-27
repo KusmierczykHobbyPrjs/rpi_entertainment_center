@@ -118,7 +118,7 @@ Kodi only:
 ```bash
 REC_UI_PROCESSES=("kodi")
 REC_UI_NAMES=("Kodi")
-REC_UI_START=("kodi &")
+REC_UI_START=("kodi-standalone &")
 REC_UI_STOP=("kodi-send --action=\"Quit\"")
 REC_UI_DEFAULT_INDEX=0
 ```
@@ -133,7 +133,7 @@ Anything full-screen works. RetroArch standalone, for instance:
 ```bash
 REC_UI_PROCESSES=("kodi" "retroarch")
 REC_UI_NAMES=("Kodi" "RetroArch")
-REC_UI_START=("kodi &" "retroarch &")
+REC_UI_START=("kodi-standalone &" "retroarch &")
 REC_UI_STOP=("kodi-send --action=\"Quit\"" "pkill retroarch")
 ```
 

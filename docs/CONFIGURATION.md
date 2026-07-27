@@ -49,7 +49,7 @@ always have the same number of entries; `doctor.sh` checks this.
 ```bash
 REC_UI_PROCESSES=("kodi" "emulationstatio" "Xorg")
 REC_UI_NAMES=("Kodi" "RetroPie" "Desktop")
-REC_UI_START=("kodi &" "emulationstation &" "startx &")
+REC_UI_START=("kodi-standalone &" "emulationstation &" "startx &")
 REC_UI_STOP=("kodi-send --action=\"Quit\"" "pkill emulationstatio" "killall Xorg")
 REC_UI_DEFAULT_INDEX=0
 ```
@@ -59,6 +59,8 @@ REC_UI_DEFAULT_INDEX=0
 | `REC_UI_PROCESSES` | Process name as it appears in `ps -A`. Used to detect what is running. |
 | `REC_UI_NAMES` | Human-readable name, used in logs and spoken messages. |
 | `REC_UI_START` | Command that starts the UI. Keep the trailing `&`. |
+| | **Kodi:** use `kodi-standalone`, not `kodi` — the bare wrapper needs an X server and cannot start from a console. |
+| | **Desktop:** `startx` under X11, `labwc` under Wayland (the default from Bookworm). Check with `raspi-config nonint get_wayland`. |
 | `REC_UI_STOP` | Command that cleanly stops it. |
 | `REC_UI_DEFAULT_INDEX` | Which UI starts on boot (`0` = the first). |
 
@@ -76,7 +78,7 @@ Delete the same index from all four arrays. Kodi only:
 ```bash
 REC_UI_PROCESSES=("kodi")
 REC_UI_NAMES=("Kodi")
-REC_UI_START=("kodi &")
+REC_UI_START=("kodi-standalone &")
 REC_UI_STOP=("kodi-send --action=\"Quit\"")
 REC_UI_DEFAULT_INDEX=0
 ```

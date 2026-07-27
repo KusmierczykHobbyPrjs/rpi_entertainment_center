@@ -109,7 +109,7 @@ the same UI:
 ```bash
 REC_UI_PROCESSES=("kodi" "emulationstatio" "Xorg")
 REC_UI_NAMES=("Kodi" "RetroPie" "Desktop")
-REC_UI_START=("kodi &" "emulationstation &" "startx &")
+REC_UI_START=("kodi-standalone &" "emulationstation &" "startx &")
 REC_UI_STOP=("kodi-send --action=\"Quit\"" "pkill emulationstatio" "killall Xorg")
 ```
 
