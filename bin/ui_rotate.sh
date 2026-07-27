@@ -30,13 +30,38 @@ fi
 
 rec_log "UI watchdog started. Managing: ${REC_UI_NAMES[*]}"
 
-# Returns 0 when any configured UI process is alive.
+# Consecutive failed starts of the current UI; used to back off rather than
+# spawn an instance per cycle.
+start_failures=0
+
+# Every name a given UI might appear under: the configured process name, and
+# the basename of whatever command starts it.
+#
+# These often differ. kodi-standalone is a script that execs kodi.bin, so the
+# configured name may match nothing once it has handed over. A UI the watchdog
+# cannot see is a UI it starts again - which is how you end up with five Kodis.
+ui_candidates() {
+    local idx="$1" start
+    printf '%s\n' "${REC_UI_PROCESSES[$idx]}"
+    start="${REC_UI_START[$idx]%% *}"
+    printf '%s\n' "${start##*/}"
+}
+
+# Returns 0 when the UI at index $1 is alive, under any of its names.
+ui_running_at() {
+    local idx="$1" name
+    while IFS= read -r name; do
+        [[ -n "$name" ]] || continue
+        rec_ui_running "$name" && return 0
+    done < <(ui_candidates "$idx")
+    return 1
+}
+
+# Returns 0 when any configured UI is alive.
 any_ui_running() {
-    local proc
-    for proc in "${REC_UI_PROCESSES[@]}"; do
-        if rec_ui_running "$proc"; then
-            return 0
-        fi
+    local i
+    for i in "${!REC_UI_PROCESSES[@]}"; do
+        ui_running_at "$i" && return 0
     done
     return 1
 }
@@ -60,9 +85,34 @@ while true; do
         # useful instead of the same failure repeating forever.
         start_binary="${REC_UI_START[$index]%% *}"
         if ! rec_has "$start_binary"; then
-            rec_error "Cannot start ${REC_UI_NAMES[$index]}: '$start_binary' not found."
-            rec_error "Fix REC_UI_START in config.sh - see docs/50-ui-rotation.md."
-            sleep 30
+            rec_error "Cannot start ${REC_UI_NAMES[$index]}: '$start_binary' not found on PATH."
+            # It may well be installed but outside PATH - RetroPie in
+            # particular lives under /opt/retropie. Say so rather than
+            # asserting it is missing.
+            found="$(find /opt /usr/local -maxdepth 4 -name "$start_binary" -type f 2>/dev/null | head -1)"
+            if [[ -n "$found" ]]; then
+                rec_error "It does exist at: $found"
+                rec_error "Use that absolute path in REC_UI_START in config.sh."
+            else
+                rec_error "Either install it, or remove index $index from all four"
+                rec_error "REC_UI_* arrays in config.sh - see docs/50-ui-rotation.md."
+            fi
+            # Fall back to the default UI rather than retrying something that
+            # cannot work, so the TV does not sit black forever.
+            if (( index != REC_UI_DEFAULT_INDEX )); then
+                rec_warn "Falling back to ${REC_UI_NAMES[$REC_UI_DEFAULT_INDEX]}."
+                echo "$REC_UI_DEFAULT_INDEX" > "$REC_UI_STATE_FILE"
+            else
+                sleep 30
+            fi
+            continue
+        fi
+
+        # Refuse to pile up instances. If anything matching this UI is already
+        # running we must not start another, however the detection got here.
+        if ui_running_at "$index"; then
+            rec_warn "${REC_UI_NAMES[$index]} already appears to be running - not starting another."
+            sleep 5
             continue
         fi
 
@@ -73,12 +123,25 @@ while true; do
         # otherwise a slow-starting Kodi gets started a second time.
         sleep 10
 
-        # If it still is not visible, say so rather than silently looping.
-        if ! rec_ui_running "${REC_UI_PROCESSES[$index]}"; then
-            rec_warn "${REC_UI_NAMES[$index]} did not appear as process '${REC_UI_PROCESSES[$index]}'."
+        if ui_running_at "$index"; then
+            start_failures=0
+        else
+            start_failures=$((start_failures + 1))
+            rec_warn "${REC_UI_NAMES[$index]} did not appear under any of: $(ui_candidates "$index" | tr '\n' ' ')"
             rec_warn "Either it failed to start, or REC_UI_PROCESSES has the wrong name."
             rec_warn "Check with: ps -A | grep -i ${REC_UI_PROCESSES[$index]:0:6}"
-            sleep 20
+
+            # Back off hard rather than spawning a new instance every cycle -
+            # that is how a single undetectable UI became five running copies.
+            if (( start_failures >= 3 )); then
+                rec_error "${REC_UI_NAMES[$index]} failed to start $start_failures times."
+                rec_error "Pausing for 5 minutes instead of launching more copies."
+                rec_error "Fix config.sh, then: pkill -f ui_rotate.sh (autostart restarts it)"
+                sleep 300
+                start_failures=0
+            else
+                sleep 20
+            fi
         fi
     fi
     sleep 1

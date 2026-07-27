@@ -57,9 +57,14 @@ done
 echo "default index: ${REC_UI_DEFAULT_INDEX}"
 
 hr "UI BINARIES"
-for cmd in kodi kodi-standalone kodi-gbm kodi-x11 kodi-wayland emulationstation startx labwc wayfire; do
-    p="$(command -v "$cmd" 2>/dev/null)"
-    printf '  %-16s %s\n' "$cmd" "${p:-not found}"
+for cmd in kodi kodi-standalone kodi-gbm emulationstation startx startx-rpd labwc labwc-pi wayfire; do
+    p="$(rec_which "$cmd" 2>/dev/null)"
+    if [[ -z "$p" ]]; then
+        # Look outside PATH before declaring it absent - RetroPie lives in /opt.
+        p="$(find /opt /usr/local -maxdepth 4 -name "$cmd" -type f 2>/dev/null | head -1)"
+        [[ -n "$p" ]] && p="$p  (NOT on PATH)"
+    fi
+    printf '  %-18s %s\n' "$cmd" "${p:-not found}"
 done
 echo
 echo "kodi packages installed:"

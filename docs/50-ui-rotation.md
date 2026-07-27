@@ -272,6 +272,60 @@ UI takes longer than that to appear in `ps`, the watchdog starts a second one.
 Increase the sleep in `bin/ui_rotate.sh`, or check why startup is so slow
 (usually an SD card at the end of its life).
 
+### Several copies of the same UI are running
+
+The watchdog starts a UI, cannot see it in the process list, concludes nothing
+is running, and starts another. Repeat once a second and you get five Kodis.
+
+**Cause: `REC_UI_PROCESSES` does not match what actually runs.** The name a UI
+appears under often differs from the command that starts it — `kodi-standalone`
+is a script that `exec`s `kodi.bin`, so once it has handed over, the original
+name matches nothing.
+
+```bash
+ps -A | grep -i kodi          # what is it actually called?
+pgrep -a kodi                 # full command lines
+```
+
+Put the name from the left-hand column of `ps -A` into `REC_UI_PROCESSES`.
+
+The watchdog now guards against this in three ways:
+
+- it looks for **both** the configured process name and the basename of the
+  start command, so either matching is enough;
+- it refuses to start a UI that already appears to be running;
+- after three failed starts it pauses for five minutes rather than launching
+  another copy every cycle.
+
+To clean up existing duplicates:
+
+```bash
+pkill -f ui_rotate.sh     # stop the watchdog first, or it restarts them
+pkill -f kodi
+```
+
+`autostart.sh` restarts the watchdog at the next console login, or reboot.
+
+### A UI is installed but reported "not found"
+
+`rec_has` searches `PATH`, `/sbin`, `/usr/sbin` and RetroPie's directories
+under `/opt/retropie`. RetroPie does not always put `emulationstation` on
+`PATH`, so a working install can still fail this check.
+
+Both `doctor.sh` and the watchdog now look outside `PATH` before saying
+anything is missing, and report where they found it:
+
+```
+Desktop -> 'emulationstation' is not on PATH, but exists at
+           /opt/retropie/supplementary/emulationstation/emulationstation
+```
+
+Use that absolute path in `REC_UI_START`:
+
+```bash
+REC_UI_START=(... "/opt/retropie/supplementary/emulationstation/emulationstation &" ...)
+```
+
 ### The switcher keeps cycling on its own
 
 A UI is starting and immediately exiting. The watchdog sees "nothing running",

@@ -128,8 +128,29 @@ rec_rate_limit() {
 rec_has() {
     command -v "$1" >/dev/null 2>&1 && return 0
     local dir
-    for dir in /sbin /usr/sbin /usr/local/sbin; do
+    # /sbin and /usr/sbin are not on a normal user's PATH on Raspberry Pi OS.
+    # RetroPie installs emulationstation and its tools under /opt/retropie and
+    # does not always put them on PATH either, so look there too - otherwise a
+    # perfectly working RetroPie is reported as "not installed".
+    for dir in /sbin /usr/sbin /usr/local/sbin \
+               /opt/retropie/supplementary/emulationstation \
+               /opt/retropie/supplementary \
+               /opt/retropie/emulators/retroarch/bin; do
         [[ -x "$dir/$1" ]] && return 0
+    done
+    return 1
+}
+
+# Absolute path of a command, searching the same places as rec_has.
+# Empty if not found.
+rec_which() {
+    local p dir
+    p="$(command -v "$1" 2>/dev/null)" && { printf '%s' "$p"; return 0; }
+    for dir in /sbin /usr/sbin /usr/local/sbin \
+               /opt/retropie/supplementary/emulationstation \
+               /opt/retropie/supplementary \
+               /opt/retropie/emulators/retroarch/bin; do
+        [[ -x "$dir/$1" ]] && { printf '%s' "$dir/$1"; return 0; }
     done
     return 1
 }

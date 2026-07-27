@@ -221,10 +221,17 @@ fi
 for i in "${!REC_UI_NAMES[@]}"; do
     binary="${REC_UI_START[$i]%% *}"
     if rec_has "$binary"; then
-        pass "${REC_UI_NAMES[$i]} -> $binary"
+        pass "${REC_UI_NAMES[$i]} -> $(rec_which "$binary")"
     else
-        bad "${REC_UI_NAMES[$i]} -> $binary is not installed" \
-            "Install it, or remove index $i from all four arrays in config.sh"
+        # Do not claim it is missing without looking outside PATH first.
+        found="$(find /opt /usr/local -maxdepth 4 -name "$binary" -type f 2>/dev/null | head -1)"
+        if [[ -n "$found" ]]; then
+            bad "${REC_UI_NAMES[$i]} -> '$binary' is not on PATH, but exists at $found" \
+                "Use the absolute path in REC_UI_START in config.sh"
+        else
+            bad "${REC_UI_NAMES[$i]} -> $binary is not installed" \
+                "Install it, or remove index $i from all four arrays in config.sh"
+        fi
     fi
 
     # The two start commands that are commonly wrong rather than missing.
