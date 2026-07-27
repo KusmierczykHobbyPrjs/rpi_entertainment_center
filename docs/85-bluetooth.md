@@ -201,9 +201,10 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md#shutdown-takes-2-minutes-or-an-insta
 There is no PIN — `bt-agent` runs with `NoInputNoOutput`, which means "Just
 Works" pairing. That message almost never means a wrong code was typed.
 
-**1. A stale bond on either side.** The usual cause, especially after a failed
-attempt. A leftover link key on one end no longer matches the other, and the
-mismatch is reported as a PIN failure. Clear *both*:
+**1. A stale bond on either side.** The usual cause, and confirmed in
+practice: a failed attempt leaves a link key on one end that no longer matches
+the other, and the mismatch surfaces as a PIN failure. `bluetoothctl remove`
+followed by a fresh pairing fixes it. Clear *both* sides:
 
 ```bash
 bluetoothctl devices                    # find the phone
