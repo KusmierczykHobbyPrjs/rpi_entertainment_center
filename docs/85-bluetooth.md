@@ -150,6 +150,59 @@ Pairing grants audio only: no files, no network, no shell.
 
 ---
 
+## It was working, then disappeared
+
+The Pi stops being visible to phones and does not come back on its own.
+Discoverability is not as permanent as `DiscoverableTimeout = 0` suggests.
+
+**What knocks it down:**
+
+| Cause | Why |
+|---|---|
+| `bluetoothd` restarted | Discoverable resets to off |
+| `bt-agent` hit its systemd start limit | After 5 restarts in 120s systemd gives up **permanently**; its `ExecStartPost` is what asserts discoverability |
+| `rfkill` soft-blocked the adapter | Often by a desktop power-saving setting |
+| The chip reset | A Pi 3B's combined Wi-Fi/Bluetooth chip drops out after a brownout — check `vcgencmd get_throttled` |
+
+**Diagnose after the fact:**
+
+```bash
+systemctl status bluetooth bt-agent --no-pager | head -25
+bluetoothctl show                     # Powered / Pairable / Discoverable
+rfkill list bluetooth
+journalctl -b -u bluetooth -u bt-agent --no-pager | tail -50
+dmesg | grep -iE 'bluetooth|hci|brcm' | tail -20
+vcgencmd get_throttled                # want 0x0
+```
+
+**Recover now:**
+
+```bash
+sudo systemctl reset-failed bt-agent      # required after a start-limit hit
+sudo systemctl restart bluetooth bt-agent
+bluetoothctl discoverable on
+```
+
+### Preventing it
+
+Module `85-bluetooth` installs `bluetooth-keepalive.timer`, which every five
+minutes re-asserts powered/pairable/discoverable and revives `bt-agent`,
+including the `reset-failed` that a start-limit hit requires. It logs only when
+it had to change something:
+
+```bash
+systemctl list-timers bluetooth-keepalive
+journalctl -u bluetooth-keepalive         # quiet unless it fixed something
+bin/bluetooth_keepalive.sh                # run it by hand
+```
+
+Worst case you are unavailable for five minutes rather than until someone
+notices and logs in. If the journal shows it fixing things repeatedly, treat
+that as a symptom — check power and the `dmesg` output above rather than
+letting the timer paper over it.
+
+---
+
 ## Troubleshooting
 
 **Shutdown hangs on `Job bt-agent.service/stop running (Xs / 1min 30s)`**

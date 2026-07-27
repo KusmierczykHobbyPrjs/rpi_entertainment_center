@@ -216,6 +216,53 @@ else
     note "Check: sudo journalctl -u bt-agent -n 30"
 fi
 
+# --- Keepalive -------------------------------------------------------------
+step "Installing the availability keepalive"
+# Discoverability is not permanent in practice. bluetoothd restarting resets
+# it, rfkill can soft-block the adapter, the Pi 3B's combined Wi-Fi/Bluetooth
+# chip resets after a brownout, and bt-agent can exceed its systemd start
+# limit and be given up on for good - after which the Pi silently disappears
+# from every phone's device list and never returns on its own.
+#
+# A five-minute timer re-asserts powered/pairable/discoverable and revives the
+# agent. It logs only when it had to change something.
+sudo tee /etc/systemd/system/bluetooth-keepalive.service >/dev/null <<EOF
+[Unit]
+Description=Keep the Pi discoverable as a Bluetooth speaker
+After=bluetooth.service
+Wants=bluetooth.service
+
+[Service]
+Type=oneshot
+User=$USER
+StandardInput=null
+TimeoutStartSec=60
+ExecStart=$REC_BIN/bluetooth_keepalive.sh
+EOF
+
+sudo tee /etc/systemd/system/bluetooth-keepalive.timer >/dev/null <<'EOF'
+[Unit]
+Description=Re-assert Bluetooth availability every 5 minutes
+
+[Timer]
+# Soon after boot, then steadily. Persistent=false: a missed run while powered
+# off is meaningless, and catching up on boot would only duplicate the first.
+OnBootSec=2min
+OnUnitActiveSec=5min
+AccuracySec=30s
+
+[Install]
+WantedBy=timers.target
+EOF
+
+sudo systemctl daemon-reload
+if sudo timeout 20 systemctl enable --now bluetooth-keepalive.timer >/dev/null 2>&1; then
+    ok "Keepalive timer enabled (runs every 5 minutes)"
+    note "It logs only when it fixes something: journalctl -u bluetooth-keepalive"
+else
+    fail "Could not enable the keepalive timer"
+fi
+
 # --- Keep audio alive without a login session ------------------------------
 if [[ "$AUDIO_STACK" == "pipewire" ]]; then
     step "Making PipeWire run without a login session"

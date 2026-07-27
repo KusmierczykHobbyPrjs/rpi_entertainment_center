@@ -728,6 +728,15 @@ if rec_has bluetoothctl; then
         bad "bt-agent is not installed" "Pairing cannot complete: ./install.sh 85-bluetooth"
     fi
 
+    # Without this, a lapse in discoverability is permanent until someone
+    # notices and SSHes in.
+    if systemctl is-enabled --quiet bluetooth-keepalive.timer 2>/dev/null; then
+        pass "Keepalive timer enabled (restores discoverability automatically)"
+    else
+        warn "No keepalive timer - if the Pi stops being discoverable it stays that way" \
+             "./install.sh 85-bluetooth"
+    fi
+
     paired="$(bluetoothctl devices 2>/dev/null | grep -c '^Device')"
     (( paired > 0 )) && pass "$paired device(s) paired" \
                      || warn "No paired devices yet" "See docs/85-bluetooth.md"
