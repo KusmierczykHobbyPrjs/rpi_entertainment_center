@@ -280,6 +280,47 @@ More detail: [90-speech.md](90-speech.md).
 
 ---
 
+## Shutdown takes ~2 minutes, or an install step hangs
+
+A systemd unit that never finishes starting blocks both: `systemctl
+enable --now` waits for it, and at shutdown systemd waits out the full
+`TimeoutStopSec` (90 seconds by default) before killing it.
+
+Find it:
+
+```bash
+systemctl list-jobs                 # anything "running" here is stuck
+systemctl is-active bt-agent        # "activating" means stuck, not starting
+systemd-analyze blame | head        # slow units at boot
+```
+
+To recover immediately:
+
+```bash
+sudo systemctl disable --now bt-agent
+sudo systemctl reset-failed bt-agent
+```
+
+### The cause, in this project's case
+
+An early version of the `bt-agent` unit ran `bluetoothctl discoverable on` as
+`ExecStartPre`. **`bluetoothctl` reads stdin**, and under systemd there is no
+terminal, so it waited for input that could never arrive. The unit sat in
+`activating` forever, `./install.sh 85-bluetooth` appeared to hang, and every
+shutdown took the full timeout.
+
+The unit now sets `StandardInput=null`, wraps the helper in `timeout 5` with a
+leading `-` so its failure is ignored, and bounds both
+`TimeoutStartSec` and `TimeoutStopSec`. The installer also wraps its
+`systemctl` calls in `timeout` and disables the unit again if it does not come
+up, so a bad unit cannot leave your Pi slow to shut down.
+
+> **Writing a systemd unit?** Any helper that might read stdin needs
+> `StandardInput=null`, and anything that might block needs a `timeout`. A
+> hang here is invisible until shutdown gets slow.
+
+---
+
 ## Messages printed by `labwc-pi` — which matter?
 
 Starting the desktop prints several warnings. Most are not from this project

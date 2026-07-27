@@ -700,9 +700,21 @@ if rec_has bluetoothctl; then
         || bad "No Audio Sink profile" "./install.sh 85-bluetooth"
 
     if rec_has bt-agent; then
-        systemctl is-active --quiet bt-agent \
-            && pass "bt-agent is running (pairing needs no keyboard)" \
-            || bad "bt-agent is not running" "sudo systemctl enable --now bt-agent"
+        agent_state="$(systemctl is-active bt-agent 2>/dev/null)"
+        case "$agent_state" in
+            active)
+                pass "bt-agent is running (pairing needs no keyboard)" ;;
+            activating)
+                # A unit stuck in "activating" is the signature of a helper
+                # blocking on stdin. It also makes shutdown wait out the full
+                # stop timeout.
+                bad "bt-agent is stuck in 'activating' - it will delay shutdown" \
+                    "sudo systemctl disable --now bt-agent; sudo systemctl reset-failed bt-agent; ./install.sh 85-bluetooth" ;;
+            failed)
+                bad "bt-agent has failed" "sudo journalctl -u bt-agent -n 30" ;;
+            *)
+                bad "bt-agent is not running ($agent_state)" "sudo systemctl enable --now bt-agent" ;;
+        esac
     else
         bad "bt-agent is not installed" "Pairing cannot complete: ./install.sh 85-bluetooth"
     fi

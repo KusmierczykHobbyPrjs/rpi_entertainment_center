@@ -122,8 +122,15 @@ ini_set "$BT_CONF" General Name "$bt_name"
 ok "Advertised name: $bt_name"
 
 sudo systemctl enable --now bluetooth >/dev/null 2>&1
-sudo systemctl restart bluetooth
-ok "bluetooth.service restarted"
+# Bound this: a bluetoothd that will not stop would otherwise hang the whole
+# installer with no indication of why.
+if sudo timeout 30 systemctl restart bluetooth; then
+    ok "bluetooth.service restarted with the new settings"
+else
+    fail "bluetooth.service did not restart within 30s."
+    note "The settings are written; they will apply after a reboot."
+    note "If shutdown is also slow, check: systemctl list-jobs"
+fi
 
 # --- Pairing agent ---------------------------------------------------------
 step "Installing the pairing agent"
@@ -137,19 +144,35 @@ Requires=bluetooth.service
 
 [Service]
 Type=simple
-ExecStartPre=-/usr/bin/bluetoothctl discoverable on
+# StandardInput=null is load-bearing. bluetoothctl reads stdin, and under
+# systemd there is no terminal - given a tty it would sit waiting for input
+# forever, so the unit never finishes starting and systemd then waits out the
+# full stop timeout at shutdown. `timeout` and the leading `-` make sure a
+# misbehaving helper can never block the unit either way.
+StandardInput=null
+ExecStartPost=-/usr/bin/timeout 5 /usr/bin/bluetoothctl discoverable on
 ExecStart=/usr/bin/bt-agent --capability=NoInputNoOutput
 Restart=always
 RestartSec=5
+# Bound both ends so a stuck agent cannot delay boot or shutdown.
+TimeoutStartSec=15
+TimeoutStopSec=10
 
 [Install]
 WantedBy=multi-user.target
 EOF
 sudo systemctl daemon-reload
-sudo systemctl enable --now bt-agent >/dev/null 2>&1
-systemctl is-active --quiet bt-agent \
-    && ok "bt-agent is running - the Pi accepts pairing requests" \
-    || fail "bt-agent did not start. Check: sudo journalctl -u bt-agent -n 30"
+if sudo timeout 30 systemctl enable --now bt-agent >/dev/null 2>&1; then
+    systemctl is-active --quiet bt-agent \
+        && ok "bt-agent is running - the Pi accepts pairing requests" \
+        || fail "bt-agent enabled but not active. Check: sudo journalctl -u bt-agent -n 30"
+else
+    fail "bt-agent did not start within 30s - disabling it again so it cannot"
+    fail "delay shutdown."
+    sudo timeout 20 systemctl disable --now bt-agent >/dev/null 2>&1
+    sudo systemctl reset-failed bt-agent >/dev/null 2>&1
+    note "Check: sudo journalctl -u bt-agent -n 30"
+fi
 
 # --- Keep audio alive without a login session ------------------------------
 if [[ "$AUDIO_STACK" == "pipewire" ]]; then

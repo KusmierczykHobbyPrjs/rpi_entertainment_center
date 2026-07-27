@@ -152,6 +152,20 @@ Pairing grants audio only: no files, no network, no shell.
 
 ## Troubleshooting
 
+**Shutdown suddenly takes two minutes, or the installer hung**
+
+A `bt-agent` unit stuck in `activating` does both. Check and recover:
+
+```bash
+systemctl is-active bt-agent            # "activating" = stuck
+sudo systemctl disable --now bt-agent
+sudo systemctl reset-failed bt-agent
+```
+
+Then `git pull` and re-run the module — earlier versions ran `bluetoothctl` as
+`ExecStartPre`, which blocks on stdin under systemd and never returns. See
+[TROUBLESHOOTING.md](TROUBLESHOOTING.md#shutdown-takes-2-minutes-or-an-install-step-hangs).
+
 **The Pi does not appear on the phone**
 
 ```bash
