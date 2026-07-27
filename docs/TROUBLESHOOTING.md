@@ -280,6 +280,53 @@ More detail: [90-speech.md](90-speech.md).
 
 ---
 
+## The desktop is black, with no taskbar
+
+`pcmanfm` is drawing the desktop (you see the wallpaper and a wastebasket) but
+no panel started — the session is half-assembled.
+
+The usual cause on Bookworm and later is that something removed Raspberry Pi
+OS's own desktop packages. **An early version of this project's `40-desktop`
+module did exactly that**, installing `lxde-core` and letting apt remove
+`rpd-common`, `rpd-x-core` and `rpd-wayland-core`. Repair:
+
+```bash
+sudo apt install rpd-common rpd-x-core rpd-wayland-core raspberrypi-ui-mods
+sudo reboot
+```
+
+Let apt remove the `lxde-*` packages when it offers. Check what happened:
+
+```bash
+grep -E 'Remove|Purge' /var/log/apt/history.log | tail -20
+```
+
+---
+
+## "xrandr: cannot find mode ..." at desktop start
+
+Your display does not offer the resolution in `REC_DESKTOP_MODE`.
+
+Leave it empty — the desktop then uses whatever the display negotiates, which
+is what you want unless you have a specific reason:
+
+```bash
+export REC_DESKTOP_MODE=""
+```
+
+If you do need a fixed mode, take one from the list **your own display**
+reports, from inside a desktop session:
+
+```bash
+wlr-randr                 # Wayland
+DISPLAY=:0 xrandr         # X11
+```
+
+`desktop_set_resolution.sh` prints that list when a mode is rejected, along
+with the exact `config.sh` line to use.
+
+---
+
 ## Sound is too quiet, even at maximum volume
 
 Two things are going on, and only one of them is fixable in software.

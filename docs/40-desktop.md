@@ -30,6 +30,18 @@ Widevine, so those services play in the browser here. See
 >
 > An earlier version of this module installed `lxde-core` unconditionally and
 > did exactly that. It now detects the existing desktop and leaves it alone.
+>
+> **If it already happened to you**, the symptom is a black desktop with no
+> taskbar — `pcmanfm` draws the wallpaper and wastebasket, but the Pi's own
+> session and panel configuration are gone, so neither `startx` nor `labwc`
+> finds a complete session. Repair it with:
+>
+> ```bash
+> sudo apt install rpd-common rpd-x-core rpd-wayland-core raspberrypi-ui-mods
+> ```
+>
+> Let apt remove the `lxde-*` packages when it offers — they are what replaced
+> the real desktop. Then reboot.
 
 What it actually does:
 
@@ -99,12 +111,28 @@ something the Pi can actually drive. Kodi and RetroPie set their own modes, so
 they are unaffected — which is why this is done per session rather than
 globally in `/boot/firmware/config.txt`.
 
-Configure it in `config.sh`:
+**This is opt-in, and off by default:**
 
 ```bash
-export REC_DESKTOP_OUTPUT="HDMI-1"
-export REC_DESKTOP_MODE="1360x768"
+export REC_DESKTOP_OUTPUT=""      # empty = first connected output
+export REC_DESKTOP_MODE=""        # empty = leave the resolution alone
 export REC_DESKTOP_RATE="60"
+```
+
+With `REC_DESKTOP_MODE` empty the script does nothing and the desktop starts
+at whatever the display negotiates — right for most people.
+
+> Earlier versions shipped `1360x768` as the default, which is not a mode most
+> displays offer. The result was
+> `xrandr: cannot find mode 1360x768` on every boot, forcing you to fix a
+> setting you never asked for. **Do not copy a resolution from a guide** —
+> take one from the list your own display reports.
+
+Only set a mode if the desktop is genuinely too slow at your TV's native
+resolution — a Pi 3B cannot play video in a browser at 1080p. Then:
+
+```bash
+export REC_DESKTOP_MODE="1280x720"
 ```
 
 Find what your TV supports — **from inside a running desktop session**, not

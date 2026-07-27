@@ -164,8 +164,18 @@ export REC_WEATHER_UNITS="metric"
 #     DISPLAY=:0 xrandr     X11
 # Over SSH with no session both fail; xrandr also fails under Wayland
 # entirely, which is what "Can't open display" usually means.
-export REC_DESKTOP_OUTPUT="HDMI-1"
-export REC_DESKTOP_MODE="1360x768"
+# LEAVE EMPTY to keep whatever the display negotiates. That is the right
+# setting unless you have a specific reason: a mode your TV does not advertise
+# is simply rejected, and the desktop then starts at whatever it would have
+# used anyway.
+#
+# Only set these if the desktop is too slow at your TV's native resolution -
+# a Pi 3B cannot play video in a browser at 1080p. Pick a mode from the list
+# your own display reports (see above); do not copy one from a guide.
+#
+#   export REC_DESKTOP_MODE="1280x720"
+export REC_DESKTOP_OUTPUT=""
+export REC_DESKTOP_MODE=""
 export REC_DESKTOP_RATE="60"
 
 

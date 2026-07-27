@@ -20,8 +20,16 @@ set -uo pipefail
 source "$(dirname "$(readlink -f "$0")")/../lib/common.sh"
 
 output="${REC_DESKTOP_OUTPUT:-}"
-mode="${REC_DESKTOP_MODE:-1360x768}"
+mode="${REC_DESKTOP_MODE:-}"
 rate="${REC_DESKTOP_RATE:-60}"
+
+# No mode configured means "leave the display alone", which is the default and
+# the right answer for most people. Forcing a guessed mode only ever produces
+# "mode rejected" on displays that do not happen to offer it.
+if [[ -z "$mode" ]]; then
+    rec_log "REC_DESKTOP_MODE is empty - leaving the resolution as negotiated."
+    exit 0
+fi
 
 # --- Wayland ---------------------------------------------------------------
 if [[ -n "${WAYLAND_DISPLAY:-}" ]] || rec_has wlr-randr && ! [[ -n "${DISPLAY:-}" ]]; then
@@ -46,8 +54,11 @@ if [[ -n "${WAYLAND_DISPLAY:-}" ]] || rec_has wlr-randr && ! [[ -n "${DISPLAY:-}
 
     rec_log "Setting $output to ${mode}@${rate}Hz (Wayland)"
     if ! wlr-randr --output "$output" --mode "${mode}@${rate}Hz"; then
-        rec_error "Mode rejected. Available modes:"
-        wlr-randr
+        rec_error "Your display does not offer ${mode}@${rate}Hz."
+        rec_error "Modes it does offer:"
+        wlr-randr | sed 's/^/    /'
+        rec_error "Set REC_DESKTOP_MODE in config.sh to one of those, or leave"
+        rec_error "it empty to keep the negotiated resolution."
         exit 1
     fi
     exit 0
@@ -77,7 +88,12 @@ fi
 
 rec_log "Setting $output to ${mode}@${rate}Hz (X11)"
 if ! xrandr --output "$output" --mode "$mode" --rate "$rate"; then
-    rec_error "Mode ${mode}@${rate} was rejected. Available modes:"
-    xrandr --query | sed -n "/^${output} connected/,/^[A-Za-z]/p" | sed 1d
+    rec_error "Your display does not offer ${mode}@${rate}Hz."
+    rec_error "Modes it does offer on ${output}:"
+    xrandr --query | sed -n "/^${output} connected/,/^[A-Za-z]/p" | sed 1d | sed 's/^/    /'
+    rec_error ""
+    rec_error "Set one of those in config.sh, e.g.:"
+    rec_error "    export REC_DESKTOP_MODE=\"$(xrandr --query | sed -n "/^${output} connected/,/^[A-Za-z]/p" | sed 1d | awk 'NR==1{print $1}')\""
+    rec_error "or leave REC_DESKTOP_MODE empty to keep the negotiated resolution."
     exit 1
 fi
