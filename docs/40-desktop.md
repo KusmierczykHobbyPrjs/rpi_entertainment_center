@@ -37,11 +37,21 @@ Widevine, so those services play in the browser here. See
 > finds a complete session. Repair it with:
 >
 > ```bash
-> sudo apt install rpd-common rpd-x-core rpd-wayland-core raspberrypi-ui-mods
+> sudo apt install rpd-common rpd-x-core rpd-wayland-core
+> sudo apt autoremove --purge lxde-core lxde-common openbox-lxde-session
+> sudo reboot
 > ```
 >
-> Let apt remove the `lxde-*` packages when it offers — they are what replaced
-> the real desktop. Then reboot.
+> **Do not add `raspberrypi-ui-mods`.** That is the older metapackage and it
+> *conflicts* with `rpd-common`, which replaces it on Bookworm and later:
+>
+> ```
+> rpd-common : Conflicts: raspberrypi-ui-mods
+> ```
+>
+> Reinstalling the `rpd-*` packages is not always enough on its own — the
+> leftover `lxde-*` packages can still supply a competing session. Removing
+> them is the part that matters.
 
 What it actually does:
 

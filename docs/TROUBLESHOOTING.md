@@ -291,11 +291,17 @@ module did exactly that**, installing `lxde-core` and letting apt remove
 `rpd-common`, `rpd-x-core` and `rpd-wayland-core`. Repair:
 
 ```bash
-sudo apt install rpd-common rpd-x-core rpd-wayland-core raspberrypi-ui-mods
+sudo apt install rpd-common rpd-x-core rpd-wayland-core
+sudo apt autoremove --purge lxde-core lxde-common openbox-lxde-session
 sudo reboot
 ```
 
-Let apt remove the `lxde-*` packages when it offers. Check what happened:
+**Do not add `raspberrypi-ui-mods`** — it is the older metapackage and
+conflicts with `rpd-common`, which supersedes it on Bookworm and later.
+
+Reinstalling the `rpd-*` packages may not be enough by itself: the leftover
+`lxde-*` packages can still provide a competing session, so removing them is
+the part that actually fixes it. Check what happened:
 
 ```bash
 grep -E 'Remove|Purge' /var/log/apt/history.log | tail -20
