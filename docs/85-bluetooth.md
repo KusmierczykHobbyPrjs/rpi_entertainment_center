@@ -196,6 +196,51 @@ sudo systemctl reset-failed bt-agent
 
 See [TROUBLESHOOTING.md](TROUBLESHOOTING.md#shutdown-takes-2-minutes-or-an-install-step-hangs).
 
+**"Couldn't pair because of an incorrect PIN or passkey"**
+
+There is no PIN — `bt-agent` runs with `NoInputNoOutput`, which means "Just
+Works" pairing. That message almost never means a wrong code was typed.
+
+**1. A stale bond on either side.** The usual cause, especially after a failed
+attempt. A leftover link key on one end no longer matches the other, and the
+mismatch is reported as a PIN failure. Clear *both*:
+
+```bash
+bluetoothctl devices                    # find the phone
+bluetoothctl remove AA:BB:CC:DD:EE:FF
+```
+
+Then on the phone: Bluetooth → the Pi → **Forget this device**. Pair again.
+
+**2. A second agent is answering.** Only one agent can be the default. If a
+desktop session is running, `blueman-applet` or the GNOME agent registers one
+too — and if it wins, it silently prompts on a screen nobody is watching while
+the phone times out.
+
+```bash
+# watch the pairing attempt live, then pair from the phone
+sudo journalctl -u bt-agent -u bluetooth -f
+```
+
+`bt-agent` should log `Agent registered` and `Default agent requested`. If the
+request never reaches it, something else took the default. Switch to Kodi or
+the console first — away from the desktop — and try again, or stop the
+competing applet.
+
+**3. bt-agent is not actually running.**
+
+```bash
+systemctl is-active bt-agent
+sudo systemctl restart bt-agent
+```
+
+**4. Pairing while not discoverable.** Some phones will initiate a bond
+against a cached address and fail oddly.
+
+```bash
+bluetoothctl show | grep Discoverable    # want: yes
+```
+
 **The Pi does not appear on the phone**
 
 ```bash
