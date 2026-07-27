@@ -265,10 +265,42 @@ rec_ui_running() {
 # force-kill escalation does nothing at all. Fall back to a command-line match.
 rec_ui_kill() {
     local name="$1" sig="${2:-}"
+    local killed=1
+
+    # A UI is usually several processes, not one. Kodi started through
+    # kodi-standalone runs as THREE, all alive at once:
+    #
+    #     kodi-standalone   the launcher
+    #     kodi              the wrapper
+    #     kodi.bin          the actual program
+    #
+    # `pkill -x kodi` matches only the middle one, leaving kodi.bin running -
+    # so the UI never actually stops, the watchdog still sees it, and the
+    # switch to the next UI never completes.
     if (( ${#name} <= 15 )); then
-        pkill ${sig:+"$sig"} -x "$name" 2>/dev/null && return 0
+        pkill ${sig:+"$sig"} -x "$name" 2>/dev/null && killed=0
     fi
-    pkill ${sig:+"$sig"} -f "(^|/)${name}" 2>/dev/null
+
+    # Then sweep the rest by command line. Anchored to a path separator or the
+    # start of the line, so "kodi" matches /usr/bin/kodi and .../kodi.bin but
+    # not an unrelated process that merely mentions it in an argument.
+    #
+    # Done through pgrep rather than `pkill -f` so we can exclude ourselves and
+    # our ancestors: a script whose own path contains the name would otherwise
+    # match and kill the very shell doing the killing. `pkill` protects itself
+    # but not its parents.
+    local pid
+    while IFS= read -r pid; do
+        [[ -n "$pid" ]] || continue
+        [[ "$pid" == "$$" || "$pid" == "${PPID:-0}" ]] && continue
+        # Skip anything in our own ancestry, for the same reason.
+        local ppid_of_pid
+        ppid_of_pid="$(ps -o ppid= -p "$$" 2>/dev/null | tr -d ' ')"
+        [[ "$pid" == "$ppid_of_pid" ]] && continue
+        kill ${sig:-} "$pid" 2>/dev/null && killed=0
+    done < <(pgrep -f "(^|/)${name}" 2>/dev/null)
+
+    return $killed
 }
 
 # Convert a 0-100 volume percentage into the 0-32768 scale mpg123 -f expects.

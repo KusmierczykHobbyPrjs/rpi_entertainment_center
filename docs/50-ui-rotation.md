@@ -272,6 +272,33 @@ UI takes longer than that to appear in `ps`, the watchdog starts a second one.
 Increase the sleep in `bin/ui_rotate.sh`, or check why startup is so slow
 (usually an SD card at the end of its life).
 
+### A UI is several processes, not one
+
+Kodi launched through `kodi-standalone` runs as **three** processes, all alive
+simultaneously:
+
+```
+$ ps -A | grep odi
+ 1053 tty1     00:00:00 kodi-standalone     ← launcher
+ 1057 tty1     00:00:00 kodi                ← wrapper
+ 1062 tty1     00:00:32 kodi.bin            ← the actual program
+```
+
+This matters twice over:
+
+**Detection.** `REC_UI_PROCESSES="kodi"` matches the wrapper exactly, so the
+watchdog sees it. Setting it to `kodi.bin` or `kodi-standalone` also works via
+the command-line fallback, but `kodi` is the cleanest.
+
+**Stopping.** `pkill -x kodi` kills *only the wrapper* — `kodi.bin` keeps
+running, the screen stays on Kodi, and the switch to the next UI never
+completes. The force-kill therefore sweeps the whole family by command line,
+excluding the calling script and its ancestors so a script whose own path
+contains the name cannot kill itself.
+
+The same applies to `labwc-pi` and to `emulationstation`, which run their real
+work under different names.
+
 ### Several copies of the same UI are running
 
 The watchdog starts a UI, cannot see it in the process list, concludes nothing

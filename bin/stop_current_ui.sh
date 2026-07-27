@@ -59,6 +59,10 @@ eval "${REC_UI_STOP[$current_index]}"
 # Kodi's clean "Quit" can take a few seconds. If it is still alive after the
 # grace period, escalate - otherwise the watchdog sees a UI running and never
 # starts the next one, which looks like the button did nothing.
+#
+# Note this must check every process the UI consists of, not just the one named
+# in config: kodi-standalone, kodi and kodi.bin all run together, and the
+# graceful Quit may leave the launcher behind.
 for _ in {1..10}; do
     rec_ui_running "${REC_UI_PROCESSES[$current_index]}" || exit 0
     sleep 1
