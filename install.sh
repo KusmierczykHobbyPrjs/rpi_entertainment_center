@@ -32,7 +32,7 @@ declare -a MODULES=(
     "20-kodi-addons|Bundled Kodi add-ons: YouTube, TVP VOD, Yle, Shell Launcher"
     "25-tvheadend|Tvheadend DVB/TV backend and its Kodi client"
     "30-retropie|RetroPie retro gaming front-end (EmulationStation)"
-    "40-desktop|LXDE desktop session and Chromium at a TV-friendly resolution"
+    "40-desktop|The shipped desktop as the third UI, plus Chromium"
     "45-kdeconnect|Control the desktop from a phone with KDE Connect"
     "50-ui-rotation|Switch between Kodi / RetroPie / Desktop with one button"
     "60-gpio|Physical push buttons wired to GPIO pins"
