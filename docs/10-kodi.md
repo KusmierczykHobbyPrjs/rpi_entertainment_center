@@ -234,6 +234,25 @@ Work through, in order:
 `SIGKILL`. If it happens every time, Kodi is hanging on shutdown — check
 `~/.kodi/temp/kodi.log`.
 
+**Squares (□) instead of characters — in weather, titles or menus**
+
+A "tofu box" means the font has no glyph for that character. Kodi's default
+Estuary font ships a limited set, so degree signs, separators, and accented or
+non-Latin characters can all come out as boxes.
+
+> **Settings → Interface → Skin → Fonts → change `Default` to `Arial based`**
+
+That covers a much wider glyph range and applies immediately. It is the fix
+for essentially every missing-character report in Kodi, and is worth setting
+straight away if you use a non-English locale.
+
+If a box persists in one add-on only, that add-on is emitting a character even
+the Arial-based font lacks — worth reporting upstream rather than chasing
+locally.
+
+> Not to be confused with module `95-weather`, which is the *spoken* weather
+> and shares no code with Kodi's weather display.
+
 **No sound**
 
 - Force HDMI audio: `sudo raspi-config` → System Options → Audio → HDMI.

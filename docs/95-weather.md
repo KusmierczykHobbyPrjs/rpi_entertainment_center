@@ -137,6 +137,18 @@ python3 bin/weather.py
 
 ---
 
+## This is not Kodi's weather
+
+Kodi has its own weather section, provided by a Kodi add-on and shown on
+screen. This module is separate: it **speaks** the forecast, so you can hear it
+without a screen, and shares no code or configuration with Kodi's display.
+
+Both can be used at once. If Kodi's weather shows squares (□) instead of
+characters, that is a font issue in the skin — see
+[10-kodi.md](10-kodi.md#troubleshooting).
+
+---
+
 ## Troubleshooting
 
 **"OPENWEATHER_API_KEY is not set"**

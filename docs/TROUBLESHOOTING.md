@@ -232,6 +232,19 @@ specifically to catch this before it bites.
 
 ---
 
+## Squares (□) instead of characters in Kodi
+
+The font has no glyph for that character. Kodi's default Estuary font ships a
+limited set, so degree signs, separators and accented characters can all come
+out as boxes.
+
+> **Settings → Interface → Skin → Fonts → `Arial based`**
+
+Applies immediately, and fixes essentially every missing-character report.
+Worth setting up front if you use a non-English locale.
+
+---
+
 ## No sound
 
 **Is there a sound card at all?**
