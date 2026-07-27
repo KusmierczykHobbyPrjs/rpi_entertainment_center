@@ -96,6 +96,82 @@ step "Group membership"
 ensure_group bluetooth || true
 ensure_group audio || true
 
+# --- Adapter selection -----------------------------------------------------
+step "Checking Bluetooth adapters"
+mapfile -t adapters < <(rec_bt_adapters)
+
+if (( ${#adapters[@]} == 0 )); then
+    # Not fatal. Everything else here - packages, the PipeWire config, the
+    # keepalive - is still worth installing, and the adapter may simply not be
+    # plugged in yet.
+    fail "No Bluetooth adapter found."
+    note "If you have just plugged in a dongle: dmesg | tail -20"
+    note "Continuing; re-run this module once an adapter is present."
+fi
+
+have_usb=0; have_builtin=0
+for a in "${adapters[@]}"; do
+    read -r dev kind mac <<<"$a"
+    case "$kind" in
+        usb)     ok  "$dev  USB dongle      ($mac)"; have_usb=1 ;;
+        builtin) note "$dev  built-in radio  ($mac)"; have_builtin=1 ;;
+    esac
+done
+
+if (( have_usb == 1 && have_builtin == 1 )); then
+    cat <<EOF
+
+  Both a USB dongle and the Pi's built-in radio are present.
+
+  The built-in radio shares one chip and one antenna with 2.4 GHz Wi-Fi, and
+  talks over an on-board UART. That is why sustained A2DP on it drops out and
+  can wedge the controller entirely. A dongle has neither problem.
+
+  Disabling the built-in radio means:
+    - the dongle becomes hci0, so everything targets it with no configuration
+    - the UART is freed
+    - Bluetooth stops competing with Wi-Fi for the antenna
+
+  This edits /boot/firmware/config.txt and needs a reboot.
+
+EOF
+    if confirm "Disable the built-in Bluetooth and use the dongle only?"; then
+        BOOTCFG=/boot/firmware/config.txt
+        [[ -f "$BOOTCFG" ]] || BOOTCFG=/boot/config.txt
+        backup_file "$BOOTCFG"
+        if grep -qE '^\s*dtoverlay=disable-bt' "$BOOTCFG"; then
+            skip "disable-bt is already set"
+        else
+            echo "
+# Added by rpi-entertainment-center (module 85-bluetooth).
+# Disables the Pi's built-in Bluetooth so the USB dongle is the only adapter.
+# The built-in radio shares an antenna with Wi-Fi and an on-board UART, which
+# makes sustained A2DP unreliable.
+dtoverlay=disable-bt" | sudo tee -a "$BOOTCFG" >/dev/null
+            ok "Added dtoverlay=disable-bt to $BOOTCFG"
+        fi
+        # hciuart attaches the built-in radio to the UART; pointless once the
+        # overlay disables it, and it fails noisily at boot if left enabled.
+        sudo systemctl disable hciuart >/dev/null 2>&1 \
+            && ok "Disabled hciuart.service" \
+            || skip "hciuart.service not present"
+        REC_BT_REBOOT=1
+        note "Takes effect after a reboot."
+    else
+        skip "Keeping both adapters"
+        note "bluez uses the first controller; with two present that may be"
+        note "the built-in one. Select explicitly with: bluetoothctl select <MAC>"
+    fi
+elif (( have_usb == 1 )); then
+    ok "USB dongle only - the best configuration for audio"
+elif (( have_builtin == 1 )); then
+    ok "Built-in radio - nothing to configure"
+    # Said once, as information rather than a warning: this is the default
+    # configuration and it works. It is only sustained A2DP that strains it.
+    note "If music later drops out, a USB dongle avoids the antenna shared"
+    note "with Wi-Fi. See docs/85-bluetooth.md."
+fi
+
 # --- Advertise as a speaker ------------------------------------------------
 # This part is identical on both stacks: it is bluez, not the audio system.
 step "Advertising the Pi as an audio device"
@@ -424,3 +500,9 @@ ${REC_C_BOLD}If it is quiet${REC_C_OFF}
 
 Full walkthrough: docs/85-bluetooth.md
 EOF
+
+if [[ "${REC_BT_REBOOT:-0}" == "1" ]]; then
+    echo
+    fail "REBOOT REQUIRED - the built-in radio is disabled from the next boot."
+    note "Until then both adapters are present and bluez may target the wrong one."
+fi

@@ -678,6 +678,29 @@ if rec_has bluetoothctl; then
         && pass "bluetooth.service is running" \
         || bad "bluetooth.service is not running" "sudo systemctl enable --now bluetooth"
 
+    # Which adapter is in use matters: the Pi's built-in radio shares an
+    # antenna with Wi-Fi and is unreliable for sustained A2DP.
+    mapfile -t bt_adapters < <(rec_bt_adapters)
+    bt_usb=0; bt_builtin=0
+    for a in "${bt_adapters[@]}"; do
+        read -r dev kind _ <<<"$a"
+        [[ "$kind" == "usb" ]] && bt_usb=1
+        [[ "$kind" == "builtin" ]] && bt_builtin=1
+    done
+    if (( bt_usb == 1 && bt_builtin == 1 )); then
+        warn "Both a USB dongle and the built-in radio are active" \
+             "bluez may use the built-in one. Disable it: ./install.sh 85-bluetooth"
+    elif (( bt_usb == 1 )); then
+        pass "USB dongle in use (avoids the shared Wi-Fi antenna)"
+    elif (( bt_builtin == 1 )); then
+        # A pass, not a warning: the built-in radio is the default and is fine
+        # for pairing, remotes and light use. Only sustained A2DP strains it,
+        # and nagging every run about hardware the user may not have is noise.
+        pass "Using the Pi's built-in radio"
+    elif (( ${#bt_adapters[@]} == 0 )); then
+        warn "No Bluetooth adapter detected" "Plug one in, or check: dmesg | tail"
+    fi
+
     btshow="$(bluetoothctl show 2>/dev/null)"
 
     # Phones decide whether to offer "media audio" from the device class. A Pi

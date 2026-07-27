@@ -250,6 +250,27 @@ rec_group_configured() {
     id -nG "${2:-$USER}" 2>/dev/null | tr ' ' '\n' | grep -qx "$1"
 }
 
+# List Bluetooth adapters as "hciN kind MAC", one per line, where kind is
+# "usb" (a dongle) or "builtin" (the Pi's own chip).
+#
+# The distinction matters: the built-in radio on a Pi 3B shares one chip and
+# antenna with Wi-Fi and talks over an on-board UART, which is why sustained
+# A2DP is unreliable on it. A USB dongle has neither problem.
+rec_bt_adapters() {
+    local h n mac kind
+    for h in /sys/class/bluetooth/hci*; do
+        [[ -e "$h" ]] || continue
+        n="$(basename "$h")"
+        mac="$(cat "$h/address" 2>/dev/null)"
+        if readlink -f "$h" 2>/dev/null | grep -q '/usb'; then
+            kind=usb
+        else
+            kind=builtin
+        fi
+        printf '%s %s %s\n' "$n" "$kind" "${mac:-unknown}"
+    done
+}
+
 # True when a UI process is running.
 #
 # Matching on the exact process name is not enough: what a UI is called in

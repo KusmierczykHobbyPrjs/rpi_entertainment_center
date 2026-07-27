@@ -21,6 +21,52 @@ amplifier.
 
 ---
 
+## Adapters: built-in, dongle, or both
+
+The module adapts to what is present and **changes nothing unless you have
+both**.
+
+| What you have | What the module does |
+|---|---|
+| **Built-in radio only** (the default Pi) | Nothing special — configures it and moves on. This works. |
+| **USB dongle only** | Nothing special. The best configuration for audio. |
+| **Both** | Offers to disable the built-in radio, so the dongle becomes `hci0` |
+| **Neither** | Warns and carries on — packages and config are still installed |
+
+### Why a dongle helps
+
+The Pi's built-in Bluetooth is a BCM43438 sharing **one chip and one antenna
+with 2.4 GHz Wi-Fi**, connected over an on-board UART. That is fine for
+pairing, remotes and light use. Sustained A2DP is the hard case: it is
+continuous and latency-sensitive, so contention shows up as dropouts, and in
+the worst case the HCI link corrupts and the controller stops responding
+altogether.
+
+A USB dongle has its own radio, antenna and USB link, so none of that applies.
+
+### Running both
+
+If you decline, both adapters stay. bluez uses the first controller, which may
+be the built-in one — so pick explicitly:
+
+```bash
+bluetoothctl list                       # both, with their MACs
+bluetoothctl select 00:11:22:33:44:55   # the dongle
+```
+
+Disabling the built-in avoids that ambiguity entirely, which is why the module
+offers it:
+
+```
+dtoverlay=disable-bt        # in /boot/firmware/config.txt
+sudo systemctl disable hciuart
+```
+
+Both need a reboot. `hciuart` is what attaches the built-in radio to the UART;
+left enabled with the overlay in place it fails noisily at every boot.
+
+---
+
 ## Why it needs more than pairing
 
 Getting a phone to pair is the easy part. Three things have to line up:
