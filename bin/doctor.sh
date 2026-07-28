@@ -202,15 +202,21 @@ if rec_has kodi; then
         warn "Shell Script Launcher menu is missing" "./install.sh 20-kodi-addons"
     fi
 
-    # The Netflix add-on cannot complete a login on its own any more: Netflix
-    # retired the endpoint it uses to verify your password. Only report this if
-    # the add-on is actually installed - most people do not have it.
-    nf_access="${KODI_HOME:-$HOME/.kodi}/addons/plugin.video.netflix/resources/lib/services/nfsession/session/access.py"
-    if [[ -f "$nf_access" ]]; then
-        if grep -q 'rec-patch:profilehub-404' "$nf_access"; then
-            pass "Netflix add-on has the profilehub 404 login patch"
+    # Stock Netflix add-on 1.23.5 can neither log in nor browse: Netflix retired
+    # the endpoints it uses. Both patches are reapplied by the same script, and
+    # an add-on update wipes them. Only report if the add-on is installed.
+    nf_lib="${KODI_HOME:-$HOME/.kodi}/addons/plugin.video.netflix/resources/lib"
+    if [[ -d "$nf_lib" ]]; then
+        if grep -q 'rec-patch:profilehub-404' "$nf_lib/services/nfsession/session/access.py" 2>/dev/null; then
+            pass "Netflix add-on has the login patch (profilehub 404)"
         else
             warn "Netflix add-on login will fail with a profilehub 404" \
+                 "bash bin/kodi_netflix_fix.sh"
+        fi
+        if grep -q 'MY_LIST_GRAPHQL_MUTATIONS' "$nf_lib/utils/api_requests.py" 2>/dev/null; then
+            pass "Netflix add-on has the API patch (browsing, search, My List)"
+        else
+            warn "Netflix add-on browsing will fail with a pathEvaluator 404" \
                  "bash bin/kodi_netflix_fix.sh"
         fi
     fi

@@ -682,18 +682,24 @@ break, not your configuration — Netflix changed its API and the add-on has not
 caught up. See [when it
 breaks](20-kodi-addons.md#when-it-breaks-netflix-api-changes).
 
-**Netflix login returns to the login-method chooser after you type the
-password**, with `404 Client Error ... /api/shakti/mre/profilehub` in
-`kodi.log`. Netflix retired that endpoint, so the add-on cannot verify the
-password — even though the session it just built is valid. Fix:
+**Netflix add-on 1.23.5 cannot log in or browse.** Two distinct 404s, both
+because Netflix retired endpoints the add-on has hardcoded:
+
+| In `kodi.log` | What you see |
+|---|---|
+| `404 … /api/shakti/mre/profilehub` | Key and PIN accepted, password typed, back at the login-method chooser |
+| `404 … /memberapi/release/pathEvaluator` | Logged in, but picking a profile errors at once; browsing, search and My List dead |
+
+Both are fixed by:
 
 ```bash
 bash bin/kodi_netflix_fix.sh
 ```
 
-Restart Kodi and log in again with your key. Details and the reasoning:
-[20-kodi-addons.md](20-kodi-addons.md#fixing-the-login).
-Re-run it after any add-on update.
+Restart Kodi and log in again with your key. Updating the add-on does **not**
+help — 1.23.5 is the newest release. Re-run the script after any add-on update;
+`./bin/doctor.sh kodi` tells you when it is needed. Details, provenance and the
+reasoning: [20-kodi-addons.md](20-kodi-addons.md#fixing-it-binkodi_netflix_fixsh).
 
 **Read the actual error:**
 

@@ -1,51 +1,52 @@
 #!/bin/bash
 # ---------------------------------------------------------------------------
-# kodi_netflix_fix.sh - let the Netflix add-on finish logging in again.
+# kodi_netflix_fix.sh - make the Netflix add-on usable again.
 #
-# Symptom this fixes (in ~/.kodi/temp/kodi.log):
+# Netflix retired its /api/shakti/mre/* endpoints and reshaped its Falcor
+# content schema in June 2026. Add-on 1.23.5 is the newest release and upstream
+# has had no commits since August 2025, so there is nothing to update to. Two
+# separate things are broken, and this script fixes both:
 #
-#   requests.exceptions.HTTPError: 404 Client Error: Not Found for url:
-#     https://www.netflix.com/api/shakti/mre/profilehub
+#   STAGE 1 - "api"    Everything after login. Picking a profile fails with
+#                      404 on .../memberapi/release/pathEvaluator, and with it
+#                      go browsing, search, My List, Continue Watching,
+#                      artwork, cast, year and resume positions.
+#                      Fixed by a community patch vendored in
+#                      assets/patches/ - see the README there for its
+#                      provenance, and read it before you run it.
 #
-# You choose "log in with an authentication key", give the key and its PIN,
-# are asked for your account password, and are then dropped back at the
-# login-method chooser with no useful error.
+#   STAGE 2 - "login"  Login itself. You give the authentication key and its
+#                      PIN, type your password, and land back at the
+#                      login-method chooser. In the log:
+#                        404 ... /api/shakti/mre/profilehub
+#                      Fixed by a four-line change made here, because nobody
+#                      upstream or in the issue thread has patched it.
 #
-# WHY IT HAPPENS
-#   Netflix retired the whole /api/shakti/mre/* address family. That address
-#   is a hardcoded constant in the add-on (resources/lib/services/nfsession/
-#   session/endpoints.py), not something it scrapes, so no amount of
-#   reinstalling, re-keying or session refreshing can reach a live endpoint.
-#   Add-on 1.23.5 is the newest release and upstream has been quiet since
-#   August 2025, so there is nothing to update to.
+# WHY SKIPPING THE LOGIN CHECK IS SOUND
+#   Read login_auth_data() in access.py and note the order. Before it calls
+#   profilehub the add-on has ALREADY loaded your auth-key cookies, fetched
+#   /browse and parsed the session data (the real validation), and read your
+#   account e-mail. The profilehub call only *confirms* the password you typed,
+#   through the parental-control API. Its 404 discards a session that already
+#   works - cookies.save() two lines later never runs.
 #
-# WHY IT IS SAFE TO SKIP
-#   Read login_auth_data() in access.py and note the order of events. By the
-#   time this call is made the add-on has ALREADY:
-#     - loaded your auth-key cookies into the session
-#     - fetched /browse and parsed the session data (the real validation)
-#     - read your account e-mail off /account/security
-#   The profilehub call adds nothing to that. It is a *confirmation* that the
-#   password you typed is the right one, done through the parental-control
-#   API. Its 404 throws away a session that already works.
-#
-#   The password itself is still stored, exactly as before - the add-on needs
-#   it for MSL EMAIL_PASSWORD authentication during playback. So this patch
-#   removes a check, not a credential. Type your real password.
-#
-#   The cost: a wrong password is no longer caught at login. It surfaces later
-#   as a playback failure instead.
+#   Your password is still stored, because MSL EMAIL_PASSWORD authentication
+#   needs it during playback. This removes a check, not a credential, so type
+#   your real password. The cost: a wrong one now shows up as a playback
+#   failure rather than at login.
 #
 # USAGE
-#   bash bin/kodi_netflix_fix.sh            apply the patch
-#   bash bin/kodi_netflix_fix.sh --status   report whether it is applied
-#   bash bin/kodi_netflix_fix.sh --revert   restore the original file
+#   bash bin/kodi_netflix_fix.sh              apply both stages
+#   bash bin/kodi_netflix_fix.sh --login-only just the login fix
+#   bash bin/kodi_netflix_fix.sh --status     report what is applied
+#   bash bin/kodi_netflix_fix.sh --revert     restore the add-on as shipped
 #
-# Restart Kodi afterwards. Re-run this after every add-on update - an update
-# overwrites the patch, which is the outcome you want, since a real upstream
-# fix should win.
+# Restart Kodi afterwards. Re-run after every add-on update - an update
+# overwrites both patches, which is the outcome you want, since a genuine
+# upstream fix should win. ./bin/doctor.sh kodi tells you when that has
+# happened.
 #
-# See docs/20-kodi-addons.md.
+# See docs/20-kodi-addons.md and assets/patches/README.md.
 # ---------------------------------------------------------------------------
 set -uo pipefail
 
@@ -53,69 +54,150 @@ set -uo pipefail
 source "$(dirname "$(readlink -f "$0")")/../lib/common.sh"
 
 ADDON_DIR="${KODI_HOME:-$HOME/.kodi}/addons/plugin.video.netflix"
-TARGET="$ADDON_DIR/resources/lib/services/nfsession/session/access.py"
-BACKUP="$TARGET.rec-orig"
-MARKER="rec-patch:profilehub-404"
+LIB_DIR="$ADDON_DIR/resources/lib"
+ACCESS_PY="$LIB_DIR/services/nfsession/session/access.py"
+BACKUP="$ADDON_DIR/.rec-original-lib.tar.gz"
+
+API_PATCH="$REC_ASSETS/patches/netflix-api-fixes10.patch"
+# Something the community patch introduces and stock 1.23.5 does not have.
+API_MARKER_FILE="$LIB_DIR/utils/api_requests.py"
+API_MARKER="MY_LIST_GRAPHQL_MUTATIONS"
+LOGIN_MARKER="rec-patch:profilehub-404"
 
 mode="apply"
 case "${1:-}" in
-    --status) mode="status" ;;
-    --revert) mode="revert" ;;
-    --help|-h) sed -n '2,50p' "$0" | sed 's/^# \?//'; exit 0 ;;
-    "") ;;
-    *) rec_die "Unknown option: $1  (try --help)" ;;
+    --status)     mode="status" ;;
+    --revert)     mode="revert" ;;
+    --login-only) mode="login" ;;
+    --help|-h)    sed -n '2,52p' "$0" | sed 's/^# \?//'; exit 0 ;;
+    "")           ;;
+    *)            rec_die "Unknown option: $1  (try --help)" ;;
 esac
 
-[[ -f "$TARGET" ]] || rec_die "Netflix add-on not found at $ADDON_DIR
+[[ -f "$ACCESS_PY" ]] || rec_die "Netflix add-on not found at $ADDON_DIR
 Install it from the CastagnaIT repository first - see docs/20-kodi-addons.md."
 
 version="$(sed -n 's/.*id="plugin.video.netflix".*version="\([^"]*\)".*/\1/p' \
     "$ADDON_DIR/addon.xml" 2>/dev/null | head -1)"
 [[ -n "$version" ]] || version="unknown"
 
-is_patched() { grep -q "$MARKER" "$TARGET"; }
+api_applied()   { grep -q "$API_MARKER" "$API_MARKER_FILE" 2>/dev/null; }
+login_applied() { grep -q "$LOGIN_MARKER" "$ACCESS_PY" 2>/dev/null; }
+
+# The whole of resources/lib is backed up once, before anything is touched, so
+# --revert is a restore rather than an attempt to reverse two patches that may
+# have been applied in either order.
+make_backup() {
+    [[ -f "$BACKUP" ]] && return 0
+    tar czf "$BACKUP" -C "$ADDON_DIR" resources/lib \
+        || rec_die "Could not back up $LIB_DIR"
+    rec_log "Backed up the original add-on to $BACKUP"
+}
+
+# An earlier version of this script did the login patch alone and kept a single
+# access.py.rec-orig. Undo that first, so the tarball below captures a genuinely
+# unmodified add-on and --revert means what it says. The login stage then
+# re-applies as part of the normal run.
+OLD_BACKUP="$ACCESS_PY.rec-orig"
+migrate_old_backup() {
+    [[ -f "$OLD_BACKUP" ]] || return 0
+    if [[ -f "$BACKUP" ]]; then
+        rm -f -- "$OLD_BACKUP"        # already superseded
+        return 0
+    fi
+    rec_log "Converting the backup left by an earlier version of this script."
+    cp -- "$OLD_BACKUP" "$ACCESS_PY" || rec_die "Could not restore $ACCESS_PY"
+    rm -f -- "$OLD_BACKUP"
+}
 
 # -- status ----------------------------------------------------------------
 if [[ "$mode" == "status" ]]; then
     rec_log "Netflix add-on version: $version"
-    if is_patched; then
-        rec_log "The profilehub 404 patch IS applied."
+    if api_applied; then
+        rec_log "  [x] API patch (browsing, search, My List, playback metadata)"
     else
-        rec_log "The profilehub 404 patch is NOT applied."
+        rec_log "  [ ] API patch - profiles and browsing will fail with a 404"
     fi
-    [[ -f "$BACKUP" ]] && rec_log "Original file kept at: $BACKUP"
+    if login_applied; then
+        rec_log "  [x] Login patch (profilehub 404)"
+    else
+        rec_log "  [ ] Login patch - logging in will fail with a 404"
+    fi
+    [[ -f "$BACKUP" ]] && rec_log "Original add-on kept at: $BACKUP"
     exit 0
 fi
 
 # -- revert ----------------------------------------------------------------
 if [[ "$mode" == "revert" ]]; then
+    if [[ ! -f "$BACKUP" && -f "$OLD_BACKUP" ]]; then
+        cp -- "$OLD_BACKUP" "$ACCESS_PY" || rec_die "Could not restore $ACCESS_PY"
+        rm -f -- "$OLD_BACKUP"
+        rec_log "Restored access.py from the earlier script's backup. Restart Kodi."
+        exit 0
+    fi
     if [[ ! -f "$BACKUP" ]]; then
         rec_log "Nothing to revert - no backup at $BACKUP"
         exit 0
     fi
-    cp -- "$BACKUP" "$TARGET" || rec_die "Could not restore $TARGET"
+    rm -rf -- "$LIB_DIR" || rec_die "Could not remove $LIB_DIR"
+    tar xzf "$BACKUP" -C "$ADDON_DIR" || rec_die "Could not restore from $BACKUP"
     rm -f -- "$BACKUP"
-    rec_log "Restored the original access.py. Restart Kodi."
+    rec_log "Restored the add-on as shipped. Restart Kodi."
     exit 0
 fi
 
 # -- apply -----------------------------------------------------------------
-if is_patched; then
-    rec_log "Already patched (add-on $version) - nothing to do."
-    exit 0
-fi
+migrate_old_backup
 
-# 1.23.5 is what this was written against. A different version is not fatal:
-# the patch is applied by matching the exact source block, so it either finds
-# it or refuses. But say so, because a newer release may have fixed this.
 if [[ "$version" != "1.23.5"* ]]; then
-    rec_warn "Add-on version is $version, not 1.23.5 - this patch was written"
-    rec_warn "against 1.23.5. If the block has changed, nothing will be touched."
+    rec_warn "Add-on version is $version, not 1.23.5 - both patches were written"
+    rec_warn "against 1.23.5. Nothing will be applied unless it matches exactly."
+    rec_warn "Check whether upstream has released a real fix:"
+    rec_warn "  https://github.com/CastagnaIT/plugin.video.netflix/releases"
 fi
 
-[[ -f "$BACKUP" ]] || cp -- "$TARGET" "$BACKUP" || rec_die "Could not back up $TARGET"
+# Stage 1: the community API patch.
+if [[ "$mode" == "apply" ]]; then
+    if api_applied; then
+        rec_log "API patch: already applied."
+    elif [[ ! -f "$API_PATCH" ]]; then
+        rec_warn "API patch not found at $API_PATCH - skipping stage 1."
+    else
+        # patch(1) is not installed by default on Raspberry Pi OS Lite.
+        if rec_has patch; then
+            patcher=(patch -p1 --forward --silent --directory "$ADDON_DIR")
+            checker=(patch -p1 --forward --silent --dry-run --directory "$ADDON_DIR")
+        elif rec_has git; then
+            patcher=(git -C "$ADDON_DIR" apply -p1)
+            checker=(git -C "$ADDON_DIR" apply -p1 --check)
+        else
+            rec_die "Neither 'patch' nor 'git' is available.  sudo apt install patch"
+        fi
 
-python3 - "$TARGET" "$MARKER" <<'PYEOF'
+        if ! "${checker[@]}" < "$API_PATCH" >/dev/null 2>&1; then
+            rec_error "The API patch does not apply to add-on $version."
+            rec_error "The add-on source has changed - check whether the fix has landed:"
+            rec_error "  https://github.com/CastagnaIT/plugin.video.netflix/issues/1792"
+            rec_error "Continuing with the login patch only."
+        else
+            make_backup
+            if "${patcher[@]}" < "$API_PATCH" >/dev/null 2>&1; then
+                rec_log "API patch applied (18 files) - browsing, search and My List."
+            else
+                rec_error "The API patch failed halfway. Restoring the original."
+                rm -rf -- "$LIB_DIR"; tar xzf "$BACKUP" -C "$ADDON_DIR"
+                rec_die "Add-on restored; nothing was changed."
+            fi
+        fi
+    fi
+fi
+
+# Stage 2: the login patch.
+if login_applied; then
+    rec_log "Login patch: already applied."
+else
+    make_backup
+    python3 - "$ACCESS_PY" "$LOGIN_MARKER" <<'PYEOF'
 import sys
 
 path, marker = sys.argv[1], sys.argv[2]
@@ -162,17 +244,36 @@ except SyntaxError as exc:
     sys.exit(f'patched file does not compile: {exc}')
 PYEOF
 
-status=$?
-if (( status != 0 )); then
-    cp -- "$BACKUP" "$TARGET"
-    rec_die "Patch not applied; $TARGET left untouched.
-The add-on source has changed - check whether upstream has fixed this:
-  https://github.com/CastagnaIT/plugin.video.netflix/issues/1781"
+    if (( $? != 0 )); then
+        rec_error "Login patch not applied; $ACCESS_PY left untouched."
+        rec_error "The add-on source has changed - check whether upstream has fixed this:"
+        rec_die   "  https://github.com/CastagnaIT/plugin.video.netflix/issues/1781"
+    fi
+    rec_log "Login patch applied - the profilehub password check is now skipped."
 fi
 
-rec_log "Patched $TARGET  (add-on $version)"
-rec_log "Original saved as $BACKUP"
+# Nothing here is worth leaving in place if Kodi cannot import it. Checked with
+# compile() rather than compileall, so no __pycache__ is written into someone
+# else's add-on.
+python3 - "$LIB_DIR" <<'PYEOF' || rec_warn "Run --revert if Kodi misbehaves."
+import pathlib, sys
+
+bad = []
+for path in pathlib.Path(sys.argv[1]).rglob('*.py'):
+    try:
+        compile(path.read_text(encoding='utf-8'), str(path), 'exec')
+    except SyntaxError as exc:
+        bad.append(f'  {path}: {exc}')
+
+if bad:
+    print('WARNING: these add-on modules do not compile:', file=sys.stderr)
+    print('\n'.join(bad), file=sys.stderr)
+    sys.exit(1)
+PYEOF
+
 rec_log ""
-rec_log "Now: restart Kodi, then log in with your authentication key again."
-rec_log "Enter your REAL Netflix password at the password prompt - it is still"
-rec_log "stored and used for playback, it is only no longer checked up front."
+rec_log "Done (add-on $version). Restart Kodi, then log in with your key again."
+rec_log "Enter your REAL Netflix password - it is still stored and used for"
+rec_log "playback, it is only no longer checked up front."
+rec_log ""
+rec_log "Undo everything with:  bash bin/kodi_netflix_fix.sh --revert"

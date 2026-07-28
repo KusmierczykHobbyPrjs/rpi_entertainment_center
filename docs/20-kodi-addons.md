@@ -296,14 +296,17 @@ grep -o 'version="[^"]*"' ~/.kodi/addons/plugin.video.netflix/addon.xml | head -
 
 against <https://github.com/CastagnaIT/plugin.video.netflix/releases>.
 
-For the **login** failure specifically, this project ships a fix — see the
-next section. For everything else:
+**What does help** is the next section: `bin/kodi_netflix_fix.sh` applies both
+the login fix and a community API patch, which together get 1.23.5 working
+again. If your symptom is not one of the two it covers:
 
 1. **Check the tracker** for the exact endpoint from your log:
-   <https://github.com/CastagnaIT/plugin.video.netflix/issues>. Community
-   patches appear there before releases do; profile switching has one in
-   [PR #1783](https://github.com/CastagnaIT/plugin.video.netflix/pull/1783),
-   unmerged.
+   <https://github.com/CastagnaIT/plugin.video.netflix/issues>. With upstream
+   dormant, community patches appear in the issue threads long before any
+   release — [#1792](https://github.com/CastagnaIT/plugin.video.netflix/issues/1792)
+   is where the current work happens, and
+   [PR #1783](https://github.com/CastagnaIT/plugin.video.netflix/pull/1783)
+   covers profile switching.
 2. **Watch it in the browser instead** — see below. There is no alternative
    Kodi add-on to switch to.
 
@@ -312,20 +315,41 @@ next section. For everything else:
 > and HBO Max but **not Netflix** — it has been requested and does not exist.
 > When CastagnaIT's is broken, Kodi cannot play Netflix at all.
 
-### Fixing the login
-
-The login failure *is* fixable locally, because the call that fails does not
-do anything the login needs.
+### Fixing it: `bin/kodi_netflix_fix.sh`
 
 ```bash
-bash bin/kodi_netflix_fix.sh          # apply
-bash bin/kodi_netflix_fix.sh --status # is it applied?
-bash bin/kodi_netflix_fix.sh --revert # undo
+bash bin/kodi_netflix_fix.sh          # apply both patches
+bash bin/kodi_netflix_fix.sh --status # what is applied?
+bash bin/kodi_netflix_fix.sh --revert # restore the add-on as shipped
 ```
 
 Restart Kodi, then log in with your authentication key again.
 
-**Why skipping it is sound.** Read `login_auth_data()` in
+**Two separate things are broken**, and the script fixes both:
+
+| Stage | Symptom | Fix |
+|---|---|---|
+| **login** | Key and PIN accepted, password typed, back at the login-method chooser. `404 … /api/shakti/mre/profilehub` | Four lines, written here — see below |
+| **api** | Login works; picking a profile errors immediately. `404 … /memberapi/release/pathEvaluator`. Also browsing, search, My List, Continue Watching, artwork, cast, year, resume positions | A community patch, vendored in [`assets/patches/`](../assets/patches/README.md) |
+
+They are independent — neither patch touches the other's files — and the script
+applies them in that order. `--login-only` skips the second if you would rather
+not run a large third-party diff.
+
+Before anything is modified the script tars up the add-on's `resources/lib`, so
+`--revert` is a restore rather than an attempt to reverse two patches. It needs
+`patch(1)`, falling back to `git apply`; on Raspberry Pi OS Lite you may need
+`sudo apt install patch`.
+
+> **Read [`assets/patches/README.md`](../assets/patches/README.md) before
+> running this.** The API patch is 71 hunks across 18 files, written by a user
+> in the upstream issue tracker, unreviewed by the add-on's author, and it runs
+> in an add-on you will hand your Netflix password to. Its provenance and
+> SHA-256 are recorded there so you can check it against the source.
+
+#### The login patch
+
+**Why skipping the check is sound.** Read `login_auth_data()` in
 `resources/lib/services/nfsession/session/access.py` and note the order. Before
 it ever calls `profilehub`, the add-on has already:
 
@@ -347,21 +371,39 @@ your real password**; the patch removes a check, not a credential.
 The cost: a wrong password is no longer caught at login. It shows up later as a
 playback failure instead.
 
-The script keeps the original as `access.py.rec-orig`, matches the exact 1.23.5
-source block (so an upstream rewrite makes it a clean no-op rather than a
-mangle), refuses to leave a file that does not compile, and is safe to re-run.
+It matches the exact 1.23.5 source block, so an upstream rewrite of that area
+makes it a clean no-op rather than a mangle.
 
-> **Re-run it after every add-on update.** An update overwrites the patch —
-> which is what you want, since a genuine upstream fix should win.
-> `./bin/doctor.sh kodi` tells you when it needs reapplying.
+#### The API patch
 
-**This gets you logged in. It does not fix everything else.** Netflix also
-changed its Falcor content schema, which breaks browsing, search, My List and
-Continue Watching for some accounts
-([#1792](https://github.com/CastagnaIT/plugin.video.netflix/issues/1792)); and
-profile switching hits the same dead `mre` address
-([PR #1783](https://github.com/CastagnaIT/plugin.video.netflix/pull/1783)).
-If those bite too, the browser below is the answer.
+Netflix retired `/api/shakti/mre/*` and reshaped its Falcor content schema in
+June 2026, which broke `pathEvaluator` — the call behind nearly every screen.
+`netflix-api-fixes10.patch` reworks the API layer and adds GraphQL fallbacks
+where the old paths are simply gone. Full provenance, licence, hash and known
+limitations: [`assets/patches/README.md`](../assets/patches/README.md).
+
+Some users report search still times out with it. Everything else — browsing,
+profiles, My List, Continue Watching, playback, artwork, resume positions —
+works again.
+
+Alternatives, if you would rather not run a vendored diff:
+
+- [`atrHusK/plugin.video.netflix`](https://github.com/atrHusK/plugin.video.netflix)
+  packages an earlier revision of the same work as an installable zip
+  (v1.24.1). Simpler to install; predates the artwork, cast, year and
+  resume-position fixes, and does **not** fix login either — you still want
+  `--login-only` on top of it.
+- Watch it in the browser instead, below.
+
+#### Keeping it working
+
+> **Re-run the script after every add-on update.** An update overwrites both
+> patches — which is what you want, since a genuine upstream fix should win.
+> `./bin/doctor.sh kodi` reports each patch separately and tells you when they
+> need reapplying.
+
+Neither patch survives a reinstall of the add-on, and neither is backed up by
+`bin/backup.sh` — they are derived state, reproducible with one command.
 
 ### The fallback: Netflix in the browser
 

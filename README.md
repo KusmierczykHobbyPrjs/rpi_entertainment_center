@@ -189,7 +189,7 @@ Install them in this order; each is a separate `./install.sh <name>` run.
 │   ├── speech.sh               spoken messages
 │   ├── signal_action.sh        the confirmation beep
 │   ├── clipboard2chromium.sh   open the phone's clipboard URL on the TV
-│   ├── kodi_netflix_fix.sh     unstick the Netflix add-on's broken login
+│   ├── kodi_netflix_fix.sh     patch the broken Netflix add-on (login + API)
 │   ├── backup.sh               save settings before a reinstall
 │   ├── restore.sh              put them back afterwards
 │   ├── doctor.sh               health check
@@ -201,7 +201,7 @@ Install them in this order; each is a separate `./install.sh <name>` run.
 │
 ├── modules/<name>/install.sh    one installer per module
 ├── docs/                        one document per module, plus the guides above
-├── assets/                      sounds, IPTV playlists, Kodi add-on packages
+├── assets/                      sounds, IPTV playlists, Kodi add-on packages, patches
 └── photos/                      pictures of the finished build
 ```
 

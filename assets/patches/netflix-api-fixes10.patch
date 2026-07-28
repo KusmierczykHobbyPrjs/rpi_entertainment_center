@@ -1,0 +1,3179 @@
+diff --git a/resources/lib/database/db_shared.py b/resources/lib/database/db_shared.py
+index da4ea11..c37cf7d 100644
+--- a/resources/lib/database/db_shared.py
++++ b/resources/lib/database/db_shared.py
+@@ -210,7 +210,8 @@ def get_shareddb_class(use_mysql=False):
+             """Return True if a movie id exists"""
+             query = 'SELECT EXISTS(SELECT 1 FROM video_lib_movies WHERE MovieID = ?)'
+             cur = self._execute_query(query, (movieid,))
+-            return bool(cur.fetchone()[0])
++            result = cur.fetchone()
++            return bool(result and result[0])
+ 
+         @db_base_mysql.handle_connection
+         @db_base_sqlite.handle_connection
+@@ -218,7 +219,8 @@ def get_shareddb_class(use_mysql=False):
+             """Return True if a tvshow id exists"""
+             query = 'SELECT EXISTS(SELECT 1 FROM video_lib_tvshows WHERE TvShowID = ?)'
+             cur = self._execute_query(query, (tvshowid,))
+-            return bool(cur.fetchone()[0])
++            result = cur.fetchone()
++            return bool(result and result[0])
+ 
+         @db_base_mysql.handle_connection
+         @db_base_sqlite.handle_connection
+@@ -231,7 +233,8 @@ def get_shareddb_class(use_mysql=False):
+                  'ON video_lib_seasons.TvShowID = video_lib_tvshows.TvShowID '
+                  'WHERE video_lib_tvshows.TvShowID = ? AND video_lib_seasons.SeasonID = ?)')
+             cur = self._execute_query(query, (tvshowid, seasonid))
+-            return bool(cur.fetchone()[0])
++            result = cur.fetchone()
++            return bool(result and result[0])
+ 
+         @db_base_mysql.handle_connection
+         @db_base_sqlite.handle_connection
+@@ -248,7 +251,8 @@ def get_shareddb_class(use_mysql=False):
+                  'video_lib_seasons.SeasonID = ? AND '
+                  'video_lib_episodes.EpisodeID = ?)')
+             cur = self._execute_query(query, (tvshowid, seasonid, episodeid))
+-            return bool(cur.fetchone()[0])
++            result = cur.fetchone()
++            return bool(result and result[0])
+ 
+         @db_base_mysql.handle_connection
+         @db_base_sqlite.handle_connection
+diff --git a/resources/lib/globals.py b/resources/lib/globals.py
+index 261c41a..4ee3d37 100644
+--- a/resources/lib/globals.py
++++ b/resources/lib/globals.py
+@@ -73,10 +73,16 @@ class GlobalVariables:
+                     'request_context_name': 'mylist',
+                     'view': VIEW_MYLIST,
+                     'has_sort_setting': True,
+-                    'query_without_reference': True}),
++                    'query_without_reference': True,
++                    'label_id': 30167,
++                    'description_id': None,
++                    'icon': 'DefaultVideoPlaylists.png'}),
+         ('continueWatching', {'path': ['video_list', 'continueWatching'],
+                               'loco_contexts': ['continueWatching'],
+-                              'loco_known': True}),
++                              'loco_known': True,
++                              'label_id': 30168,
++                              'description_id': 30093,
++                              'icon': 'DefaultInProgressShows.png'}),
+         ('newAndPopular', {'path': ['category_list', 'newAndPopular'],
+                            'loco_contexts': ['comingSoon'],
+                            'loco_known': False,
+@@ -85,7 +91,10 @@ class GlobalVariables:
+                            'icon': 'DefaultRecentlyAddedMovies.png'}),
+         ('chosenForYou', {'path': ['video_list', 'chosenForYou'],
+                           'loco_contexts': ['topTen'],
+-                          'loco_known': True}),
++                          'loco_known': True,
++                          'label_id': 30169,
++                          'description_id': 30094,
++                          'icon': 'DefaultUser.png'}),
+         ('recentlyAdded', {'path': ['video_list_sorted', 'recentlyAdded', '1592210'],
+                            'loco_contexts': None,
+                            'loco_known': False,
+@@ -102,10 +111,16 @@ class GlobalVariables:
+                         'query_without_reference': True}),
+         ('currentTitles', {'path': ['video_list', 'currentTitles'],
+                            'loco_contexts': ['trendingNow'],
+-                           'loco_known': True}),
++                           'loco_known': True,
++                           'label_id': 30150,
++                           'description_id': 30146,
++                           'icon': 'DefaultRecentlyAddedMovies.png'}),
+         ('mostViewed', {'path': ['video_list', 'mostViewed'],
+                         'loco_contexts': ['popularTitles'],
+-                        'loco_known': True}),
++                        'loco_known': True,
++                        'label_id': 30001,
++                        'description_id': 30094,
++                        'icon': 'DefaultUser.png'}),
+         ('netflixOriginals', {'path': ['video_list_sorted', 'netflixOriginals', '839338'],
+                               'loco_contexts': ['netflixOriginals'],
+                               'loco_known': True,
+@@ -120,13 +135,6 @@ class GlobalVariables:
+                             'icon': 'DefaultTVShows.png',
+                             'has_sort_setting': True,
+                             'query_without_reference': True}),
+-        ('recommendations', {'path': ['recommendations', 'recommendations'],
+-                             'loco_contexts': ['similars', 'becauseYouAdded', 'becauseYouLiked', 'watchAgain',
+-                                               'bigRow'],
+-                             'loco_known': False,
+-                             'label_id': 30001,
+-                             'description_id': 30094,
+-                             'icon': 'DefaultUser.png'}),
+         ('tvshowsGenres', {'path': ['subgenres', 'tvshowsGenres', '83'],
+                            'loco_contexts': None,
+                            'loco_known': False,
+diff --git a/resources/lib/kodi/infolabels.py b/resources/lib/kodi/infolabels.py
+index f6ec0c3..1c0da4c 100644
+--- a/resources/lib/kodi/infolabels.py
++++ b/resources/lib/kodi/infolabels.py
+@@ -55,8 +55,17 @@ def get_info(videoid, item, raw_data, profile_language_code='', delayed_db_op=Fa
+         cache_entry = G.CACHE.get(CACHE_INFOLABELS, cache_identifier)
+         infos = cache_entry['infos']
+         quality_infos = cache_entry['quality_infos']
++        updated = False
++        updated = _refresh_missing_plot(infos, item) or updated
++        updated = _refresh_missing_atomic_infos(infos, item, ('Trailer', 'Year')) or updated
++        updated = _refresh_missing_referenced_infos(infos, item, raw_data) or updated
++        updated = _refresh_missing_profile_cast(infos, videoid, profile_language_code) or updated
++        if updated:
++            G.CACHE.add(CACHE_INFOLABELS, cache_identifier, {'infos': infos, 'quality_infos': quality_infos},
++                        delayed_db_op=delayed_db_op)
+     except CacheMiss:
+         infos, quality_infos = parse_info(videoid, item, raw_data, common_data)
++        _refresh_missing_profile_cast(infos, videoid, profile_language_code)
+         G.CACHE.add(CACHE_INFOLABELS, cache_identifier, {'infos': infos, 'quality_infos': quality_infos},
+                     delayed_db_op=delayed_db_op)
+     # Use a deepcopy of dict to not reflect changes of the dictionary also to the cache
+@@ -68,10 +77,69 @@ def get_info(videoid, item, raw_data, profile_language_code='', delayed_db_op=Fa
+     return infos_copy, quality_infos
+ 
+ 
++
++def _refresh_missing_plot(infos, item):
++    if infos.get('Plot') or infos.get('PlotOutline'):
++        return False
++    synopsis = common.get_path_safe(['synopsis', 'value'], item)
++    if not synopsis:
++        synopsis = common.get_path_safe(['regularSynopsis', 'value'], item)
++    if not synopsis:
++        return False
++    infos['Plot'] = synopsis
++    infos['PlotOutline'] = synopsis
++    return True
++
++
++def _refresh_missing_referenced_infos(infos, item, raw_data):
++    if not item or not raw_data:
++        return False
++    updated = False
++    referenced_infos = _parse_referenced_infos(item, raw_data)
++    for key, value in referenced_infos.items():
++        if value and not infos.get(key):
++            infos[key] = value
++            updated = True
++    return updated
++
++
++def _refresh_missing_atomic_infos(infos, item, targets):
++    if not item:
++        return False
++    updated = False
++    atomic_infos = _parse_atomic_infos(item)
++    for key in targets:
++        value = atomic_infos.get(key)
++        if value and not infos.get(key):
++            infos[key] = value
++            updated = True
++    return updated
++
++
++def _refresh_missing_profile_cast(infos, videoid, profile_language_code):
++    """Reuse language-independent cast names from another infolabel cache key."""
++    if infos.get('Cast'):
++        return False
++    active_language = G.LOCAL_DB.get_profile_config('language', '')
++    for language_code in (active_language, ''):
++        if language_code == profile_language_code:
++            continue
++        try:
++            cached_infos = G.CACHE.get(
++                CACHE_INFOLABELS, f'{videoid.value}_{language_code}')['infos']
++        except (CacheMiss, KeyError, TypeError):
++            continue
++        if cached_infos.get('Cast'):
++            infos['Cast'] = copy.deepcopy(cached_infos['Cast'])
++            return True
++    return False
++
++
+ def add_info_list_item(list_item: ListItemW, videoid, item, raw_data, is_in_mylist, common_data, art_item=None,
+                        is_in_remind_me=False):
+     """Add infolabels and art to a ListItem"""
+     infos, quality_infos = get_info(videoid, item, raw_data, delayed_db_op=True, common_data=common_data)
++    _add_trailer_fallback(infos, videoid)
+     list_item.addStreamInfoFromDict(quality_infos)
+     if is_in_mylist and common_data.get('mylist_titles_color'):
+         # Highlight ListItem title when the videoid is contained in "My list"
+@@ -87,6 +155,12 @@ def add_info_list_item(list_item: ListItemW, videoid, item, raw_data, is_in_myli
+                              delayed_db_op=True))
+ 
+ 
++def _add_trailer_fallback(infos, videoid):
++    if infos.get('Trailer') or videoid.mediatype not in (common.VideoId.MOVIE, common.VideoId.SHOW):
++        return
++    infos['Trailer'] = common.build_url(['play_trailer'], videoid=videoid, mode=G.MODE_ACTION)
++
++
+ def _add_supplemental_plot_info(infos, item, common_data):
+     """Add supplemental info to plot description"""
+     suppl_info = []
+@@ -132,6 +206,10 @@ def get_art(videoid, item, profile_language_code='', delayed_db_op=False):
+     cache_identifier = f'{videoid.value}_{profile_language_code}'
+     try:
+         art = G.CACHE.get(CACHE_ARTINFO, cache_identifier)
++        parsed_art = parse_art(videoid, item)
++        if _refresh_cached_art(art, parsed_art, item):
++            G.CACHE.add(CACHE_ARTINFO, cache_identifier, art,
++                        delayed_db_op=delayed_db_op)
+     except CacheMiss:
+         art = parse_art(videoid, item)
+         G.CACHE.add(CACHE_ARTINFO, cache_identifier, art,
+@@ -139,6 +217,51 @@ def get_art(videoid, item, profile_language_code='', delayed_db_op=False):
+     return art
+ 
+ 
++def _refresh_cached_art(art, parsed_art, item):
++    updated = False
++    for key in ('poster', 'fanart', 'thumb', 'landscape', 'clearlogo'):
++        if parsed_art.get(key) and not art.get(key):
++            art[key] = parsed_art[key]
++            updated = True
++    if _repair_browser_boxart_wide_cache(art, parsed_art, item):
++        updated = True
++    return updated
++
++
++def _repair_browser_boxart_wide_cache(art, parsed_art, item):
++    fallback = common.get_path_safe(['itemSummary', 'value', 'boxArt', 'url'], item)
++    updated = False
++    if fallback:
++        portrait_poster = parsed_art.get('poster')
++        if portrait_poster and portrait_poster != fallback:
++            for key in ('poster', 'thumb'):
++                if parsed_art.get(key) == portrait_poster and art.get(key) != portrait_poster:
++                    art[key] = portrait_poster
++                    updated = True
++        for key in ('fanart', 'thumb', 'landscape'):
++            if art.get(key) == fallback and parsed_art.get(key) != fallback:
++                art[key] = parsed_art.get(key, '')
++                updated = True
++        if art.get('poster') == fallback and parsed_art.get('poster') != fallback:
++            art['poster'] = parsed_art.get('poster', '')
++            updated = True
++    parsed_poster = parsed_art.get('poster')
++    if parsed_poster and parsed_poster != fallback and art.get('poster') != parsed_poster:
++        if not art.get('poster') or art.get('poster') in (art.get('landscape'), art.get('fanart'), fallback):
++            art['poster'] = parsed_poster
++            updated = True
++    parsed_thumb = parsed_art.get('thumb')
++    if (parsed_thumb and parsed_thumb == parsed_poster and parsed_thumb != fallback
++            and art.get('thumb') != parsed_thumb):
++        art['thumb'] = parsed_thumb
++        updated = True
++    elif parsed_thumb and art.get('thumb') and art['thumb'] != parsed_thumb:
++        if art['thumb'] in (art.get('landscape'), art.get('fanart'), fallback):
++            art['thumb'] = parsed_thumb
++            updated = True
++    return updated
++
++
+ def get_resume_info_from_library(videoid):
+     """Retrieve the resume value from the Kodi library"""
+     try:
+@@ -265,15 +388,13 @@ def parse_art(videoid, item):
+ 
+ def _assign_art(videoid, **kwargs):
+     """Assign the art available from Netflix to appropriate Kodi art"""
+-    art = {'poster': _best_art([kwargs['poster'], kwargs['fallback']]),
+-           'fanart': _best_art([kwargs['fanart'],
+-                                kwargs['interesting_moment'],
+-                                kwargs['boxart_large'],
+-                                kwargs['boxart_small']]),
+-           'thumb': ((kwargs['interesting_moment']
+-                      if videoid.mediatype in (common.VideoId.EPISODE, common.VideoId.SUPPLEMENTAL) else '')
+-                     or kwargs['boxart_large'] or kwargs['boxart_small'])}
+-    art['landscape'] = art['thumb']
++    poster = _best_art([kwargs['poster'], kwargs['fallback']])
++    wide_art = _best_art([kwargs['interesting_moment'], kwargs['boxart_large'], kwargs['boxart_small']])
++    thumb = (wide_art if videoid.mediatype in (common.VideoId.EPISODE, common.VideoId.SUPPLEMENTAL) else poster)
++    art = {'poster': poster,
++           'fanart': _best_art([kwargs['fanart'], wide_art]),
++           'thumb': thumb}
++    art['landscape'] = wide_art or thumb
+     if videoid.mediatype != common.VideoId.UNSPECIFIED:
+         art['clearlogo'] = _best_art([kwargs['clearlogo']])
+     return art
+@@ -317,32 +438,42 @@ def set_watched_status(list_item: ListItemW, video_data, common_data):
+     resume_time = 0
+     video_runtime = video_data.get('runtime', {}).get('value', 0)
+     if is_watched_user_overrided is None:
+-        # Note to shakti properties:
+-        # 'watched':  unlike the name this value is used to other purposes, so not to set a video as watched
+-        # 'watchedToEndOffset':  this value is used to determine if a video is watched but
+-        #                        is available only with the metadata api and only for "episode" video type
+-        # 'creditsOffset' :  this value is used as position where to show the (play) "Next" (episode) button
+-        #                    on the website, but it may not be always available with the "movie" video type
+-        credits_offset_val = video_data.get('creditsOffset', {}).get('value', 0)
+-        if credits_offset_val > 0:
+-            # To better ensure that a video is marked as watched also when a user do not reach the ending credits
+-            # we generally lower the watched threshold by 50 seconds for 50 minutes of video (3000 secs)
+-            lower_value = video_runtime / 3000 * 50
+-            watched_threshold = credits_offset_val - lower_value
+-        else:
+-            # When missing the value should be only a video of movie type,
+-            # then we simulate the default Kodi playcount behaviour (playcountminimumpercent)
+-            watched_threshold = video_runtime / 100 * 90
+-        # To avoid asking to the server again the entire list of titles (after watched a video)
+-        # to get the updated value, we override the value with the value saved in memory (see am_video_events.py)
++        # Cached bookmarks are written by AMVideoEvents while playback is active. They must
++        # override list data, including GraphQL fallback items, which remains stale until the
++        # server response and directory caches are refreshed.
++        has_cached_bookmark = True
+         try:
+             bookmark_position = G.CACHE.get(CACHE_BOOKMARKS, video_id)
+         except CacheMiss:
++            has_cached_bookmark = False
+             # NOTE shakti 'bookmarkPosition' tag when it is not set have -1 value
+-            bookmark_position = video_data['bookmarkPosition'].get('value', 0)
+-        playcount = 1 if 0 < watched_threshold <= bookmark_position else 0
+-        if playcount == 0 and bookmark_position > 0:
+-            resume_time = bookmark_position
++            bookmark_position = video_data.get('bookmarkPosition', {}).get('value', 0)
++        graphql_playcount = video_data.get('_graphql_playcount', {}).get('value')
++        if graphql_playcount is not None and not has_cached_bookmark:
++            playcount = int(graphql_playcount)
++            if playcount == 0 and bookmark_position > 0:
++                resume_time = bookmark_position
++        else:
++            # Note to shakti properties:
++            # 'watched':  unlike the name this value is used to other purposes, so not to set a video as watched
++            # 'watchedToEndOffset':  this value is used to determine if a video is watched but
++            #                        is available only with the metadata api and only for "episode" video type
++            # 'creditsOffset' :  this value is used as position where to show the (play) "Next" (episode) button
++            #                    on the website, but it may not be always available with the "movie" video type
++            credits_offset_val = (video_data.get('creditsOffset', {}).get('value', 0) or
++                                  video_data.get('watchedToEndOffset', {}).get('value', 0))
++            if credits_offset_val > 0:
++                # To better ensure that a video is marked as watched also when a user do not reach the ending credits
++                # we generally lower the watched threshold by 50 seconds for 50 minutes of video (3000 secs)
++                lower_value = video_runtime / 3000 * 50
++                watched_threshold = credits_offset_val - lower_value
++            else:
++                # When missing the value should be only a video of movie type,
++                # then we simulate the default Kodi playcount behaviour (playcountminimumpercent)
++                watched_threshold = video_runtime / 100 * 90
++            playcount = 1 if 0 < watched_threshold <= bookmark_position else 0
++            if playcount == 0 and bookmark_position > 0:
++                resume_time = bookmark_position
+     else:
+         playcount = 1 if is_watched_user_overrided else 0
+     # We have to set playcount with setInfo(), because the setProperty('PlayCount', ) have a bug
+diff --git a/resources/lib/navigation/actions.py b/resources/lib/navigation/actions.py
+index 75ecf5a..ac5fd69 100644
+--- a/resources/lib/navigation/actions.py
++++ b/resources/lib/navigation/actions.py
+@@ -9,6 +9,8 @@
+ """
+ import xbmc
+ import xbmcgui
++import xbmcplugin
++from urllib.parse import unquote, urlparse
+ 
+ import resources.lib.common as common
+ import resources.lib.kodi.ui as ui
+@@ -151,6 +153,57 @@ class AddonActionExecutor:
+         else:
+             ui.show_notification(common.get_local_string(30111))
+ 
++    @common.inject_video_id(path_offset=1)
++    @measure_exec_time_decorator()
++    def play_trailer(self, videoid):
++        """Resolve the first trailer for the Kodi info dialog trailer button."""
++        trailer_videoid = self._first_trailer_videoid(videoid)
++        if trailer_videoid:
++            from resources.lib.navigation.player import _play  # pylint: disable=protected-access,import-outside-toplevel
++            _play(trailer_videoid, False)
++            return
++        trailer_url = self._direct_trailer_url(videoid)
++        if trailer_url:
++            list_item = xbmcgui.ListItem(path=trailer_url, offscreen=True)
++            list_item.setProperty('isPlayable', 'true')
++            list_item.setContentLookup(False)
++            xbmcplugin.setResolvedUrl(handle=G.PLUGIN_HANDLE, succeeded=True, listitem=list_item)
++            return
++        xbmcplugin.setResolvedUrl(handle=G.PLUGIN_HANDLE, succeeded=False, listitem=xbmcgui.ListItem())
++
++    @staticmethod
++    def _first_trailer_videoid(videoid):
++        menu_data = {'path': ['is_context_menu_item', 'is_context_menu_item'],
++                     'title': common.get_local_string(30179)}
++        list_data, _extra_data = common.make_call('get_video_list_supplemental',
++                                                  {
++                                                      'menu_data': menu_data,
++                                                      'video_id_dict': videoid.to_dict(),
++                                                      'supplemental_type': SUPPLEMENTAL_TYPE_TRAILERS
++                                                  })
++        for url, list_item, is_folder in list_data or []:
++            if is_folder:
++                continue
++            videoid_path = list_item.getProperty('nf_videoid')
++            if videoid_path:
++                return common.VideoId.from_path(videoid_path.split('/'))
++            parsed_path = _plugin_pathitems(url)
++            if parsed_path[:1] == [G.MODE_PLAY]:
++                return common.VideoId.from_path(parsed_path[1:])
++        return None
++
++    @staticmethod
++    def _direct_trailer_url(videoid):
++        try:
++            infos, _art = common.make_call('get_videoid_info', videoid)
++        except Exception as exc:  # pylint: disable=broad-except
++            LOG.warn('Trailer info lookup failed for {}: {}', videoid, exc)
++            return ''
++        trailer_url = infos.get('Trailer', '')
++        if trailer_url.startswith('http'):
++            return trailer_url
++        return ''
++
+     @measure_exec_time_decorator()
+     def purge_cache(self, pathitems=None):  # pylint: disable=unused-argument
+         """Clear the cache. If on_disk param is supplied, also clear cached items from disk"""
+@@ -293,3 +346,8 @@ def change_watched_status_locally(videoid):
+         G.SHARED_DB.set_watched_status(profile_guid, videoid.value, True)
+     ui.show_notification(common.get_local_string(30237).split('|')[txt_index])
+     common.container_refresh()
++
++
++def _plugin_pathitems(url):
++    path = unquote(urlparse(url).path).strip('/')
++    return [part for part in path.split('/') if part]
+diff --git a/resources/lib/navigation/directory.py b/resources/lib/navigation/directory.py
+index 95a3ec7..ea71cc5 100644
+--- a/resources/lib/navigation/directory.py
++++ b/resources/lib/navigation/directory.py
+@@ -156,10 +156,12 @@ class Directory:
+         menu_data = G.MAIN_MENU_ITEMS.get(pathitems[1])
+         if not menu_data:  # Dynamic menus
+             menu_data = G.LOCAL_DB.get_value(pathitems[1], table=TABLE_MENU_DATA, data_type=dict)
++        list_id = pathitems[2] if len(pathitems) > 2 else pathitems[1]
++        is_dynamic_id = len(pathitems) > 2 and not G.is_known_menu_context(list_id)
+         call_args = {
+-            'list_id': pathitems[2],
++            'list_id': list_id,
+             'menu_data': menu_data,
+-            'is_dynamic_id': not G.is_known_menu_context(pathitems[2])
++            'is_dynamic_id': is_dynamic_id
+         }
+         dir_items, extra_data = common.make_call('get_video_list', call_args)
+ 
+@@ -180,7 +182,7 @@ class Directory:
+             'menu_data': menu_data,
+             'sub_genre_id': self.params.get('sub_genre_id'),  # Used to show the sub-genre folder when sub-genres exists
+             'perpetual_range_start': self.perpetual_range_start,
+-            'is_dynamic_id': not G.is_known_menu_context(pathitems[2])
++            'is_dynamic_id': len(pathitems) > 2 and not G.is_known_menu_context(pathitems[2])
+         }
+         dir_items, extra_data = common.make_call('get_video_list_sorted', call_args)
+         sort_type = 'sort_nothing'
+diff --git a/resources/lib/services/nfsession/directorybuilder/dir_builder.py b/resources/lib/services/nfsession/directorybuilder/dir_builder.py
+index 67e9c81..9ff5fc3 100644
+--- a/resources/lib/services/nfsession/directorybuilder/dir_builder.py
++++ b/resources/lib/services/nfsession/directorybuilder/dir_builder.py
+@@ -7,15 +7,21 @@
+     SPDX-License-Identifier: MIT
+     See LICENSES/MIT.md for more information.
+ """
+-from resources.lib.utils.data_types import merge_data_type
+-from resources.lib.common.exceptions import CacheMiss
++import resources.lib.common as common
++from resources.lib.utils.data_types import merge_data_type, CustomVideoList
++from resources.lib.common.exceptions import CacheMiss, InvalidVideoListTypeError
+ from resources.lib.common import VideoId
+ from resources.lib.globals import G
++from resources.lib.utils.api_paths import ART_SIZE_FHD, ART_SIZE_POSTER
+ from resources.lib.services.nfsession.directorybuilder.dir_builder_items \
+     import (build_video_listing, build_subgenres_listing, build_season_listing, build_episode_listing,
+             build_loco_listing, build_mainmenu_listing, build_profiles_listing, build_lolomo_category_listing)
+-from resources.lib.services.nfsession.directorybuilder.dir_path_requests import DirectoryPathRequests
+-from resources.lib.utils.logging import measure_exec_time_decorator
++from resources.lib.services.nfsession.directorybuilder.dir_path_requests import (DirectoryPathRequests,
++                                                                                 _has_reference_entries,
++                                                                                 _metadata_year,
++                                                                                 metadata_with_title_page_fallback,
++                                                                                 normalize_metadata_references)
++from resources.lib.utils.logging import LOG, measure_exec_time_decorator
+ 
+ 
+ class DirectoryBuilder(DirectoryPathRequests):
+@@ -76,32 +82,169 @@ class DirectoryBuilder(DirectoryPathRequests):
+ 
+     @measure_exec_time_decorator(is_immediate=True)
+     def get_video_list(self, list_id, menu_data, is_dynamic_id):
+-        if not is_dynamic_id:
+-            list_id = self.get_loco_list_id_by_context(menu_data['loco_contexts'][0])
+-        # pylint: disable=unexpected-keyword-arg
+-        video_list = self.req_video_list(list_id, no_use_cache=menu_data.get('no_use_cache'))
++        menu_id = menu_data['path'][1]
++        current_contexts = {
++            'chosenForYou': ('windowedNewReleases',),
++            'currentTitles': ('windowedNewReleases',),
++            'mostViewed': ('mostWatched',)
++        }
++        if not is_dynamic_id and menu_id == 'continueWatching':
++            video_list = self._browser_continue_watching_list()
++        elif not is_dynamic_id and menu_id in current_contexts:
++            video_list = self._video_list_from_lolomo_category_context(
++                'comingSoon', current_contexts[menu_id], fallback_first=True)
++        else:
++            if not is_dynamic_id:
++                list_id = self.get_loco_list_id_by_context(menu_data['loco_contexts'][0])
++            # pylint: disable=unexpected-keyword-arg
++            video_list = self.req_video_list(list_id, menu_data=menu_data, no_use_cache=menu_data.get('no_use_cache'))
++        self._enrich_video_list_art(video_list)
+         return build_video_listing(video_list, menu_data,
+                                    mylist_items=self.req_mylist_items())
+ 
+     @measure_exec_time_decorator(is_immediate=True)
+     def get_video_list_sorted(self, pathitems, menu_data, sub_genre_id, perpetual_range_start, is_dynamic_id):
+         context_id = None
+-        if is_dynamic_id and pathitems[2] != 'None':
++        if is_dynamic_id and len(pathitems) > 2 and pathitems[2] != 'None':
+             # Dynamic IDs for common video lists
+             # The context_id can be:
+             # -In the loco list: 'video list id'
+             # -In the video list: 'sub-genre id'
+             # -In the list of genres: 'sub-genre id'
+             context_id = pathitems[2]
+-        # pylint: disable=unexpected-keyword-arg
+-        video_list = self.req_video_list_sorted(menu_data['request_context_name'],
+-                                                context_id=context_id,
+-                                                perpetual_range_start=perpetual_range_start,
+-                                                menu_data=menu_data,
+-                                                no_use_cache=menu_data.get('no_use_cache'))
++        if menu_data['path'][1] == 'recentlyAdded' and context_id:
++            video_list = self._video_list_from_lolomo_category_context(
++                'comingSoon', ('windowedNewReleases', 'newThisWeek', 'newOnNetflix', 'newOnNetflixThisWeek'),
++                fallback_first=True)
++            self._filter_unavailable_videos(video_list)
++        else:
++            # pylint: disable=unexpected-keyword-arg
++            video_list = self.req_video_list_sorted(menu_data['request_context_name'],
++                                                    context_id=context_id,
++                                                    perpetual_range_start=perpetual_range_start,
++                                                    menu_data=menu_data,
++                                                    no_use_cache=menu_data.get('no_use_cache'))
++        self._enrich_video_list_art(video_list)
+         return build_video_listing(video_list, menu_data, sub_genre_id, pathitems, perpetual_range_start,
+                                    self.req_mylist_items())
+ 
++    def _enrich_video_list_art(self, video_list, include_refs=False):
++        if not getattr(video_list, 'videos', None):
++            return video_list
++        for video in video_list.videos.values():
++            if not isinstance(video, dict):
++                continue
++            needs_art = self._needs_metadata_boxart(video)
++            needs_refs = include_refs and not _has_reference_entries(video, 'cast')
++            needs_year = not common.get_path_safe(['releaseYear', 'value'], video)
++            if not needs_art and not needs_refs and not needs_year:
++                continue
++            try:
++                videoid = VideoId.from_videolist_item(video)
++            except Exception:  # pylint: disable=broad-except
++                continue
++            if videoid.mediatype not in (VideoId.MOVIE, VideoId.SHOW):
++                continue
++            try:
++                metadata = self.nfsession._metadata(videoid)  # pylint: disable=protected-access
++            except Exception as exc:  # pylint: disable=broad-except
++                LOG.debug('Metadata enrichment skipped for {}: {}', videoid, exc)
++                continue
++            if needs_year and not _metadata_year(metadata):
++                metadata = metadata_with_title_page_fallback(videoid.value, metadata)
++            if needs_art:
++                self._apply_metadata_art(video, metadata)
++            if needs_year:
++                release_year = _metadata_year(metadata)
++                if release_year:
++                    video['releaseYear'] = {'value': release_year}
++            if needs_refs:
++                metadata = metadata_with_title_page_fallback(videoid.value, metadata)
++                normalize_metadata_references(video_list.data, videoid.value, metadata, video)
++        video_list.artitem = next(iter(video_list.videos.values()), None)
++        return video_list
++
++    @staticmethod
++    def _needs_metadata_boxart(video):
++        poster = common.get_path_safe(['boxarts', ART_SIZE_POSTER, 'jpg', 'value', 'url'], video)
++        fallback = common.get_path_safe(['itemSummary', 'value', 'boxArt', 'url'], video)
++        return not poster and not fallback
++
++    @staticmethod
++    def _apply_metadata_art(video, metadata):
++        boxart = DirectoryBuilder._best_metadata_art(metadata, ('boxart', 'boxArt'), portrait=True)
++        if boxart:
++            video.setdefault('boxarts', {})[ART_SIZE_POSTER] = {'jpg': {'value': {'url': boxart}}}
++        wide_art = DirectoryBuilder._best_metadata_art(metadata, ('artwork', 'interestingMoment'), portrait=False)
++        if wide_art:
++            video.setdefault('interestingMoment', {})[ART_SIZE_FHD] = {'jpg': {'value': {'url': wide_art}}}
++
++    @staticmethod
++    def _best_metadata_art(metadata, keys, portrait):
++        candidates = []
++        for key in keys:
++            value = metadata.get(key) if isinstance(metadata, dict) else None
++            items = value if isinstance(value, list) else [value]
++            for item in items:
++                if not isinstance(item, dict):
++                    continue
++                url = item.get('url')
++                width = item.get('w') or item.get('width') or 0
++                height = item.get('h') or item.get('height') or 0
++                if not url or not width or not height:
++                    continue
++                if portrait and height <= width:
++                    continue
++                if not portrait and width <= height:
++                    continue
++                candidates.append((width * height, url))
++        return max(candidates)[1] if candidates else ''
++
++    def _filter_unavailable_videos(self, video_list):
++        videos_type = type(video_list.videos)
++        playable_videos = videos_type(
++            (video_id, video)
++            for video_id, video in video_list.videos.items()
++            if video.get('availability', {}).get('value', {}).get('isPlayable', False))
++        if len(playable_videos) == len(video_list.videos):
++            return video_list
++        video_list.videos = playable_videos
++        video_list.artitem = next(iter(playable_videos.values()), None)
++        video_list.contained_titles = [
++            video.get('title', {}).get('value')
++            for video in playable_videos.values()
++            if video.get('title', {}).get('value')]
++        return video_list
++
++    def _video_list_from_lolomo_category_context(self, category_name, contexts, fallback_first=False):
++        if isinstance(contexts, str):
++            contexts = (contexts,)
++        first_list_id = None
++        for list_id, summary, video_list in self.req_lolomo_category(category_name).lists():
++            if not first_list_id and video_list.videos:
++                first_list_id = list_id
++            if summary.get('context') in contexts:
++                return self._browser_lolomo_video_list_by_id(category_name, list_id)
++        if fallback_first and first_list_id:
++            return self._browser_lolomo_video_list_by_id(category_name, first_list_id)
++        raise InvalidVideoListTypeError(f'No LoLoMo category list with context {contexts} available')
++
++    def _video_list_from_genre_context(self, genre_id, contexts):
++        if isinstance(contexts, str):
++            contexts = (contexts,)
++        try:
++            loco_list = self.req_loco_list_genre(genre_id)
++            for list_id, video_list in loco_list.lists.items():
++                if video_list.get('context') in contexts:
++                    try:
++                        return self._browser_genre_video_list_by_id(genre_id, list_id)
++                    except Exception as exc:  # pylint: disable=broad-except
++                        LOG.warn('Using materialized genre row {} after list lookup failed: {}', list_id, exc)
++                        return video_list
++        except Exception as exc:
++            LOG.warn('Continue Watching genre fallback failed: {}', exc)
++        return CustomVideoList({'videos': {}})
++
+     @measure_exec_time_decorator(is_immediate=True)
+     def get_video_list_sorted_sp(self, pathitems, menu_data, context_name, context_id, perpetual_range_start):
+         # Method used for the menu search
+@@ -131,6 +274,7 @@ class DirectoryBuilder(DirectoryPathRequests):
+     @measure_exec_time_decorator(is_immediate=True)
+     def get_video_list_search(self, pathitems, menu_data, search_term, perpetual_range_start, path_params=None):
+         video_list = self.req_video_list_search(search_term, perpetual_range_start=perpetual_range_start)
++        self._enrich_video_list_art(video_list)
+         return build_video_listing(video_list, menu_data,
+                                    pathitems=pathitems, mylist_items=self.req_mylist_items(), path_params=path_params)
+ 
+@@ -139,6 +283,12 @@ class DirectoryBuilder(DirectoryPathRequests):
+         if genre_id:
+             # Load the LoCo list of the specified genre
+             loco_list = self.req_loco_list_genre(genre_id)
++            if menu_data['path'][1] in ('tvshows', 'movies'):
++                menu_data = dict(menu_data)
++                menu_data['loco_contexts'] = None
++                force_use_videolist_id = True
++        elif menu_data['path'][1] == 'recommendations':
++            return build_lolomo_category_listing(self.req_lolomo_category('comingSoon'), menu_data)
+         else:
+             # Load the LoCo root list filtered by 'loco_contexts' specified in the menu_data
+             loco_list = self.req_loco_list_root()
+@@ -178,6 +328,11 @@ class DirectoryBuilder(DirectoryPathRequests):
+         :param video_id: videoid as [string] value
+         :return: a tuple ([bool] true if videoid exists, [string] the current list id, that depends from loco id)
+         """
+-        list_id = self.get_loco_list_id_by_context('continueWatching')
+-        video_list = self.req_video_list(list_id).videos if video_id else []
++        try:
++            list_id = self.get_loco_list_id_by_context('continueWatching')
++            video_list = self.req_video_list(list_id).videos if video_id else []
++        except Exception:
++            current_list = self._video_list_from_genre_context('1592210', ('continueWatching',))
++            list_id = current_list.videoid.value if getattr(current_list, 'videoid', None) else None
++            video_list = current_list.videos if video_id else []
+         return video_id in video_list, list_id
+diff --git a/resources/lib/services/nfsession/directorybuilder/dir_builder_items.py b/resources/lib/services/nfsession/directorybuilder/dir_builder_items.py
+index 0ef5c52..18b77cc 100644
+--- a/resources/lib/services/nfsession/directorybuilder/dir_builder_items.py
++++ b/resources/lib/services/nfsession/directorybuilder/dir_builder_items.py
+@@ -50,12 +50,23 @@ def build_mainmenu_listing(loco_list):
+             continue
+         if data['loco_known']:
+             list_id, video_list = loco_list.find_by_context(data['loco_contexts'][0])
+-            if not list_id:
++            if list_id:
++                menu_title = video_list['displayName']
++                directory_item = _create_videolist_item(list_id, video_list, data, common_data, static_lists=True)
++                directory_item[1].addContextMenuItems(generate_context_menu_mainmenu(menu_id))
++                directory_items.append(directory_item)
++            elif data.get('label_id'):
++                menu_title = common.get_local_string(data['label_id'])
++                menu_description = (common.get_local_string(data['description_id'])
++                                    if data.get('description_id') is not None
++                                    else '')
++                list_item = ListItemW(label=menu_title)
++                list_item.setArt({'icon': data.get('icon', 'DefaultFolder.png')})
++                list_item.setInfo('video', {'Plot': menu_description})
++                list_item.addContextMenuItems(generate_context_menu_mainmenu(menu_id))
++                directory_items.append((common.build_url(data['path'], mode=G.MODE_DIRECTORY), list_item, True))
++            else:
+                 continue
+-            menu_title = video_list['displayName']
+-            directory_item = _create_videolist_item(list_id, video_list, data, common_data, static_lists=True)
+-            directory_item[1].addContextMenuItems(generate_context_menu_mainmenu(menu_id))
+-            directory_items.append(directory_item)
+         else:
+             menu_title = common.get_local_string(data['label_id']) if data.get('label_id') else 'Missing menu title'
+             menu_description = (common.get_local_string(data['description_id'])
+@@ -262,7 +273,8 @@ def build_video_listing(video_list, menu_data, sub_genre_id=None, pathitems=None
+         'active_profile_guid': G.LOCAL_DB.get_active_profile_guid(),
+         'marks_tvshow_started': G.ADDON.getSettingBool('marks_tvshow_started'),
+         'trackid': trackid,
+-        'is_supplemental_type': video_list.__class__.__name__ == 'VideoListSupplemental'
++        'is_supplemental_type': (getattr(video_list, 'is_supplemental_type', False) or
++                                 video_list.__class__.__name__ == 'VideoListSupplemental')
+     })
+     directory_items = [_create_video_item(videoid_value, video, video_list, perpetual_range_start, common_data)
+                        for videoid_value, video
+diff --git a/resources/lib/services/nfsession/directorybuilder/dir_path_requests.py b/resources/lib/services/nfsession/directorybuilder/dir_path_requests.py
+index 628cb07..8d3c732 100644
+--- a/resources/lib/services/nfsession/directorybuilder/dir_path_requests.py
++++ b/resources/lib/services/nfsession/directorybuilder/dir_path_requests.py
+@@ -8,20 +8,797 @@
+     See LICENSES/MIT.md for more information.
+ """
+ from typing import TYPE_CHECKING
++from collections import OrderedDict
++from types import SimpleNamespace
++import json
++import re
++import time
++import uuid
++from urllib.parse import urlencode
++
++import requests
++import requests.exceptions as req_exceptions
+ 
+ from resources.lib import common
++from resources.lib.utils import website
+ from resources.lib.utils.data_types import (VideoListSorted, SubgenreList, SeasonList, EpisodeList, LoCo, VideoList,
+                                             SearchVideoList, CustomVideoList, LoLoMoCategory, VideoListSupplemental,
+                                             VideosList)
+-from resources.lib.common.exceptions import InvalidVideoListTypeError, InvalidVideoId
++from resources.lib.common.exceptions import (InvalidVideoListTypeError, InvalidVideoId, MetadataNotAvailable,
++                                             WebsiteParsingError)
++from resources.lib.database.db_utils import TABLE_SESSION
+ from resources.lib.utils.api_paths import (VIDEO_LIST_PARTIAL_PATHS, RANGE_PLACEHOLDER, VIDEO_LIST_BASIC_PARTIAL_PATHS,
+                                            SEASONS_PARTIAL_PATHS, EPISODES_PARTIAL_PATHS, ART_PARTIAL_PATHS,
+-                                           TRAILER_PARTIAL_PATHS, PATH_REQUEST_SIZE_STD, build_paths,
++                                           ART_SIZE_FHD, ART_SIZE_POSTER, TRAILER_PARTIAL_PATHS,
++                                           PATH_REQUEST_SIZE_STD, build_paths,
+                                            PATH_REQUEST_SIZE_MAX)
+ from resources.lib.common import cache_utils
+ from resources.lib.globals import G
+ from resources.lib.utils.logging import LOG
+ 
++GRAPHQL_URL = 'https://web.prod.cloud.netflix.com/graphql'
++GRAPHQL_OP_SEASONS = 'dbc3b274-d4f9-4811-aaf1-d082d3b936f2'
++GRAPHQL_OP_EPISODES = '27b30e4e-871d-46aa-ac8b-244103d2e37d'
++GRAPHQL_OP_SEARCH = '8d902979-56f2-4886-8c16-f8910f6b52ee'
++NETFLIX_TITLE_URL = 'https://www.netflix.com/title/{}'
++TITLE_PAGE_GRAPHQL_RE = re.compile(r"netflix\.reactContext\.models\.graphql\s*=\s*JSON\.parse\('(.*?)'\);", re.DOTALL)
++TITLE_PAGE_JSONLD_RE = re.compile(
++    r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>', re.DOTALL)
++LOCO_ROOT_ID_RE = re.compile(r'NES_[A-Za-z0-9_]+_p_\d+')
++LOCO_ROOT_CANDIDATE_RE = re.compile(r'NES_[A-Za-z0-9_]+')
++LOCO_ROW_RANGE = {'from': 0, 'to': 50}
++LOCO_PAGE_RANGE = {'from': 0, 'to': 20}
++LOCO_REFERENCE_FIELDS = [
++    'availability', 'episodeCount', 'inRemindMeList', 'queue', 'summary',
++    'title', 'synopsis', 'runtime', 'seasonCount', 'bookmarkPosition',
++    'creditsOffset', 'watched', 'delivery', 'trackIds', 'userRating',
++    'maturity', 'releaseYear'
++]
++LOCO_CATEGORY_CONTEXTS = {
++    'comingSoon': ('newThisWeek', 'popularTitles', 'mostWatched', 'trendingNow'),
++    'recommendations': ('similars', 'becauseYouAdded', 'becauseYouLiked', 'watchAgain', 'bigRow',
++                        'topTen', 'trendingNow', 'popularTitles')
++}
++SORTED_LIST_CONTEXT_FALLBACKS = {
++    ('genres', '1592210'): 'newThisWeek'
++}
++BROWSER_LOCO_ROW_KEYS = [0, 1, 2, 3, 'continueWatching']
++BROWSER_LOCO_OTHER_ROW_KEYS = [1, 2, 3, 'continueWatching']
++BROWSER_LOCO_SUMMARY_FIELDS = [
++    'availability', 'bbSupplementalMessage', 'bbSupplementalMessageIcon',
++    'maturity', 'mostWatchedData', 'summary'
++]
++BROWSER_LOCO_CURRENT_FIELDS = ['hasAudioDescription', 'summary']
++BROWSER_LOCO_CONTINUE_FIELDS = ['bookmarkPosition', 'runtime', 'summary', 'title']
++BROWSER_LOCO_REFERENCE_FIELDS = ['availability', 'episodeCount', 'inRemindMeList', 'queue', 'summary']
++BROWSER_LOCO_METADATA_FIELDS = BROWSER_LOCO_REFERENCE_FIELDS + [
++    'title', 'synopsis', 'runtime', 'seasonCount', 'bookmarkPosition',
++    'creditsOffset', 'watched', 'delivery', 'trackIds', 'userRating',
++    'maturity', 'releaseYear', 'promoVideo'
++]
++BROWSER_LOCO_PERSON_FIELDS = ['genres', 'tags', 'creators', 'directors', 'cast']
++BROWSER_GENRE_SUBGENRE_FIELDS = ['id', 'name', 'unifiedEntityId']
++BROWSER_LOCO_DIRECT_RANGE = {'from': 0, 'to': PATH_REQUEST_SIZE_MAX}
++BROWSER_LOCO_HOME_ROW_RANGE = {'from': 4, 'to': 50}
++BROWSER_LOCO_HOME_VISIBLE_RANGE = {'from': 0, 'to': 8}
++BROWSER_LOCO_CONTINUE_LAZY_RANGE = {'from': 8, 'to': 100}
++SEARCH_GRAPHQL_PAGE_SIZE = 48
++METADATA_REFERENCE_KEYS = {
++    'cast': ('people', ('cast', 'actors', 'actor', 'starring', 'starringActors')),
++    'directors': ('people', ('directors', 'director')),
++    'creators': ('people', ('creators', 'creator', 'writers', 'writer')),
++    'genres': ('genres', ('genres', 'genre', 'tags'))
++}
++
++
++def _value(value):
++    return {'value': value}
++
++
++def _has_reference_entries(item, source):
++    refs = item.get(source, {}) if isinstance(item, dict) else {}
++    if not isinstance(refs, dict):
++        return False
++    return any(common.is_numeric(key) for key in refs)
++
++
++def _metadata_names_from_value(value):
++    if not value:
++        return []
++    if isinstance(value, str):
++        return [name.strip() for name in value.split(',') if name.strip()]
++    if isinstance(value, list):
++        names = []
++        for item in value:
++            names.extend(_metadata_names_from_value(item))
++        return names
++    if not isinstance(value, dict):
++        return []
++    for key in ('name', 'fullName', 'displayName', 'title'):
++        name = value.get(key)
++        if isinstance(name, str) and name.strip():
++            return [name.strip()]
++        if isinstance(name, dict):
++            nested_names = _metadata_names_from_value(name.get('value') or name)
++            if nested_names:
++                return nested_names
++    for key in ('value', 'person', 'node'):
++        nested_names = _metadata_names_from_value(value.get(key))
++        if nested_names:
++            return nested_names
++    if 'edges' in value:
++        return _metadata_names_from_value(value.get('edges'))
++    if all(common.is_numeric(key) for key in value):
++        names = []
++        for item in value.values():
++            names.extend(_metadata_names_from_value(item))
++        return names
++    return []
++
++
++def _metadata_names(metadata, keys):
++    names = []
++    for key in keys:
++        names.extend(_metadata_names_from_value(metadata.get(key)))
++    unique_names = []
++    seen = set()
++    for name in names:
++        normalized = name.strip()
++        if not normalized or normalized.lower() in seen:
++            continue
++        seen.add(normalized.lower())
++        unique_names.append(normalized)
++    return unique_names
++
++
++def _metadata_has_reference_names(metadata):
++    if not isinstance(metadata, dict):
++        return False
++    for _source, (_target, keys) in METADATA_REFERENCE_KEYS.items():
++        if _metadata_names(metadata, keys):
++            return True
++    return False
++
++
++def _metadata_has_trailer(metadata):
++    return bool(_metadata_trailer_id(metadata) or _metadata_trailer_url(metadata))
++
++
++def _metadata_year(metadata):
++    if not isinstance(metadata, dict):
++        return 0
++    value = (metadata.get('year') or metadata.get('releaseYear') or
++             metadata.get('dateCreated') or metadata.get('datePublished'))
++    if isinstance(value, int):
++        return value
++    match = re.search(r'\b(18|19|20|21)\d{2}\b', str(value or ''))
++    return int(match.group(0)) if match else 0
++
++
++def _title_page_jsonld_data(content):
++    from html import unescape
++    html_text = content.decode('utf-8', 'replace') if isinstance(content, bytes) else str(content)
++    for match in TITLE_PAGE_JSONLD_RE.finditer(html_text):
++        try:
++            jsonld_data = json.loads(unescape(match.group(1)))
++        except (TypeError, ValueError) as exc:
++            LOG.debug('Unable to parse title page JSON-LD ({})', type(exc).__name__)
++            continue
++        candidates = jsonld_data if isinstance(jsonld_data, list) else [jsonld_data]
++        for candidate in candidates:
++            if not isinstance(candidate, dict):
++                continue
++            if candidate.get('@type') in ('Movie', 'TVSeries') or candidate.get('actors') or candidate.get('creators'):
++                return candidate
++    return {}
++
++
++def _metadata_from_title_page(video_id):
++    try:
++        response = requests.get(
++            NETFLIX_TITLE_URL.format(video_id),
++            headers={
++                'Accept': 'text/html,application/xhtml+xml,application/xml',
++                'User-Agent': common.get_user_agent(enable_android_mediaflag_fix=True)
++            },
++            timeout=8)
++        response.raise_for_status()
++    except req_exceptions.RequestException as exc:
++        LOG.debug('Title page metadata fallback failed for {} ({})', video_id, type(exc).__name__)
++        return {}
++    return _title_page_jsonld_data(response.content)
++
++
++def metadata_with_title_page_fallback(video_id, metadata_video=None):
++    """Return metadata enriched with public title page JSON-LD fields."""
++    metadata_video = dict(metadata_video or {})
++    if (_metadata_has_reference_names(metadata_video) and
++            _metadata_has_trailer(metadata_video) and
++            _metadata_year(metadata_video)):
++        return metadata_video
++    title_page_metadata = _metadata_from_title_page(video_id)
++    if not title_page_metadata:
++        return metadata_video
++    for key in ('actors', 'directors', 'creators', 'genre', 'trailer'):
++        if key in title_page_metadata and key not in metadata_video:
++            metadata_video[key] = title_page_metadata[key]
++    if not _metadata_year(metadata_video):
++        title_page_year = _metadata_year(title_page_metadata)
++        if title_page_year:
++            metadata_video['year'] = title_page_year
++    return metadata_video
++
++
++def _metadata_trailer_id(metadata_video):
++    promo_video = metadata_video.get('promoVideo')
++    if isinstance(promo_video, dict):
++        promo_value = promo_video.get('value') if isinstance(promo_video.get('value'), dict) else promo_video
++        trailer_id = promo_value.get('id') or promo_value.get('videoId')
++        if trailer_id:
++            return trailer_id
++    trailer_id = metadata_video.get('merchedVideoId') or metadata_video.get('promoVideoId')
++    return trailer_id
++
++
++def _metadata_trailer_url(metadata_video):
++    trailer = metadata_video.get('trailer')
++    if isinstance(trailer, dict):
++        trailer_url = trailer.get('contentUrl') or trailer.get('url')
++        if trailer_url:
++            return trailer_url
++    return metadata_video.get('trailerUrl') or metadata_video.get('previewUrl')
++
++
++def _add_metadata_trailer(item, metadata_video):
++    if item.get('promoVideo') or item.get('trailerUrl'):
++        return
++    trailer_id = _metadata_trailer_id(metadata_video)
++    if trailer_id:
++        item['promoVideo'] = _value({'id': trailer_id})
++        return
++    trailer_url = _metadata_trailer_url(metadata_video)
++    if trailer_url:
++        item['trailerUrl'] = _value(trailer_url)
++
++
++def _reference_id(prefix, name, index):
++    safe_name = re.sub(r'[^A-Za-z0-9]+', '_', name).strip('_').lower()
++    return f'{prefix}_{index}_{safe_name}' if safe_name else f'{prefix}_{index}'
++
++
++def _add_metadata_references(path_response, item, source, target, names):
++    if not names or _has_reference_entries(item, source):
++        return
++    target_data = path_response.setdefault(target, {})
++    refs = item.setdefault(source, {})
++    for index, name in enumerate(names[:10]):
++        ref_id = _reference_id(f'metadata_{source}', name, index)
++        target_data.setdefault(ref_id, {'name': _value(name)})
++        refs[str(index)] = {'$type': 'ref', 'value': [target, ref_id]}
++
++
++def normalize_metadata_references(path_response, video_id, metadata_video, item=None):
++    """Copy metadata people/genre fields into the JSON graph reference shape."""
++    if not isinstance(metadata_video, dict):
++        return
++    item = item or path_response.get('videos', {}).get(str(video_id))
++    if not isinstance(item, dict):
++        return
++    for source, (target, keys) in METADATA_REFERENCE_KEYS.items():
++        _add_metadata_references(path_response, item, source, target, _metadata_names(metadata_video, keys))
++    _add_metadata_trailer(item, metadata_video)
++
++
++def _summary(video_id, title, video_type, number=None, length=None):
++    data = {'id': int(video_id), 'type': video_type, 'name': title}
++    if number is not None:
++        data['season' if video_type == 'season' else 'episode'] = number
++        data['shortName'] = str(number)
++    if length is not None:
++        data['length'] = length
++    return _value(data)
++
++
++def _graphql_headers():
++    headers = {
++        'Accept': '*/*',
++        'Content-Type': 'application/json',
++        'Origin': 'https://www.netflix.com',
++        'Referer': 'https://www.netflix.com/browse',
++        'x-netflix.nq.stack': 'prod',
++        'x-netflix.request.client.user.guid': G.LOCAL_DB.get_active_profile_guid()
++    }
++    for header, key in (
++            ('X-Netflix.browserVersion', 'browser_info_version'),
++            ('X-Netflix.osName', 'browser_info_os_name'),
++            ('X-Netflix.osVersion', 'browser_info_os_version'),
++            ('X-Netflix.uiVersion', 'ui_version')):
++        value = G.LOCAL_DB.get_value(key, '', table=('session', ['Name', 'Value']))
++        if value:
++            headers[header] = value
++    return headers
++
++
++def _season_node_to_item(node, index):
++    season_id = str(node['videoId'])
++    title = node.get('title') or f'Season {index + 1}'
++    episodes = node.get('episodes', {}).get('totalCount')
++    return season_id, {
++        'summary': _summary(season_id, title, 'season', index + 1, episodes),
++        'title': _value(title),
++        'availability': _value({'isPlayable': True})
++    }
++
++
++def _episode_node_to_item(node, season_number, metadata=None):
++    episode_id = str(node['videoId'])
++    metadata = metadata or {}
++    synopsis = metadata.get('synopsis') or (node.get('contextualSynopsis') or {}).get('text') or ''
++    runtime = metadata.get('runtime') or node.get('runtimeSec') or node.get('displayRuntimeSec') or 0
++    bookmark = metadata.get('bookmark') or node.get('bookmark') or {}
++    bookmark_position = bookmark.get('offset') or bookmark.get('bookmarkPosition') or 0
++    credits_offset = metadata.get('creditsOffset') or metadata.get('watchedToEndOffset') or 0
++    watched_threshold = credits_offset - (runtime / 3000 * 50) if credits_offset else runtime * 0.9
++    graph_playcount = 1 if 0 < watched_threshold <= bookmark_position else 0
++    artwork = node.get('artwork') or {}
++    image_url = ''
++    if isinstance(artwork, dict):
++        image_url = artwork.get('url') or (artwork.get('image') or {}).get('url') or ''
++    return episode_id, {
++        'summary': _summary(episode_id, node.get('title') or '', 'episode', node.get('number')),
++        'title': _value(node.get('title') or ''),
++        'synopsis': _value(synopsis),
++        'regularSynopsis': _value(synopsis),
++        'runtime': _value(runtime),
++        'availability': _value({'isPlayable': bool(node.get('isPlayable', True))}),
++        'bookmarkPosition': _value(bookmark_position),
++        'creditsOffset': _value(metadata.get('creditsOffset', 0)),
++        'watchedToEndOffset': _value(metadata.get('watchedToEndOffset', 0)),
++        'watched': _value(bool(bookmark.get('watchedDate'))),
++        '_graphql_playcount': _value(graph_playcount),
++        'interestingMoment': {'_1920x1080': {'jpg': {'value': {'url': image_url}}}},
++        'season': _value(season_number)
++    }
++
++
++def _search_graphql_artwork_params():
++    return {
++        'artworkType': 'SDP',
++        'dimension': {'width': 342, 'height': 192},
++        'features': {'fallbackStrategy': 'STILL'}
++    }
++
++
++def _search_graphql_game_artwork_params(artwork_type, top_content_type_badge):
++    return {
++        'artworkType': artwork_type,
++        'dimension': {'width': 342, 'height': 192},
++        'features': {'fallbackStrategy': 'STILL', 'topContentTypeBadge': top_content_type_badge}
++    }
++
++
++def _search_graphql_options():
++    entity_treatments = {
++        'pinotStandardBoxshot': {'base': {'canHandleEntityKinds': ['VIDEO']}},
++        'pinotStandardCloudAppIcon': {'base': {'canHandleEntityKinds': ['GAME']}},
++        'pinotStandardMobileAppIcon': {'base': {'canHandleEntityKinds': ['GAME']}},
++        'pinotStandardDestination': {'base': {'canHandleEntityKinds': ['GENERIC_CONTAINER']}}
++    }
++    return {
++        'pageCapabilities': {'base': {
++            'canHandlePlayingCloudGames': False,
++            'capabilitiesBySection': {
++                'pinotGallery': {'base': {'capabilitiesBySectionTreatment': {
++                    'pinotCreatorHome': {'base': {
++                        'capabilitiesByEntityTreatment': entity_treatments,
++                        'maxTotalEntities': 300
++                    }},
++                    'pinotStandard': {'base': {
++                        'capabilitiesByEntityTreatment': entity_treatments,
++                        'maxTotalEntities': 300
++                    }}
++                }}},
++                'pinotList': {'base': {'capabilitiesBySectionTreatment': {
++                    'pinotSuggestions': {'base': {
++                        'capabilitiesByEntityTreatment': {
++                            'pinotSuggestion': {'base': {'canHandleEntityKinds': [
++                                'AUTOCOMPLETE', 'VIDEO', 'CHARACTER', 'GENERIC_CONTAINER', 'GENRE', 'PERSON'
++                            ]}}
++                        },
++                        'maxTotalEntities': 100
++                    }}
++                }}}
++            },
++            'maxTotalSections': 2
++        }},
++        'session': {'id': str(uuid.uuid4())}
++    }
++
++
++def _search_graphql_variables(search_term, end_cursor=None):
++    return {
++        'imageParamsForStandardBoxart': _search_graphql_artwork_params(),
++        'imageParamsForCloudGameBoxart': _search_graphql_game_artwork_params(
++            'GAME_CLOUD_BOXART_HORIZONTAL_INCOMPATIBLE', True),
++        'imageParamsForMobileGameBoxart': _search_graphql_game_artwork_params(
++            'GAME_ICON_BOXART_HORIZONTAL_CARD', True),
++        'pageSize': SEARCH_GRAPHQL_PAGE_SIZE,
++        'options': _search_graphql_options(),
++        'searchTerm': search_term,
++        'selectedSuggestionId': None,
++        'endCursor': end_cursor
++    }
++
++
++def _merge_search_metadata_video(base_video, metadata_video):
++    merged = dict(base_video)
++    metadata_video = metadata_video or {}
++    title = metadata_video.get('title') or merged.get('title', {}).get('value')
++    if title:
++        merged['title'] = _value(title)
++        summary = merged.get('summary', {}).get('value', {})
++        if isinstance(summary, dict):
++            summary['name'] = title
++            merged['summary'] = _value(summary)
++    synopsis = metadata_video.get('synopsis') or metadata_video.get('regularSynopsis')
++    if synopsis:
++        merged['synopsis'] = _value(synopsis)
++        merged['regularSynopsis'] = _value(synopsis)
++    runtime = metadata_video.get('runtime')
++    if runtime:
++        merged['runtime'] = _value(runtime)
++    release_year = _metadata_year(metadata_video)
++    if release_year:
++        merged['releaseYear'] = _value(release_year)
++    seasons = metadata_video.get('seasons') or []
++    if seasons:
++        merged['seasonCount'] = _value(len(seasons))
++        episode_count = sum(len(season.get('episodes') or []) for season in seasons)
++        if episode_count:
++            merged['episodeCount'] = _value(episode_count)
++    poster_url = _metadata_image_url(metadata_video, ('boxart', 'boxArt'), portrait=True)
++    if poster_url:
++        boxarts = dict(merged.get('boxarts') or {})
++        boxarts[ART_SIZE_POSTER] = {
++            'jpg': {'value': {'url': poster_url}}
++        }
++        merged['boxarts'] = boxarts
++    landscape_url = _metadata_image_url(
++        metadata_video, ('artwork', 'storyart', 'storyArt', 'stills'), portrait=False)
++    if landscape_url:
++        interesting_moments = dict(merged.get('interestingMoment') or {})
++        interesting_moments[ART_SIZE_FHD] = {
++            'jpg': {'value': {'url': landscape_url}}
++        }
++        merged['interestingMoment'] = interesting_moments
++    return merged
++
++
++def _metadata_image_url(metadata, keys, portrait):
++    candidates = []
++
++    def _collect(value):
++        if isinstance(value, str):
++            if value.startswith('http'):
++                candidates.append((value, 0, 0))
++            return
++        if isinstance(value, list):
++            for item in value:
++                _collect(item)
++            return
++        if not isinstance(value, dict):
++            return
++        url = value.get('url')
++        if isinstance(url, str) and url.startswith('http'):
++            width = value.get('w') or value.get('width') or 0
++            height = value.get('h') or value.get('height') or 0
++            candidates.append((url, width, height))
++        else:
++            for nested_value in value.values():
++                _collect(nested_value)
++
++    for key in keys:
++        _collect(metadata.get(key))
++    if not candidates:
++        return ''
++
++    def _score(candidate):
++        _url, width, height = candidate
++        matches_orientation = height > width if portrait else width >= height
++        return int(matches_orientation), width * height
++
++    return max(candidates, key=_score)[0]
++
++
++def _search_graphql_node_to_item(node):
++    entity = node.get('unifiedEntity') or {}
++    entity_type = entity.get('__typename')
++    if entity_type not in ('Movie', 'Show'):
++        return None
++    video_id = str(entity.get('videoId') or '')
++    if not video_id:
++        return None
++    video_type = 'movie' if entity_type == 'Movie' else 'show'
++    title = node.get('displayString') or str(video_id)
++    item = {
++        'summary': _summary(video_id, title, video_type),
++        'title': _value(title),
++        'availability': _value({'isPlayable': True}),
++        'queue': _value({'inQueue': False}),
++        'inRemindMeList': _value(False),
++        'bookmarkPosition': _value(0),
++        'creditsOffset': _value(0),
++        'watchedToEndOffset': _value(0),
++        'watched': _value(False),
++        'runtime': _value(entity.get('runtimeSec', 0)),
++        'releaseYear': _value(entity.get('releaseYear', 0)),
++        'maturity': _value(entity.get('contentAdvisory', {})),
++        'trackIds': _value({}),
++        'requestId': _value('')
++    }
++    artwork = (node.get('contextualArtwork') or {}).get('artwork') or {}
++    if artwork.get('url'):
++        _set_browser_boxart(item, {'id': int(video_id), 'title': title, 'boxArt': {'url': artwork['url']}})
++    return video_id, item
++
++
++
++def _graphql_cache_node(graphql_data, typename, video_id):
++    video_id = str(video_id)
++    direct_key = f'{typename}:{{"videoId":{video_id}}}'
++    node = graphql_data.get(direct_key)
++    if isinstance(node, dict):
++        return node
++    key_prefix = f'{typename}:'
++    for key, candidate in graphql_data.items():
++        if not isinstance(candidate, dict):
++            continue
++        if key.startswith(key_prefix) and str(candidate.get('videoId')) == video_id:
++            return candidate
++    return None
++
++
++def _graphql_ref_node(graphql_data, node_or_ref):
++    if not isinstance(node_or_ref, dict):
++        return None
++    ref = node_or_ref.get('__ref')
++    if ref:
++        return graphql_data.get(ref)
++    return node_or_ref
++
++
++def _iter_graphql_edges(value):
++    if isinstance(value, dict) and '__ref' in value:
++        return []
++    edges = value.get('edges') if isinstance(value, dict) else value
++    if isinstance(edges, dict):
++        return edges.values()
++    if isinstance(edges, list):
++        return edges
++    return []
++
++
++def _first_artwork_url(value):
++    if isinstance(value, dict):
++        url = value.get('url')
++        if isinstance(url, str) and url.startswith('http'):
++            return url
++        for nested in value.values():
++            nested_url = _first_artwork_url(nested)
++            if nested_url:
++                return nested_url
++    elif isinstance(value, list):
++        for nested in value:
++            nested_url = _first_artwork_url(nested)
++            if nested_url:
++                return nested_url
++    return ''
++
++
++def _supplemental_artwork_url(node):
++    for key, value in node.items():
++        if 'artwork' not in key.lower():
++            continue
++        image_url = _first_artwork_url(value)
++        if image_url:
++            return image_url
++    return ''
++
++
++def _supplemental_node_to_item(node):
++    video_id = str(node.get('videoId') or node.get('id') or '')
++    if not video_id:
++        return None
++    title = node.get('title') or node.get('displayName') or video_id
++    item = {
++        'summary': _summary(video_id, title, 'movie'),
++        'title': _value(title),
++        'availability': _value({'isPlayable': True}),
++        'queue': _value({'inQueue': False}),
++        'inRemindMeList': _value(False),
++        'bookmarkPosition': _value(0),
++        'creditsOffset': _value(0),
++        'watchedToEndOffset': _value(0),
++        'watched': _value(False),
++        'runtime': _value(node.get('runtimeSec') or node.get('runtime') or 0),
++        'trackIds': _value({'trackId': video_id}),
++        'requestId': _value('')
++    }
++    synopsis = node.get('synopsis') or node.get('contextualSynopsis') or ''
++    if isinstance(synopsis, dict):
++        synopsis = synopsis.get('text') or synopsis.get('value') or ''
++    if synopsis:
++        item['synopsis'] = _value(synopsis)
++        item['regularSynopsis'] = _value(synopsis)
++    image_url = _supplemental_artwork_url(node)
++    if image_url:
++        _set_browser_boxart(item, {'id': int(video_id), 'title': title, 'boxArt': {'url': image_url}})
++    return video_id, item
++
++
++def _supplemental_videos_from_graphql_cache(graphql_data, video_id):
++    if not isinstance(graphql_data, dict):
++        return OrderedDict()
++    title_node = (_graphql_cache_node(graphql_data, 'Show', video_id) or
++                  _graphql_cache_node(graphql_data, 'Movie', video_id))
++    if not isinstance(title_node, dict):
++        return OrderedDict()
++    supplemental_list = title_node.get('supplementalVideosList') or {}
++    supplemental_list = _graphql_ref_node(graphql_data, supplemental_list) or supplemental_list
++    videos = OrderedDict()
++    for edge in _iter_graphql_edges(supplemental_list):
++        edge_node = edge.get('node') if isinstance(edge, dict) else edge
++        supplemental_node = _graphql_ref_node(graphql_data, edge_node)
++        if not isinstance(supplemental_node, dict):
++            continue
++        item = _supplemental_node_to_item(supplemental_node)
++        if item:
++            videos[item[0]] = item[1]
++    return videos
++
++
++def _title_page_graphql_data(content, react_context):
++    graphql_data = common.get_path_safe(['models', 'graphql', 'data'], react_context, False, {})
++    if isinstance(graphql_data, dict) and graphql_data:
++        return graphql_data
++    html = content.decode('utf-8', 'replace') if isinstance(content, bytes) else str(content)
++    match = TITLE_PAGE_GRAPHQL_RE.search(html)
++    if not match:
++        return {}
++    try:
++        graphql_cache = json.loads(match.group(1).encode().decode('unicode_escape'))
++    except (TypeError, ValueError, UnicodeDecodeError) as exc:
++        LOG.warn('Unable to parse title page GraphQL cache ({})', type(exc).__name__)
++        return {}
++    graphql_data = graphql_cache.get('data') if isinstance(graphql_cache, dict) else None
++    return graphql_data if isinstance(graphql_data, dict) else {}
++
++def _normalize_browser_list_lengths(path_response):
++    for list_data in path_response.get('lists', {}).values():
++        if not isinstance(list_data, dict):
++            continue
++        length = list_data.get('componentSummary', {}).get('value', {}).get('length')
++        if not isinstance(length, int):
++            continue
++        for key in list(list_data.keys()):
++            if common.is_numeric(key) and int(key) >= length:
++                del list_data[key]
++
++
++def _browser_reference_paths(reference_path, include_metadata=False):
++    fields = BROWSER_LOCO_METADATA_FIELDS if include_metadata else BROWSER_LOCO_REFERENCE_FIELDS
++    paths = [reference_path + [fields]]
++    if include_metadata:
++        paths.append(reference_path + [BROWSER_LOCO_PERSON_FIELDS, {'from': 0, 'to': 10}, ['id', 'name']])
++    return paths
++
++
++def _set_browser_boxart(video, item_summary):
++    boxart = item_summary.get('boxArt') or {}
++    image_url = boxart.get('url')
++    video.setdefault('itemSummary', _value(item_summary))
++    if not image_url:
++        return
++    art_value = {'url': image_url}
++    video.setdefault('boxarts', {})
++    video['boxarts'].setdefault(ART_SIZE_POSTER, {'jpg': {'value': art_value}})
++
++
++def _browser_item_summary_score(item_summary):
++    synopses = item_summary.get('synopses') or {}
++    synopsis = (synopses.get('regularSynopsis') or synopses.get('shortSynopsis') or
++                synopses.get('narrative'))
++    return bool(synopsis), len(synopsis or ''), len(item_summary)
++
++
++def _normalize_browser_video_fields(path_response):
++    _normalize_browser_list_lengths(path_response)
++    item_summaries = {}
++    for list_data in path_response.get('lists', {}).values():
++        if not isinstance(list_data, dict):
++            continue
++        for item in list_data.values():
++            if not isinstance(item, dict):
++                continue
++            item_summary = item.get('itemSummary', {}).get('value', {})
++            ref = item.get('reference', {})
++            ref_value = ref.get('value') if isinstance(ref, dict) else ref
++            if isinstance(ref_value, dict) and 'value' in ref_value:
++                ref_value = ref_value['value']
++            if isinstance(ref_value, list) and len(ref_value) >= 2 and ref_value[0] == 'videos':
++                video_id = str(ref_value[1])
++                current_summary = item_summaries.get(video_id, {})
++                if _browser_item_summary_score(item_summary) > _browser_item_summary_score(current_summary):
++                    item_summaries[video_id] = item_summary
++    for video_id, video in path_response.get('videos', {}).items():
++        if not isinstance(video, dict):
++            continue
++        item_summary = item_summaries.get(str(video_id), {})
++        if item_summary:
++            video.setdefault('itemSummary', _value(item_summary))
++            _set_browser_boxart(video, item_summary)
++        current = video.get('current', {})
++        if isinstance(current, dict):
++            for key in BROWSER_LOCO_CONTINUE_FIELDS:
++                if key in current and key not in video:
++                    video[key] = current[key]
++        summary = video.get('summary', {}).get('value', {})
++        if not isinstance(summary, dict):
++            summary = {}
++        title_data = video.get('title')
++        title_value = title_data.get('value') if isinstance(title_data, dict) else title_data
++        if not title_value:
++            nested_title = summary.get('title')
++            if isinstance(nested_title, dict):
++                title_value = nested_title.get('value')
++            elif nested_title:
++                title_value = nested_title
++            else:
++                title_value = (item_summary.get('title') or item_summary.get('name') or
++                               item_summary.get('displayName') or summary.get('name') or str(video_id))
++            video['title'] = _value(title_value)
++        if title_value and isinstance(summary, dict):
++            summary.setdefault('name', title_value)
++        synopses = item_summary.get('synopses') or {}
++        synopsis = synopses.get('regularSynopsis') or synopses.get('shortSynopsis') or synopses.get('narrative')
++        if synopsis:
++            video.setdefault('synopsis', _value(synopsis))
++            video.setdefault('regularSynopsis', _value(synopsis))
++        video.setdefault('availability', _value(item_summary.get('availability', {'isPlayable': True})))
++        video.setdefault('queue', _value({'inQueue': False}))
++        video.setdefault('inRemindMeList', _value(False))
++        video.setdefault('bookmarkPosition', _value(0))
++        video.setdefault('creditsOffset', _value(0))
++        video.setdefault('watchedToEndOffset', _value(0))
++        video.setdefault('watched', _value(False))
++        video.setdefault('runtime', _value(summary.get('runtime', item_summary.get('runtime', item_summary.get('infoDensityRuntime', 0)))))
++        video.setdefault('releaseYear', _value(item_summary.get('releaseYear', 0)))
++        video.setdefault('seasonCount', _value(item_summary.get('seasonCount', 0)))
++        video.setdefault('episodeCount', _value(item_summary.get('episodeCount', 0)))
++        video.setdefault('maturity', _value(item_summary.get('maturity', {})))
++        video.setdefault('trackIds', _value({}))
++        video.setdefault('requestId', _value(item_summary.get('requestId', '')))
++
++
++def _browser_list_video_ids(path_response, list_id):
++    video_ids = []
++    list_data = path_response.get('lists', {}).get(str(list_id), {})
++    for key, item in list_data.items():
++        if not common.is_numeric(key) or not isinstance(item, dict):
++            continue
++        ref = item.get('reference', {})
++        ref_value = ref.get('value') if isinstance(ref, dict) else ref
++        if isinstance(ref_value, dict) and 'value' in ref_value:
++            ref_value = ref_value['value']
++        video_id = None
++        if isinstance(ref_value, list) and len(ref_value) >= 2 and ref_value[0] == 'videos':
++            video_id = ref_value[1]
++        if video_id is None:
++            video_id = item.get('itemSummary', {}).get('value', {}).get('videoId')
++        if video_id is not None and str(video_id) not in video_ids:
++            video_ids.append(str(video_id))
++    return video_ids
++
+ if TYPE_CHECKING:  # This variable/imports are used only by the editor, so not at runtime
+     from resources.lib.services.nfsession.nfsession_ops import NFSessionOperations
+ 
+@@ -37,16 +814,17 @@ class DirectoryPathRequests:
+         """Return the 'my list' video list as videoid items"""
+         LOG.debug('Requesting "my list" video list as videoid items')
+         try:
+-            items = []
+-            video_list = self.req_datatype_video_list_full(G.MAIN_MENU_ITEMS['myList']['request_context_name'])
++            video_list = self._browser_mylist_video_list()
+             if video_list:
+-                # pylint: disable=unused-variable
+-                items = [common.VideoId.from_videolist_item(video)
+-                         for video_id, video in video_list.videos.items()
+-                         if video['queue']['value'].get('inQueue', False)]
+-            return items
++                return [common.VideoId.from_videolist_item(video)
++                        for video in video_list.videos.values()]
+         except InvalidVideoListTypeError:
+             return []
++        except req_exceptions.HTTPError as exc:
++            if getattr(exc.response, 'status_code', None) != 404:
++                raise
++            LOG.warn('My List marker lookup disabled because pathEvaluator returned 404')
++        return []
+ 
+     @cache_utils.cache_output(cache_utils.CACHE_COMMON, fixed_identifier='loco_list', ignore_self_class=True)
+     def req_loco_list_root(self):
+@@ -63,26 +841,20 @@ class DirectoryPathRequests:
+                  # Art for the first video of each context list (needed only to add art to the menu item)
+                  build_paths(['loco', {'from': 0, 'to': 50}, 0, 'reference'], ART_PARTIAL_PATHS))
+         call_args = {'paths': paths}
+-        path_response = self.nfsession.path_request(**call_args)
++        try:
++            path_response = self.nfsession.path_request(**call_args)
++        except req_exceptions.HTTPError as exc:
++            if exc.response is None or exc.response.status_code != 404:
++                raise
++            LOG.warn('Falling back to empty LoCo root menu after pathEvaluator 404')
++            path_response = {'locos': {'root': {'componentSummary': _value({'length': 0})}}, 'lists': {}}
+         return LoCo(path_response)
+ 
+     @cache_utils.cache_output(cache_utils.CACHE_GENRES, identify_from_kwarg_name='genre_id', ignore_self_class=True)
+     def req_loco_list_genre(self, genre_id):
+         """Retrieve LoCo for the given genre"""
+         LOG.debug('Requesting LoCo for genre {}', genre_id)
+-        paths = ([['genres', genre_id, 'name'],
+-                  ['genres', genre_id, 'rw', 'componentSummary'],
+-                  ['genres', genre_id, 'rw', {'from': 0, 'to': 48}, 'componentSummary'],
+-                  # Titles of first 4 videos in each video list (needed only to show titles in the plot description)
+-                  ['genres', genre_id, 'rw',
+-                   {'from': 0, 'to': 48}, {'from': 0, 'to': 3}, 'reference', ['title', 'summary']]] +
+-                 # Art for the first video of each context list (needed only to add art to the menu item)
+-                 build_paths(['genres', genre_id, 'rw', {'from': 0, 'to': 48}, 0, 'reference'], ART_PARTIAL_PATHS) +
+-                 # IDs and names of sub-genres
+-                 [['genres', genre_id, 'subgenres', {'from': 0, 'to': 30}, ['id', 'name']]])
+-        call_args = {'paths': paths}
+-        path_response = self.nfsession.path_request(**call_args)
+-        return LoCo(path_response)
++        return self._req_browser_genre_loco(genre_id)
+ 
+     def get_loco_list_id_by_context(self, context):
+         """Return the dynamic video list ID for a LoCo context"""
+@@ -119,8 +891,14 @@ class DirectoryPathRequests:
+             'length_params': ['stdlist_wid', ['videos', videoid.tvshowid, 'seasonList']],
+             'perpetual_range_start': perpetual_range_start
+         }
+-        path_response = self.nfsession.perpetual_path_request(**call_args)
+-        return SeasonList(videoid, path_response)
++        try:
++            path_response = self.nfsession.perpetual_path_request(**call_args)
++            return SeasonList(videoid, path_response)
++        except req_exceptions.HTTPError as exc:
++            if getattr(exc.response, 'status_code', None) != 404:
++                raise
++            LOG.warn('Falling back to GraphQL season selector for show {}', videoid.tvshowid)
++            return self._req_seasons_graphql(videoid)
+ 
+     @cache_utils.cache_output(cache_utils.CACHE_COMMON, identify_from_kwarg_name='videoid',
+                               identify_append_from_kwarg_name='perpetual_range_start', ignore_self_class=True)
+@@ -138,12 +916,613 @@ class DirectoryPathRequests:
+             'length_params': ['stdlist_wid', ['seasons', videoid.seasonid, 'episodes']],
+             'perpetual_range_start': perpetual_range_start
+         }
+-        path_response = self.nfsession.perpetual_path_request(**call_args)
+-        return EpisodeList(videoid, path_response)
++        try:
++            path_response = self.nfsession.perpetual_path_request(**call_args)
++            return EpisodeList(videoid, path_response)
++        except req_exceptions.HTTPError as exc:
++            if getattr(exc.response, 'status_code', None) != 404:
++                raise
++            LOG.warn('Falling back to GraphQL episode selector for season {}', videoid.seasonid)
++            return self._req_episodes_graphql(videoid)
++
++    def _post_graphql(self, operation_name, variables, operation_id):
++        payload = {
++            'operationName': operation_name,
++            'variables': variables,
++            'extensions': {'persistedQuery': {'id': operation_id, 'version': 102}}
++        }
++        response = self.nfsession.session.post(
++            GRAPHQL_URL,
++            json=payload,
++            headers=_graphql_headers(),
++            timeout=8)
++        response.raise_for_status()
++        return response.json()['data']
++
++    def _req_seasons_graphql(self, videoid):
++        data = self._post_graphql(
++            'PreviewModalEpisodeSelector',
++            {'showId': int(videoid.tvshowid), 'seasonCount': 50},
++            GRAPHQL_OP_SEASONS)
++        show_data = data['videos'][0]
++        edges = show_data['seasons']['edges']
++        seasons = OrderedDict(
++            _season_node_to_item(edge.get('node') or edge, index)
++            for index, edge in enumerate(edges))
++        show_title = self._metadata_show_title(videoid) or show_data.get('title') or str(videoid.tvshowid)
++        tvshow = {
++            'title': _value(show_title),
++            'delivery': _value({}),
++            'seasonList': {'summary': _value({'length': len(seasons)})}
++        }
++        return SimpleNamespace(
++            perpetual_range_selector=None,
++            data={'videos': {videoid.tvshowid: tvshow}, 'seasons': seasons},
++            videoid=videoid,
++            artitem=tvshow,
++            tvshow=tvshow,
++            seasons=seasons)
++
++    def _metadata_show_title(self, videoid):
++        try:
++            metadata_data = self.nfsession.get_safe(
++                endpoint='metadata',
++                params={'movieid': videoid.tvshowid, '_': int(time.time() * 1000)})
++            return metadata_data['video'].get('title') or ''
++        except (MetadataNotAvailable, KeyError, TypeError, req_exceptions.RequestException):
++            return ''
++
++    def _metadata_episodes_by_id(self, videoid):
++        try:
++            metadata_data = self.nfsession.get_safe(
++                endpoint='metadata',
++                params={'movieid': videoid.tvshowid, '_': int(time.time() * 1000)})
++            show_metadata = metadata_data['video']
++        except (MetadataNotAvailable, KeyError, TypeError, req_exceptions.RequestException):
++            return {}
++        episodes = {}
++        for season in show_metadata.get('seasons', []):
++            if str(season.get('id')) != videoid.seasonid:
++                continue
++            for episode in season.get('episodes', []):
++                episodes[str(episode.get('id'))] = episode
++            break
++        return episodes
++
++
++    def _req_episodes_graphql(self, videoid):
++        data = self._post_graphql(
++            'PreviewModalEpisodeSelectorSeasonEpisodes',
++            {
++                'seasonId': int(videoid.seasonid),
++                'count': 50,
++                'opaqueImageFormat': 'JPG',
++                'artworkContext': {}
++            },
++            GRAPHQL_OP_EPISODES)
++        season_data = data['videos'][0]
++        season_number = season_data.get('number')
++        edges = season_data['episodes']['edges']
++        metadata_by_id = self._metadata_episodes_by_id(videoid)
++        episodes = OrderedDict(
++            _episode_node_to_item(edge.get('node') or edge, season_number,
++                                  metadata_by_id.get(str((edge.get('node') or edge).get('videoId'))))
++            for edge in edges)
++        show_title = self._metadata_show_title(videoid) or str(videoid.tvshowid)
++        tvshow = {
++            'title': _value(show_title),
++            'delivery': _value({})
++        }
++        season = {
++            'summary': _summary(videoid.seasonid, season_data.get('title') or '', 'season', season_number, len(episodes)),
++            'title': _value(season_data.get('title') or '')
++        }
++        path_response = {'videos': {videoid.tvshowid: tvshow}, 'seasons': {videoid.seasonid: season},
++                         'episodes': episodes}
++        for episode_id, episode in episodes.items():
++            normalize_metadata_references(path_response, episode_id, metadata_by_id.get(str(episode_id)), episode)
++        return SimpleNamespace(
++            perpetual_range_selector=None,
++            data=path_response,
++            videoid=videoid,
++            tvshow=tvshow,
++            season=season,
++            episodes=episodes)
++
++    def _browse_html_and_auth_url(self):
++        browse_html = self.nfsession.get_safe('browse')
++        api_data = self.nfsession.website_extract_session_data(browse_html)
++        self.nfsession.auth_url = api_data['auth_url']
++        browse_text = browse_html.decode('utf-8', 'replace') if isinstance(browse_html, bytes) else browse_html
++        return browse_text, api_data['auth_url']
++
++    def _get_current_loco_root_id(self):
++        browse_html, auth_url = self._browse_html_and_auth_url()
++        match = LOCO_ROOT_ID_RE.search(browse_html)
++        if match:
++            return match.group(0), auth_url
++        root_id = self._probe_current_loco_root_id(self._loco_root_candidates(browse_html), auth_url)
++        if not root_id:
++            raise InvalidVideoListTypeError('No current LoCo root id found in browse page')
++        return root_id, auth_url
++
++    def _loco_root_candidates(self, browse_html):
++        seen = set()
++        for match in LOCO_ROOT_CANDIDATE_RE.finditer(browse_html):
++            candidate = match.group(0)
++            if candidate in seen:
++                continue
++            seen.add(candidate)
++            yield candidate
++
++    def _probe_current_loco_root_id(self, candidates, auth_url):
++        for candidate in candidates:
++            try:
++                path_response = self._post_current_loco_paths(
++                    [['locos', candidate, 'componentSummary']], auth_url)
++            except req_exceptions.RequestException:
++                continue
++            root_data = path_response.get('locos', {}).get(candidate)
++            if isinstance(root_data, dict) and root_data.get('componentSummary', {}).get('value'):
++                LOG.warn('Using probed current LoCo root candidate from browse page')
++                return candidate
++        return None
++
++    def _current_loco_paths(self, root_id):
++        return ([
++            ['locos', root_id, 'componentSummary'],
++            ['locos', root_id, LOCO_ROW_RANGE, 'componentSummary'],
++            ['locos', root_id, LOCO_ROW_RANGE, 'page', 0, LOCO_PAGE_RANGE, 'itemSummary'],
++            ['locos', root_id, LOCO_ROW_RANGE, 'page', 0, LOCO_PAGE_RANGE, 'reference', LOCO_REFERENCE_FIELDS]
++        ] + build_paths(
++            ['locos', root_id, LOCO_ROW_RANGE, 'page', 0, LOCO_PAGE_RANGE, 'reference'],
++            ART_PARTIAL_PATHS))
++
++    def _post_current_loco_paths(self, paths, auth_url):
++        self.nfsession.auth_url = auth_url
++        return self._post_browser_path_evaluator(paths, 'https://www.netflix.com/browse')
++
++    def _post_browser_path_evaluator_with_fallback(self, paths, fallback_paths, referer, description):
++        try:
++            return self._post_browser_path_evaluator(paths, referer)
++        except req_exceptions.HTTPError as exc:
++            status_code = getattr(exc.response, 'status_code', None)
++            if status_code not in (404, 412):
++                raise
++            LOG.warn('{} metadata fields request returned {}; retrying light fields',
++                     description, status_code)
++            return self._post_browser_path_evaluator(fallback_paths, referer)
++
++    def _post_browser_path_evaluator(self, paths, referer):
++        api_url = G.LOCAL_DB.get_value(
++            'api_endpoint_url',
++            'https://www.netflix.com/nq/website/memberapi/release',
++            table=TABLE_SESSION)
++        form_data = [('path', json.dumps(path, separators=(',', ':'))) for path in paths]
++        form_data.append(('authURL', self.nfsession.auth_url))
++        response = self.nfsession.session.post(
++            f'{api_url}/pathEvaluator',
++            params={
++                'webp': 'false',
++                'drmSystem': 'widevine',
++                'isVolatileBillboardsEnabled': 'true',
++                'isTop10Supported': 'true',
++                'hasVideoMerchInBob': 'false',
++                'hasVideoMerchInJaw': 'false',
++                'falcor_server': '0.1.0',
++                'withSize': 'true',
++                'materialize': 'true',
++                'original_path': '/shakti/mre/pathEvaluator'
++            },
++            data=urlencode(form_data),
++            headers={
++                'Accept': '*/*',
++                'Content-Type': 'application/x-www-form-urlencoded',
++                'Origin': 'https://www.netflix.com',
++                'Referer': referer,
++                'sec-fetch-dest': 'empty',
++                'sec-fetch-mode': 'cors',
++                'sec-fetch-site': 'same-origin',
++                'x-netflix.nq.stack': 'prod',
++                'x-netflix.request.client.context': 'www.netflix.com',
++                'x-netflix.request.client.user.guid': G.LOCAL_DB.get_active_profile_guid()
++            },
++            timeout=8)
++        response.raise_for_status()
++        path_response = response.json()['jsonGraph']
++        _normalize_browser_video_fields(path_response)
++        return path_response
++
++    def _browser_loco_paths(self, root_path, include_genre_paths=False, include_full_rows=False,
++                            include_metadata=False):
++        paths = [
++            root_path + [['componentSummary', 'debugRequest']],
++            root_path + [BROWSER_LOCO_ROW_KEYS, 'componentSummary'],
++            root_path + ['meta', ['responseExpiration', 'statusCode']],
++            root_path + [0, 0, 'itemSummary'],
++            root_path + [0, 0, 'reference', BROWSER_LOCO_SUMMARY_FIELDS],
++            root_path + [0, 0, 'reference', 'current', BROWSER_LOCO_CURRENT_FIELDS],
++            root_path + [0, 'page', 0, LOCO_PAGE_RANGE, 'itemSummary'],
++            root_path + [BROWSER_LOCO_OTHER_ROW_KEYS, 'page', 0, LOCO_PAGE_RANGE, 'itemSummary'],
++            root_path + ['continueWatching', 'page', 0, LOCO_PAGE_RANGE, 'reference', 'current',
++                         BROWSER_LOCO_CONTINUE_FIELDS]
++        ]
++        paths.extend(_browser_reference_paths(
++            root_path + [BROWSER_LOCO_ROW_KEYS, 'page', 0, LOCO_PAGE_RANGE, 'reference']))
++        if include_full_rows:
++            paths.append(root_path + [BROWSER_LOCO_ROW_KEYS, BROWSER_LOCO_DIRECT_RANGE, 'itemSummary'])
++            paths.extend(_browser_reference_paths(
++                root_path + [BROWSER_LOCO_ROW_KEYS, BROWSER_LOCO_DIRECT_RANGE, 'reference'],
++                include_metadata=include_metadata))
++        if include_genre_paths:
++            paths.insert(0, root_path[:-1] + [['name', 'trackIds']])
++        return paths
++
++    def _browser_video_list_paths(self, list_id, include_metadata=False):
++        paths = [
++            ['lists', list_id, ['componentSummary', 'debugRequest']],
++            ['lists', list_id, 'page', 0, LOCO_PAGE_RANGE, 'itemSummary']
++        ]
++        paths.extend(_browser_reference_paths(['lists', list_id, 'page', 0, LOCO_PAGE_RANGE, 'reference'],
++                                              include_metadata=include_metadata))
++        return paths
++
++    def _browser_video_list_full_paths(self, list_id, include_metadata=False):
++        paths = [
++            ['lists', list_id, ['componentSummary', 'debugRequest']],
++            ['lists', list_id, BROWSER_LOCO_DIRECT_RANGE, 'itemSummary']
++        ]
++        paths.extend(_browser_reference_paths(['lists', list_id, BROWSER_LOCO_DIRECT_RANGE, 'reference'],
++                                              include_metadata=include_metadata))
++        return paths
++
++    def _req_browser_lolomo_category(self, category_name):
++        self._browse_html_and_auth_url()
++        path_response = self._post_browser_path_evaluator(
++            self._browser_loco_paths(['lolomoByCategory', category_name]),
++            'https://www.netflix.com/latest')
++        return LoLoMoCategory(path_response)
++
++    def _req_browser_genre_loco(self, genre_id):
++        self._browse_html_and_auth_url()
++        path_response = self._post_browser_path_evaluator(
++            self._browser_loco_paths(['genres', int(genre_id), 'rw'], include_genre_paths=True),
++            f'https://www.netflix.com/browse/genre/{genre_id}')
++        return LoCo(path_response)
++
++    def _browser_video_list_by_id(self, list_id):
++        self._browse_html_and_auth_url()
++        path_response = self._post_browser_path_evaluator_with_fallback(
++            self._browser_video_list_paths(str(list_id), include_metadata=True),
++            self._browser_video_list_paths(str(list_id)),
++            'https://www.netflix.com/browse',
++            f'Browser list {list_id}')
++        return VideoList(path_response, str(list_id))
++
++    def _browser_mylist_loco_response(self, root_id, auth_url, row_range):
++        return self._post_current_loco_paths([
++            ['locos', root_id, 'componentSummary'],
++            ['locos', root_id, row_range, 'componentSummary']
++        ], auth_url)
++
++    def _loco_row_key_for_list(self, root_response, root_id, list_id):
++        root_data = root_response.get('locos', {}).get(root_id, {})
++        for row_key, row_data in root_data.items():
++            if row_key == 'componentSummary' or not isinstance(row_data, dict):
++                continue
++            row_ref = row_data.get('value')
++            if isinstance(row_ref, list) and len(row_ref) > 1 and str(row_ref[1]) == str(list_id):
++                return int(row_key) if str(row_key).isdigit() else row_key
++        return None
++
++    def _browser_mylist_list_info(self, root_id, auth_url):
++        for row_range in (BROWSER_LOCO_HOME_VISIBLE_RANGE, BROWSER_LOCO_HOME_ROW_RANGE, LOCO_ROW_RANGE):
++            try:
++                root_response = self._browser_mylist_loco_response(root_id, auth_url, row_range)
++            except req_exceptions.HTTPError as exc:
++                if getattr(exc.response, 'status_code', None) not in (404, 412):
++                    raise
++                LOG.warn('My List queue lookup range {} returned {}; trying another range',
++                         row_range, exc.response.status_code)
++                continue
++            list_id, _video_list = LoCo(root_response).find_by_context('queue')
++            if list_id:
++                return str(list_id), self._loco_row_key_for_list(root_response, root_id, list_id)
++        raise InvalidVideoListTypeError('No current LoCo My List queue available')
++
++    def _browser_mylist_loco_row_paths(self, root_id, row_key, use_direct_range, include_metadata=False):
++        item_range = BROWSER_LOCO_DIRECT_RANGE if use_direct_range else LOCO_PAGE_RANGE
++        row_path = ['locos', root_id, row_key]
++        if use_direct_range:
++            return [
++                row_path + ['componentSummary'],
++                row_path + [item_range, 'itemSummary'],
++                *_browser_reference_paths(row_path + [item_range, 'reference'],
++                                          include_metadata=include_metadata)
++            ]
++        return [
++            row_path + ['componentSummary'],
++            row_path + ['page', 0, item_range, 'itemSummary'],
++            *_browser_reference_paths(row_path + ['page', 0, item_range, 'reference'],
++                                      include_metadata=include_metadata)
++        ]
++
++    def _browser_mylist_loco_video_list(self, root_id, row_key, list_id, auth_url):
++        for use_direct_range in (True, False):
++            metadata_paths = self._browser_mylist_loco_row_paths(root_id, row_key, use_direct_range,
++                                                                 include_metadata=True)
++            light_paths = self._browser_mylist_loco_row_paths(root_id, row_key, use_direct_range)
++            try:
++                try:
++                    path_response = self._post_current_loco_paths(metadata_paths, auth_url)
++                except req_exceptions.HTTPError as exc:
++                    status_code = getattr(exc.response, 'status_code', None)
++                    if status_code not in (404, 412):
++                        raise
++                    LOG.warn('My List LoCo metadata fields request returned {}; retrying light fields',
++                             status_code)
++                    path_response = self._post_current_loco_paths(light_paths, auth_url)
++                if str(list_id) in path_response.get('lists', {}):
++                    return VideoList(path_response, str(list_id))
++            except req_exceptions.HTTPError as exc:
++                if getattr(exc.response, 'status_code', None) not in (404, 412):
++                    raise
++                LOG.warn('My List LoCo row content request returned {}; trying fallback path',
++                         exc.response.status_code)
++        raise InvalidVideoListTypeError('No current LoCo My List content available')
++
++    def _browser_mylist_direct_video_list(self, list_id, auth_url):
++        for paths, fallback_paths in (
++                (self._browser_video_list_full_paths(str(list_id), include_metadata=True),
++                 self._browser_video_list_full_paths(str(list_id))),
++                (self._browser_video_list_paths(str(list_id), include_metadata=True),
++                 self._browser_video_list_paths(str(list_id)))):
++            try:
++                try:
++                    path_response = self._post_current_loco_paths(paths, auth_url)
++                except req_exceptions.HTTPError as exc:
++                    status_code = getattr(exc.response, 'status_code', None)
++                    if status_code not in (404, 412):
++                        raise
++                    LOG.warn('My List direct metadata fields request returned {}; retrying light fields',
++                             status_code)
++                    path_response = self._post_current_loco_paths(fallback_paths, auth_url)
++                return VideoList(path_response, str(list_id))
++            except req_exceptions.HTTPError as exc:
++                if getattr(exc.response, 'status_code', None) not in (404, 412):
++                    raise
++                LOG.warn('My List direct list content request returned {}; trying fallback path',
++                         exc.response.status_code)
++        raise InvalidVideoListTypeError('No current direct My List content available')
++
++    def _browser_mylist_video_list(self):
++        root_id, auth_url = self._get_current_loco_root_id()
++        list_id, row_key = self._browser_mylist_list_info(root_id, auth_url)
++        if row_key is not None:
++            try:
++                video_list = self._browser_mylist_loco_video_list(root_id, row_key, list_id, auth_url)
++            except InvalidVideoListTypeError:
++                LOG.warn('Falling back to direct My List request after LoCo row content lookup failed')
++                video_list = self._browser_mylist_direct_video_list(list_id, auth_url)
++        else:
++            video_list = self._browser_mylist_direct_video_list(list_id, auth_url)
++        for video in video_list.videos.values():
++            video.setdefault('queue', _value({}))
++            video['queue'].setdefault('value', {})['inQueue'] = True
++        return video_list
++
++    def _enrich_browser_video_list_metadata(self, path_response, list_id):
++        videos = path_response.get('videos', {})
++        for video_id in _browser_list_video_ids(path_response, list_id):
++            video_key = next((key for key in videos if str(key) == video_id), None)
++            if video_key is None:
++                continue
++            video = videos.get(video_key)
++            if not isinstance(video, dict):
++                continue
++            fallback_art = common.get_path_safe(
++                ['itemSummary', 'value', 'boxArt', 'url'], video)
++            poster_art = common.get_path_safe(
++                ['boxarts', ART_SIZE_POSTER, 'jpg', 'value', 'url'], video)
++            synopsis = (video.get('synopsis', {}).get('value') or
++                        video.get('regularSynopsis', {}).get('value'))
++            if synopsis and poster_art and poster_art != fallback_art:
++                continue
++            try:
++                metadata_video = self.nfsession._metadata(  # pylint: disable=protected-access
++                    video_id=common.VideoId(videoid=video_id))
++            except (MetadataNotAvailable, KeyError, TypeError, req_exceptions.RequestException):
++                LOG.warn('LoLoMo metadata enrichment skipped for video {}', video_id)
++                continue
++            videos[video_key] = _merge_search_metadata_video(video, metadata_video)
++
++    def _browser_lolomo_video_list_by_id(self, category_name, list_id):
++        self._browse_html_and_auth_url()
++        path_response = self._post_browser_path_evaluator(
++            self._browser_loco_paths(['lolomoByCategory', category_name], include_full_rows=True),
++            'https://www.netflix.com/latest')
++        if str(list_id) not in path_response.get('lists', {}):
++            raise InvalidVideoListTypeError(f'No LoLoMo category list with id {list_id}')
++        self._enrich_browser_video_list_metadata(path_response, str(list_id))
++        return VideoList(path_response, str(list_id))
++
++    def _browser_genre_video_list_by_id(self, genre_id, list_id):
++        self._browse_html_and_auth_url()
++        path_response = self._post_browser_path_evaluator_with_fallback(
++            self._browser_loco_paths(['genres', int(genre_id), 'rw'], include_genre_paths=True,
++                                     include_full_rows=True, include_metadata=True),
++            self._browser_loco_paths(['genres', int(genre_id), 'rw'], include_genre_paths=True,
++                                     include_full_rows=True),
++            f'https://www.netflix.com/browse/genre/{genre_id}',
++            f'Genre {genre_id}')
++        if str(list_id) not in path_response.get('lists', {}):
++            raise InvalidVideoListTypeError(f'No genre list with id {list_id}')
++        return VideoList(path_response, str(list_id))
++
++    def _browser_continue_watching_loco_response(self, root_id, auth_url, row_range):
++        return self._post_current_loco_paths([
++            ['locos', root_id, row_range, 'componentSummary'],
++            ['locos', root_id, row_range, 'page', 0, LOCO_PAGE_RANGE, 'itemSummary'],
++            *_browser_reference_paths(['locos', root_id, row_range, 'page', 0, LOCO_PAGE_RANGE, 'reference'])
++        ], auth_url)
++
++    def _continue_watching_list_id(self, root_response):
++        candidates = []
++        for candidate_id, list_data in root_response.get('lists', {}).items():
++            summary = list_data.get('componentSummary', {}).get('value', {})
++            if summary.get('context') != 'continueWatching':
++                continue
++            length = summary.get('length') or 0
++            materialized_items = sum(1 for key, value in list_data.items()
++                                     if str(key).isdigit() and isinstance(value, dict))
++            candidates.append((length, materialized_items, candidate_id))
++        return max(candidates)[2] if candidates else None
++
++    def _browser_continue_watching_direct_response(self, list_id):
++        return self._post_browser_path_evaluator([
++            ['lists', list_id, ['componentSummary', 'debugRequest']],
++            ['lists', list_id, BROWSER_LOCO_DIRECT_RANGE, 'itemSummary'],
++            *_browser_reference_paths(['lists', list_id, BROWSER_LOCO_DIRECT_RANGE, 'reference']),
++            ['lists', list_id, BROWSER_LOCO_DIRECT_RANGE, 'reference', 'current',
++             BROWSER_LOCO_CONTINUE_FIELDS]
++        ], 'https://www.netflix.com/browse')
++
++    def _browser_continue_watching_list(self):
++        try:
++            root_id, auth_url = self._get_current_loco_root_id()
++        except InvalidVideoListTypeError:
++            return self._browser_continue_watching_genre_fallback()
++        root_response = self._browser_continue_watching_loco_response(
++            root_id, auth_url, BROWSER_LOCO_HOME_ROW_RANGE)
++        list_id = self._continue_watching_list_id(root_response)
++        if not list_id:
++            root_response = self._browser_continue_watching_loco_response(
++                root_id, auth_url, BROWSER_LOCO_HOME_VISIBLE_RANGE)
++            list_id = self._continue_watching_list_id(root_response)
++        if not list_id:
++            raise InvalidVideoListTypeError('No current home Continue Watching list available')
++        try:
++            direct_response = self._browser_continue_watching_direct_response(list_id)
++            root_response.setdefault('lists', {}).setdefault(list_id, {}).update(
++                direct_response.get('lists', {}).get(list_id, {}))
++            root_response.setdefault('videos', {}).update(direct_response.get('videos', {}))
++            _normalize_browser_video_fields(root_response)
++        except req_exceptions.HTTPError as exc:
++            if getattr(exc.response, 'status_code', None) not in (404, 412):
++                raise
++            LOG.warn('Continue Watching direct list range returned {}; using home row data',
++                     exc.response.status_code)
++        length = root_response['lists'][list_id].get('componentSummary', {}).get('value', {}).get('length', 0)
++        if length > BROWSER_LOCO_CONTINUE_LAZY_RANGE['from']:
++            try:
++                lazy_response = self._post_browser_path_evaluator([
++                    ['lists', list_id, BROWSER_LOCO_CONTINUE_LAZY_RANGE, 'itemSummary'],
++                    *_browser_reference_paths(['lists', list_id, BROWSER_LOCO_CONTINUE_LAZY_RANGE, 'reference']),
++                    ['lists', list_id, BROWSER_LOCO_CONTINUE_LAZY_RANGE, 'reference', 'current',
++                     BROWSER_LOCO_CONTINUE_FIELDS]
++                ], 'https://www.netflix.com/browse')
++                root_response.setdefault('lists', {}).setdefault(list_id, {}).update(
++                    lazy_response.get('lists', {}).get(list_id, {}))
++                root_response.setdefault('videos', {}).update(lazy_response.get('videos', {}))
++                _normalize_browser_video_fields(root_response)
++            except req_exceptions.HTTPError as exc:
++                if getattr(exc.response, 'status_code', None) not in (404, 412):
++                    raise
++                LOG.warn('Continue Watching lazy range returned {}; using available row data',
++                         exc.response.status_code)
++        return VideoList(root_response, str(list_id))
++
++    def _browser_continue_watching_genre_fallback(self):
++        LOG.warn('Home LoCo discovery failed for Continue Watching; using genre fallback')
++        try:
++            loco_list = self.req_loco_list_genre('1592210')
++            for list_id, video_list in loco_list.lists.items():
++                if video_list.get('context') != 'continueWatching':
++                    continue
++                try:
++                    return self._browser_genre_video_list_by_id('1592210', list_id)
++                except Exception:  # pylint: disable=broad-except
++                    LOG.warn('Using materialized Continue Watching genre row after browser list lookup failed')
++                    return video_list
++        except Exception:  # pylint: disable=broad-except
++            LOG.warn('Continue Watching genre fallback failed after home LoCo discovery failure')
++        return CustomVideoList({'videos': {}})
++
++    def _first_loco_video_list(self, loco):
++        for _list_id, video_list in loco.lists.items():
++            if video_list.videos:
++                return video_list
++        return next(iter(loco.lists.values()))
++
++    def _first_full_browser_genre_video_list(self, genre_id):
++        loco = self._req_browser_genre_loco(genre_id)
++        first_list_id = None
++        first_video_list = None
++        for list_id, video_list in loco.lists.items():
++            if first_list_id is None:
++                first_list_id = list_id
++                first_video_list = video_list
++            if video_list.videos:
++                first_list_id = list_id
++                first_video_list = video_list
++                break
++        if first_list_id is None:
++            raise InvalidVideoListTypeError(f'No browser genre rows available for {genre_id}')
++        try:
++            return self._browser_genre_video_list_by_id(genre_id, first_list_id)
++        except Exception as exc:  # pylint: disable=broad-except
++            LOG.warn('Using materialized genre preview row after full row lookup failed: {}', exc)
++            return first_video_list
++
++    def _req_current_loco_root_data(self):
++        root_id, auth_url = self._get_current_loco_root_id()
++        return self._post_current_loco_paths(self._current_loco_paths(root_id), auth_url)
++
++    def _current_loco_list_by_context(self, context):
++        loco = LoCo(self._req_current_loco_root_data())
++        list_id, video_list = loco.find_by_context(context)
++        if not list_id:
++            category_contexts = LOCO_CATEGORY_CONTEXTS.get('comingSoon', ())
++            if context in category_contexts:
++                for _list_id, summary, category_video_list in self.req_lolomo_category('comingSoon').lists():
++                    if summary.get('context') == context:
++                        return category_video_list
++            raise InvalidVideoListTypeError(f'No current LoCo list with context {context} available')
++        return video_list
++
++    def _current_loco_list_by_id(self, list_id):
++        loco = LoCo(self._req_current_loco_root_data())
++        if str(list_id) not in loco.data.get('lists', {}):
++            raise InvalidVideoListTypeError(f'No current LoCo list with id {list_id} available')
++        return VideoList(loco.data, str(list_id))
++
++    def _current_lolomo_category(self, category_name):
++        contexts = LOCO_CATEGORY_CONTEXTS.get(category_name)
++        if not contexts:
++            raise InvalidVideoListTypeError(f'No current LoCo fallback for category {category_name}')
++        loco = LoCo(self._req_current_loco_root_data())
++        lists = OrderedDict(
++            (list_id, list_data)
++            for list_id, list_data in loco.data.get('lists', {}).items()
++            if list_data.get('componentSummary', {}).get('value', {}).get('context') in contexts)
++        root_id = loco.id
++        root = OrderedDict()
++        root['componentSummary'] = _value({'length': len(lists)})
++        for index, list_id in enumerate(lists):
++            root[index] = {
++                'reference': _value(['lists', list_id]),
++                'itemSummary': _value({'id': list_id})
++            }
++        return LoLoMoCategory({
++            'locos': {root_id: root},
++            'lists': lists,
++            'videos': loco.data.get('videos', {})
++        })
++
+ 
+     @cache_utils.cache_output(cache_utils.CACHE_COMMON, identify_append_from_kwarg_name='perpetual_range_start',
+                               ignore_self_class=True)
+-    def req_video_list(self, list_id, perpetual_range_start=None):
++    def req_video_list(self, list_id, perpetual_range_start=None, menu_data=None):
+         """Retrieve a video list"""
+         # Some of this type of request have results fixed at ~40 from netflix
+         # The 'length' tag never return to the actual total count of the elements
+@@ -155,7 +1534,20 @@ class DirectoryPathRequests:
+             'length_params': ['stdlist', ['lists', list_id]],
+             'perpetual_range_start': perpetual_range_start
+         }
+-        path_response = self.nfsession.perpetual_path_request(**call_args)
++        try:
++            path_response = self.nfsession.perpetual_path_request(**call_args)
++        except req_exceptions.HTTPError as exc:
++            if getattr(exc.response, 'status_code', None) != 404:
++                raise
++            initial_menu_id = (menu_data or {}).get('initial_menu_id')
++            if initial_menu_id in ('newAndPopular', 'recommendations'):
++                LOG.warn('Falling back to browser-shaped LoLoMo category list {} after pathEvaluator 404', list_id)
++                return self._browser_lolomo_video_list_by_id('comingSoon', list_id)
++            LOG.warn('Falling back to browser-shaped list {} after pathEvaluator 404', list_id)
++            try:
++                return self._browser_video_list_by_id(list_id)
++            except req_exceptions.HTTPError:
++                return self._current_loco_list_by_id(list_id)
+         return VideoList(path_response)
+ 
+     @cache_utils.cache_output(cache_utils.CACHE_COMMON, identify_from_kwarg_name='context_id',
+@@ -165,6 +1557,19 @@ class DirectoryPathRequests:
+         # This type of request allows to obtain more than ~40 results
+         LOG.debug('Requesting video list sorted for context name: "{}", context id: "{}"',
+                   context_name, context_id)
++        if context_name == 'mylist':
++            try:
++                return self._browser_mylist_video_list()
++            except InvalidVideoListTypeError:
++                LOG.warn('Returning empty My List after current queue lookup failed')
++                return CustomVideoList({'videos': {}})
++            except req_exceptions.HTTPError as exc:
++                if getattr(exc.response, 'status_code', None) not in (404, 412):
++                    raise
++                LOG.warn('Returning empty My List after browser-shaped request returned {}',
++                         exc.response.status_code)
++                return CustomVideoList({'videos': {}})
++
+         base_path = [context_name]
+         response_type = 'stdlist'
+         if context_id:
+@@ -185,7 +1590,17 @@ class DirectoryPathRequests:
+         paths = (build_paths(_base_path, VIDEO_LIST_PARTIAL_PATHS) +
+                  [base_path[:-1] + [['id', 'name', 'requestId', 'trackIds']]])
+ 
+-        path_response = self.nfsession.perpetual_path_request(paths, [response_type, base_path], perpetual_range_start)
++        try:
++            path_response = self.nfsession.perpetual_path_request(paths, [response_type, base_path], perpetual_range_start)
++        except req_exceptions.HTTPError as exc:
++            status_code = getattr(exc.response, 'status_code', None)
++            if status_code not in (404, 412):
++                raise
++            context = SORTED_LIST_CONTEXT_FALLBACKS.get((context_name, str(context_id)))
++            if context_name != 'genres' and not context:
++                raise
++            LOG.warn('Falling back to browser-shaped genre {} after pathEvaluator {}', context_id, status_code)
++            return self._first_full_browser_genre_video_list(context_id)
+         return VideoListSorted(path_response, context_name, context_id, req_sort_order_type)
+ 
+ 
+@@ -228,8 +1643,65 @@ class DirectoryPathRequests:
+         path = build_paths(
+             ['videos', videoid.value, supplemental_type, {"from": 0, "to": 35}], TRAILER_PARTIAL_PATHS
+         )
+-        path_response = self.nfsession.path_request(path)
+-        return VideoListSupplemental(path_response, 'videos', videoid.value, supplemental_type)
++        parent_metadata = {'loaded': False, 'value': None}
++
++        def _get_parent_metadata():
++            if not parent_metadata['loaded']:
++                parent_metadata['loaded'] = True
++                parent_metadata['value'] = self._metadata_for_video(videoid.value, 'Parent supplemental')
++            return parent_metadata['value']
++
++        def _inherit_parent_metadata(video_list):
++            metadata_video = _get_parent_metadata()
++            if metadata_video:
++                for supplemental_id, supplemental_video in video_list.videos.items():
++                    normalize_metadata_references(video_list.data, supplemental_id, metadata_video, supplemental_video)
++            return video_list
++
++        def _empty_fallback():
++            return SimpleNamespace(
++                perpetual_range_selector=None,
++                videos=OrderedDict(),
++                artitem=None,
++                contained_titles=[],
++                component_summary={})
++
++        def _title_page_fallback():
++            try:
++                response = requests.get(
++                    NETFLIX_TITLE_URL.format(videoid.value),
++                    headers={
++                        'Accept': 'text/html,application/xhtml+xml,application/xml',
++                        'User-Agent': common.get_user_agent(enable_android_mediaflag_fix=True)
++                    },
++                    timeout=8)
++                response.raise_for_status()
++                react_context = website.extract_json(response.content, 'reactContext')
++            except (req_exceptions.RequestException, WebsiteParsingError) as exc:
++                LOG.warn('Title page trailer fallback failed for {} ({})', videoid, type(exc).__name__)
++                return _empty_fallback()
++            graphql_data = _title_page_graphql_data(response.content, react_context)
++            videos = _supplemental_videos_from_graphql_cache(graphql_data, videoid.value)
++            if videos:
++                LOG.debug('Title page trailer fallback found {} supplemental videos for {}', len(videos), videoid)
++                trailer_list = CustomVideoList({'videos': videos})
++                trailer_list.is_supplemental_type = True
++                trailer_list.component_summary = {}
++                return _inherit_parent_metadata(trailer_list)
++            LOG.warn('No title page supplemental videos found for {}', videoid)
++            return _empty_fallback()
++        try:
++            path_response = self.nfsession.path_request(path)
++            trailer_list = VideoListSupplemental(path_response, 'videos', videoid.value, supplemental_type)
++            if trailer_list.videos:
++                return _inherit_parent_metadata(trailer_list)
++            LOG.warn('Trailer supplemental response was empty for {}, trying title page fallback', videoid)
++            return _title_page_fallback()
++        except req_exceptions.HTTPError as exc:
++            if getattr(exc.response, 'status_code', None) != 404:
++                raise
++            LOG.warn('Trailer supplemental path returned 404 for {}, trying title page fallback', videoid)
++            return _title_page_fallback()
+ 
+     @cache_utils.cache_output(cache_utils.CACHE_COMMON, identify_from_kwarg_name='chunked_video_list',
+                               ttl=900, ignore_self_class=True)
+@@ -247,8 +1719,6 @@ class DirectoryPathRequests:
+             merged_response.update(perpetual_range_selector)
+         return CustomVideoList(merged_response)
+ 
+-    @cache_utils.cache_output(cache_utils.CACHE_SEARCH, identify_from_kwarg_name='search_term',
+-                              identify_append_from_kwarg_name='perpetual_range_start', ttl=900, ignore_self_class=True)
+     def req_video_list_search(self, search_term, perpetual_range_start=None):
+         """Retrieve a video list by search term"""
+         LOG.debug('Requesting video list by search term "{}"', search_term)
+@@ -260,9 +1730,51 @@ class DirectoryPathRequests:
+             'length_params': ['searchlist', ['search', 'byReference']],
+             'perpetual_range_start': perpetual_range_start
+         }
+-        path_response = self.nfsession.perpetual_path_request(**call_args)
++        try:
++            path_response = self.nfsession.perpetual_path_request(**call_args)
++        except req_exceptions.HTTPError as exc:
++            if getattr(exc.response, 'status_code', None) != 404:
++                raise
++            LOG.warn('Falling back to browser GraphQL search for term "{}" after pathEvaluator 404', search_term)
++            return self._req_video_list_search_graphql(search_term)
+         return SearchVideoList(path_response)
+ 
++    def _req_video_list_search_graphql(self, search_term):
++        data = self._post_graphql(
++            'SearchPageQueryResults',
++            _search_graphql_variables(search_term),
++            GRAPHQL_OP_SEARCH)
++        videos = OrderedDict()
++        path_response = {'videos': videos}
++        page = data.get('page') or {}
++        sections = (page.get('sections') or {}).get('edges') or []
++        for section in sections:
++            section_node = section.get('node') or {}
++            if section_node.get('__typename') != 'PinotGallerySection':
++                continue
++            entities = (section_node.get('entities') or {}).get('edges') or []
++            for entity_edge in entities:
++                item = _search_graphql_node_to_item(entity_edge.get('node') or {})
++                if item:
++                    video_id, video_data = item
++                    videos.setdefault(video_id, video_data)
++        for video_id, video_data in list(videos.items()):
++            metadata_video = self._metadata_for_video(video_id, 'Search')
++            if metadata_video:
++                videos[video_id] = _merge_search_metadata_video(video_data, metadata_video)
++                normalize_metadata_references(path_response, video_id, metadata_video, videos[video_id])
++        return CustomVideoList(path_response)
++
++    def _metadata_for_video(self, video_id, context):
++        try:
++            metadata_data = self.nfsession.get_safe(
++                endpoint='metadata',
++                params={'movieid': video_id, '_': int(time.time() * 1000)})
++            return metadata_with_title_page_fallback(video_id, metadata_data.get('video') or {})
++        except (MetadataNotAvailable, KeyError, TypeError, req_exceptions.RequestException):
++            LOG.warn('{} metadata enrichment skipped for video {}', context, video_id)
++            return metadata_with_title_page_fallback(video_id)
++
+     def req_subgenres(self, genre_id):
+         """Retrieve sub-genres for the given genre"""
+         LOG.debug('Requesting sub-genres of the genre {}', genre_id)
+@@ -276,6 +1788,9 @@ class DirectoryPathRequests:
+         contains only minimal video info
+         """
+         LOG.debug('Requesting the full video list for {}', context_name)
++        if context_name == 'mylist' and not switch_profiles:
++            return self._browser_mylist_video_list()
++
+         paths = (build_paths([context_name, 'az', RANGE_PLACEHOLDER], VIDEO_LIST_BASIC_PARTIAL_PATHS) +
+                  [[context_name, ['id', 'name', 'requestId', 'trackIds']]])
+         call_args = {
+@@ -309,14 +1824,10 @@ class DirectoryPathRequests:
+     def req_lolomo_category(self, category_name):
+         """Retrieve LoLoMo by category lists"""
+         LOG.debug('Requesting LoLoMo "{}" category lists', category_name)
+-        paths = ([['lolomoByCategory', category_name, ['componentSummary']],
+-                  ['lolomoByCategory', category_name, {'from': 0, 'to': 10}, ['componentSummary']],
+-                  # Titles of first 4 videos in each video list (needed only to show titles in the plot description)
+-                  ['lolomoByCategory', category_name,
+-                   {'from': 0, 'to': 10}, {'from': 0, 'to': 3}, 'reference', ['title', 'summary']]] +
+-                 # Art for the first video of each context list (needed only to add art to the menu item)
+-                 build_paths(['lolomoByCategory', category_name,
+-                              {'from': 0, 'to': 10}, 0, 'reference'], ART_PARTIAL_PATHS))
+-        call_args = {'paths': paths}
+-        path_response = self.nfsession.path_request(**call_args)
+-        return LoLoMoCategory(path_response)
++        try:
++            return self._req_browser_lolomo_category(category_name)
++        except req_exceptions.HTTPError as exc:
++            if exc.response is None or exc.response.status_code not in (404, 412):
++                raise
++            LOG.warn('Falling back to current LoCo rows for LoLoMo category after pathEvaluator {}', exc.response.status_code)
++            return self._current_lolomo_category(category_name)
+diff --git a/resources/lib/services/nfsession/msl/profiles.py b/resources/lib/services/nfsession/msl/profiles.py
+index ebf94e0..f307764 100644
+--- a/resources/lib/services/nfsession/msl/profiles.py
++++ b/resources/lib/services/nfsession/msl/profiles.py
+@@ -81,7 +81,7 @@ PROFILES = {
+ def enabled_profiles():
+     """Return a list of all base and enabled additional profiles"""
+     return (PROFILES['base'] +
+-            PROFILES['h264'] + PROFILES['h264_prk_qc'] +
++            PROFILES['h264'] +
+             _subtitle_profiles() +
+             _additional_profiles('vp9profile0', 'enable_vp9_profiles') +
+             _additional_profiles('vp9profile2', ['enable_vp9_profiles', 'enable_vp9.2_profiles']) +
+diff --git a/resources/lib/services/nfsession/nfsession_ops.py b/resources/lib/services/nfsession/nfsession_ops.py
+index 3847224..03db61f 100644
+--- a/resources/lib/services/nfsession/nfsession_ops.py
++++ b/resources/lib/services/nfsession/nfsession_ops.py
+@@ -10,6 +10,7 @@
+ import time
+ from datetime import datetime, timedelta
+ 
++import requests.exceptions as req_exceptions
+ import xbmc
+ 
+ import resources.lib.common as common
+@@ -17,13 +18,15 @@ import resources.lib.utils.website as website
+ from resources.lib.common import cache_utils
+ from resources.lib.common.exceptions import (NotLoggedInError, MissingCredentialsError, WebsiteParsingError,
+                                              MbrStatusAnonymousError, MetadataNotAvailable, LoginValidateError,
+-                                             HttpError401, InvalidProfilesError, ErrorMsgNoReport)
++                                             InvalidProfilesError, ErrorMsgNoReport)
+ from resources.lib.globals import G
+ from resources.lib.kodi import ui
++from resources.lib.services.nfsession.directorybuilder.dir_path_requests import (metadata_with_title_page_fallback,
++                                                                                normalize_metadata_references)
+ from resources.lib.services.nfsession.session.path_requests import SessionPathRequests
+ from resources.lib.utils import cookies
+ from resources.lib.utils.api_paths import (EPISODES_PARTIAL_PATHS, ART_PARTIAL_PATHS, build_paths,
+-                                           VIDEO_LIST_PARTIAL_PATHS)
++                                           VIDEO_LIST_PARTIAL_PATHS, ART_SIZE_FHD, ART_SIZE_POSTER)
+ from resources.lib.utils.logging import LOG, measure_exec_time_decorator
+ 
+ 
+@@ -36,6 +39,7 @@ class NFSessionOperations(SessionPathRequests):
+         self.slots = [
+             self.get_safe,
+             self.post_safe,
++            self.post_graphql,
+             self.login,
+             self.login_auth_data,
+             self.logout,
+@@ -96,37 +100,22 @@ class NFSessionOperations(SessionPathRequests):
+     def activate_profile(self, guid):
+         """Set the profile identified by guid as active"""
+         LOG.debug('Switching to profile {}', guid)
+-        current_active_guid = G.LOCAL_DB.get_active_profile_guid()
+-        if guid == current_active_guid:
++        if guid == G.LOCAL_DB.get_active_profile_guid():
+             LOG.info('The profile guid {} is already set, activation not needed.', guid)
+             return
+         if xbmc.Player().isPlayingVideo():
+             # Change the current profile while a video is playing can cause problems with outgoing HTTP requests
+             # (MSL/NFSession) causing a failure in the HTTP request or sending data on the wrong profile
+             raise ErrorMsgNoReport('It is not possible select a profile while a video is playing.')
+-        timestamp = time.time()
+         LOG.info('Activating profile {}', guid)
+-        # 20/05/2020 - The method 1 not more working for switching PIN locked profiles
+-        # INIT Method 1 - HTTP mode
+-        # response = self._get('switch_profile', params={'tkn': guid})
+-        # self.nfsession.auth_url = self.website_extract_session_data(response)['auth_url']
+-        # END Method 1
+-        # INIT Method 2 - API mode
+         try:
+-            response = self.get_safe(endpoint='activate_profile',
+-                                     params={'switchProfileGuid': guid,
+-                                             '_': int(timestamp * 1000),
+-                                             'authURL': self.auth_url})
+-            if response.get('status') != 'success':
+-                raise InvalidProfilesError('Unable to access to the selected profile.')
+-        except HttpError401 as exc:
+-            # Profile guid not more valid
++            # Use /SwitchProfile endpoint to switch the active profile server-side
++            self.get_safe('switch_profile', params={'tkn': guid})
++            # Fetch browse page to get a fresh authURL for the new profile
++            response = self.get_safe('browse')
++            self.auth_url = website.extract_session_data(response)['auth_url']
++        except Exception as exc:
+             raise InvalidProfilesError('Unable to access to the selected profile.') from exc
+-        # Retrieve browse page to update authURL
+-        response = self.get_safe('browse')
+-        self.auth_url = website.extract_session_data(response)['auth_url']
+-        # END Method 2
+-
+         G.LOCAL_DB.switch_active_profile(guid)
+         G.CACHE_MANAGEMENT.identifier_prefix = guid
+         cookies.save(self.session.cookies)
+@@ -260,17 +249,105 @@ class NFSessionOperations(SessionPathRequests):
+         try:
+             infos = get_info(videoid, None, None, profile_language_code)[0]
+             art = get_art(videoid, None, profile_language_code)
++            if infos.get('Cast') and (videoid.mediatype == common.VideoId.EPISODE or infos.get('Trailer')):
++                return infos, art
++            LOG.debug('Cached video info for {} is missing cast/trailer; refreshing metadata', videoid)
+         except (AttributeError, TypeError):
+-            if videoid.mediatype == common.VideoId.EPISODE:
+-                paths = (build_paths(['videos', int(videoid.value)], EPISODES_PARTIAL_PATHS) +
+-                         build_paths(['videos', int(videoid.tvshowid)], ART_PARTIAL_PATHS + [[['title', 'delivery']]]))
+-            else:
+-                paths = build_paths(['videos', int(videoid.value)], VIDEO_LIST_PARTIAL_PATHS)
++            pass
++        if videoid.mediatype == common.VideoId.EPISODE:
++            paths = (build_paths(['videos', int(videoid.value)], EPISODES_PARTIAL_PATHS) +
++                     build_paths(['videos', int(videoid.tvshowid)], ART_PARTIAL_PATHS + [[['title', 'delivery']]]))
++        else:
++            paths = build_paths(['videos', int(videoid.value)], VIDEO_LIST_PARTIAL_PATHS)
++        try:
+             raw_data = self.path_request(paths)
++        except req_exceptions.HTTPError as exc:
++            LOG.warn('Video info pathEvaluator lookup failed: {}. Falling back to metadata endpoint.', exc)
++            raw_data = self._get_videoid_info_metadata(videoid)
++        infos = get_info(videoid, raw_data['videos'][videoid.value], raw_data, profile_language_code)[0]
++        if (videoid.mediatype != common.VideoId.EPISODE and
++                (not infos.get('Cast') or not infos.get('Trailer'))):
++            LOG.debug('Video info for {} is missing cast/trailer; refreshing from metadata endpoint', videoid)
++            raw_data = self._get_videoid_info_metadata(videoid)
+             infos = get_info(videoid, raw_data['videos'][videoid.value], raw_data, profile_language_code)[0]
+-            art = get_art(videoid, raw_data['videos'][videoid.value], profile_language_code)
++        art = get_art(videoid, raw_data['videos'][videoid.value], profile_language_code)
+         return infos, art
+ 
++    def _get_videoid_info_metadata(self, videoid):
++        metadata_data = self.get_safe(
++            endpoint='metadata',
++            params={'movieid': videoid.value, '_': int(time.time() * 1000)})
++        video = metadata_with_title_page_fallback(videoid.value, metadata_data['video'])
++        item = self._metadata_video_to_path_item(videoid, video)
++        videos = {videoid.value: item}
++        raw_data = {'videos': videos}
++        normalize_metadata_references(raw_data, videoid.value, video, item)
++        if videoid.mediatype == common.VideoId.EPISODE and videoid.tvshowid:
++            videos.setdefault(videoid.tvshowid, {
++                'title': {'value': video.get('seriesTitle') or video.get('showTitle') or ''},
++                'delivery': {'value': {}}
++            })
++        return raw_data
++
++    @staticmethod
++    def _metadata_video_to_path_item(videoid, video):
++        title = video.get('title') or str(videoid.value)
++        synopsis = video.get('synopsis') or video.get('regularSynopsis') or ''
++        boxart_url = NFSessionOperations._find_metadata_image_url(video, ('boxArt', 'boxart', 'artwork'))
++        still_url = NFSessionOperations._find_metadata_image_url(video, ('interestingMoment', 'interestingMomentUrl'))
++        item = {
++            'summary': {'value': {
++                'id': int(videoid.value),
++                'type': videoid.mediatype,
++                'name': title
++            }},
++            'title': {'value': title},
++            'synopsis': {'value': synopsis},
++            'regularSynopsis': {'value': synopsis},
++            'runtime': {'value': video.get('runtime') or 0},
++            'releaseYear': {'value': video.get('year') or video.get('releaseYear') or 0},
++            'delivery': {'value': video.get('delivery') or {}},
++            'availability': {'value': {'isPlayable': True}},
++            'queue': {'value': {'inQueue': False}},
++            'inRemindMeList': {'value': False},
++            'bookmarkPosition': {'value': (video.get('bookmark') or {}).get('offset', 0)},
++            'creditsOffset': {'value': video.get('creditsOffset') or 0},
++            'watchedToEndOffset': {'value': video.get('watchedToEndOffset') or 0},
++            'watched': {'value': bool((video.get('bookmark') or {}).get('watchedDate'))},
++            'trackIds': {'value': {}},
++            'requestId': {'value': ''}
++        }
++        if boxart_url:
++            art_value = {'url': boxart_url}
++            item['boxarts'] = {ART_SIZE_POSTER: {'jpg': {'value': art_value}}}
++            item['itemSummary'] = {'value': {'id': int(videoid.value), 'title': title, 'boxArt': {'url': boxart_url}}}
++        if still_url:
++            item['interestingMoment'] = {ART_SIZE_FHD: {'jpg': {'value': {'url': still_url}}}}
++        return item
++
++    @staticmethod
++    def _find_metadata_image_url(video, keys):
++        for key in keys:
++            value = video.get(key)
++            if isinstance(value, str) and value.startswith('http'):
++                return value
++            if isinstance(value, dict):
++                url = NFSessionOperations._find_url_in_dict(value)
++                if url:
++                    return url
++        return ''
++
++    @staticmethod
++    def _find_url_in_dict(data):
++        for value in data.values():
++            if isinstance(value, str) and value.startswith('http'):
++                return value
++            if isinstance(value, dict):
++                url = NFSessionOperations._find_url_in_dict(value)
++                if url:
++                    return url
++        return ''
++
+     def get_loco_data(self):
+         """
+         Get the LoCo root id and the continueWatching list data references
+diff --git a/resources/lib/services/nfsession/session/endpoints.py b/resources/lib/services/nfsession/session/endpoints.py
+index b59cbbf..99223fa 100644
+--- a/resources/lib/services/nfsession/session/endpoints.py
++++ b/resources/lib/services/nfsession/session/endpoints.py
+@@ -77,12 +77,6 @@ ENDPOINTS = {
+          'use_default_params': False,
+          'add_auth_url': None,
+          'accept': '*/*'},
+-    'activate_profile':
+-        {'address': '/api/shakti/mre/profiles/switch',
+-         'is_api_call': False,
+-         'use_default_params': False,
+-         'add_auth_url': None,
+-         'accept': '*/*'},
+     'profile_lock':
+         {'address': '/api/shakti/mre/profileLock',
+          'is_api_call': False,
+diff --git a/resources/lib/services/nfsession/session/http_requests.py b/resources/lib/services/nfsession/session/http_requests.py
+index 1a29df6..2e45390 100644
+--- a/resources/lib/services/nfsession/session/http_requests.py
++++ b/resources/lib/services/nfsession/session/http_requests.py
+@@ -23,9 +23,13 @@ from resources.lib.kodi import ui
+ from resources.lib.services.nfsession.session.base import SessionBase
+ from resources.lib.services.nfsession.session.endpoints import ENDPOINTS, BASE_URL
+ from resources.lib.utils import cookies
++from resources.lib.utils.esn import get_website_esn
+ from resources.lib.utils.logging import LOG, measure_exec_time_decorator
+ 
+ 
++GRAPHQL_URL = 'https://web.prod.cloud.netflix.com/graphql'
++
++
+ class SessionHTTPRequests(SessionBase):
+     """Manages the HTTP requests"""
+ 
+@@ -43,6 +47,30 @@ class SessionHTTPRequests(SessionBase):
+             endpoint=endpoint,
+             **kwargs)
+ 
++    @measure_exec_time_decorator(is_immediate=True)
++    def post_graphql(self, operation_name, variables, operation_id, referer=None):
++        """Execute a persisted GraphQL request against the website GraphQL gateway."""
++        self.assert_logged_in()
++        payload = {
++            'operationName': operation_name,
++            'variables': variables,
++            'extensions': {'persistedQuery': {'id': operation_id, 'version': 102}}
++        }
++        LOG.debug('Executing GraphQL request: {}', operation_name)
++        start = time.perf_counter()
++        response = self.session.post(
++            url=GRAPHQL_URL,
++            json=payload,
++            headers=_graphql_headers(referer),
++            timeout=8)
++        LOG.debug('Request took {}s', time.perf_counter() - start)
++        LOG.debug('Request returned status code {}', response.status_code)
++        response.raise_for_status()
++        decoded_response = response.json() if response.content else {}
++        if decoded_response.get('errors'):
++            raise APIError(decoded_response['errors'][0].get('message'))
++        return decoded_response
++
+     @measure_exec_time_decorator(is_immediate=True)
+     def _request_call(self, method, endpoint, **kwargs):
+         return self._request(method, endpoint, None, **kwargs)
+@@ -161,6 +189,8 @@ class SessionHTTPRequests(SessionBase):
+             headers['x-netflix.request.client.user.guid'] = G.LOCAL_DB.get_active_profile_guid()
+         if endpoint_conf.get('content_type'):
+             headers['Content-Type'] = endpoint_conf['content_type']
++        if endpoint_conf['address'] == '/pathEvaluator':
++            _add_path_evaluator_headers(headers)
+         headers.update(custom_headers)  # If needed override headers
+         # Meanings parameters known:
+         # drmSystem       DRM used
+@@ -170,13 +200,15 @@ class SessionHTTPRequests(SessionBase):
+         #                   it is still added in an 'empty' form in the response
+         if endpoint_conf['use_default_params']:
+             params = {
++                'webp': 'false',
+                 'drmSystem': 'widevine',
+-                'falcor_server': '0.1.0',
+-                'withSize': 'false',
+-                'materialize': 'false',
+-                'routeAPIRequestsThroughFTL': 'false',
+                 'isVolatileBillboardsEnabled': 'true',
+                 'isTop10Supported': 'true',
++                'hasVideoMerchInBob': 'false',
++                'hasVideoMerchInJaw': 'false',
++                'falcor_server': '0.1.0',
++                'withSize': 'true',
++                'materialize': 'true',
+                 'original_path': '/shakti/mre/pathEvaluator'
+             }
+         if endpoint_conf['add_auth_url'] == 'to_params':
+@@ -211,6 +243,70 @@ def _api_url(endpoint_address):
+     return f'{baseurl}{endpoint_address}'
+ 
+ 
++def _add_path_evaluator_headers(headers):
++    """Add browser-equivalent metadata required by current website pathEvaluator requests."""
++    headers.update({
++        'Origin': BASE_URL,
++        'Referer': f'{BASE_URL}/browse',
++        'sec-fetch-dest': 'empty',
++        'sec-fetch-mode': 'cors',
++        'sec-fetch-site': 'same-origin',
++        'X-Netflix.browserName': 'Firefox',
++        'X-Netflix.clientType': 'akira',
++        'x-netflix.request.attempt': '1',
++        'x-netflix.request.client.context': 'www.netflix.com'
++    })
++    _set_header_if_value(
++        headers, 'X-Netflix.browserVersion',
++        G.LOCAL_DB.get_value('browser_info_version', '', table=TABLE_SESSION))
++    _set_header_if_value(
++        headers, 'X-Netflix.osName',
++        G.LOCAL_DB.get_value('browser_info_os_name', '', table=TABLE_SESSION))
++    _set_header_if_value(
++        headers, 'X-Netflix.osVersion',
++        G.LOCAL_DB.get_value('browser_info_os_version', '', table=TABLE_SESSION))
++    _set_header_if_value(
++        headers, 'X-Netflix.uiVersion',
++        G.LOCAL_DB.get_value('ui_version', '', table=TABLE_SESSION))
++    _set_header_if_value(
++        headers, 'x-netflix.request.id',
++        G.LOCAL_DB.get_value('request_id', '', table=TABLE_SESSION))
++    website_esn = get_website_esn()
++    if website_esn:
++        headers['X-Netflix.esn'] = website_esn
++        headers['X-Netflix.esnPrefix'] = website_esn.rsplit('-', 1)[0] if '-' in website_esn else website_esn
++
++
++def _graphql_headers(referer=None):
++    """Add browser-equivalent metadata required by current website GraphQL requests."""
++    headers = {
++        'Accept': '*/*',
++        'Content-Type': 'application/json',
++        'Origin': BASE_URL,
++        'Referer': referer or f'{BASE_URL}/browse',
++        'x-netflix.nq.stack': 'prod',
++        'x-netflix.request.client.user.guid': G.LOCAL_DB.get_active_profile_guid()
++    }
++    _set_header_if_value(
++        headers, 'X-Netflix.browserVersion',
++        G.LOCAL_DB.get_value('browser_info_version', '', table=TABLE_SESSION))
++    _set_header_if_value(
++        headers, 'X-Netflix.osName',
++        G.LOCAL_DB.get_value('browser_info_os_name', '', table=TABLE_SESSION))
++    _set_header_if_value(
++        headers, 'X-Netflix.osVersion',
++        G.LOCAL_DB.get_value('browser_info_os_version', '', table=TABLE_SESSION))
++    _set_header_if_value(
++        headers, 'X-Netflix.uiVersion',
++        G.LOCAL_DB.get_value('ui_version', '', table=TABLE_SESSION))
++    return headers
++
++
++def _set_header_if_value(headers, name, value):
++    if value:
++        headers[name] = value
++
++
+ def _raise_api_error(decoded_response):
+     if decoded_response.get('status', 'success') == 'error':
+         raise APIError(decoded_response.get('message'))
+diff --git a/resources/lib/services/playback/action_controller.py b/resources/lib/services/playback/action_controller.py
+index 8208330..1315ae5 100644
+--- a/resources/lib/services/playback/action_controller.py
++++ b/resources/lib/services/playback/action_controller.py
+@@ -52,6 +52,7 @@ class ActionController(xbmc.Monitor):
+         self._last_player_state = {}
+         self._is_pause_called = False
+         self._is_av_started = False
++        self._is_playback_started_notified = False
+         self._av_change_last_ts = None
+         self._is_delayed_seek = False
+         self._is_ads_plan = G.LOCAL_DB.get_value('is_ads_plan', None, table=TABLE_SESSION)
+@@ -70,6 +71,7 @@ class ActionController(xbmc.Monitor):
+     def _initialize_am(self):
+         self._last_player_state = {}
+         self._is_pause_called = False
++        self._is_playback_started_notified = False
+         self._av_change_last_ts = None
+         self._is_delayed_seek = False
+         if not self._init_data:
+@@ -163,6 +165,7 @@ class ActionController(xbmc.Monitor):
+             LOG.error(traceback.format_exc())
+             self.is_tracking_enabled = False
+             self._is_av_started = False
++            self._is_playback_started_notified = False
+             if self._playback_tick and self._playback_tick.is_alive():
+                 self._playback_tick.stop_join()
+                 self._playback_tick = None
+@@ -176,6 +179,8 @@ class ActionController(xbmc.Monitor):
+             player_state = self._get_player_state()
+             if not player_state:
+                 return
++            if not self._is_playback_started_notified:
++                self._notify_playback_started(player_state)
+             # If we are waiting for OnAVChange events, dont send call_on_tick otherwise will mix old/new player_state info
+             if not self._av_change_last_ts:
+                 self._notify_all(ActionManager.call_on_tick, player_state)
+@@ -195,10 +200,18 @@ class ActionController(xbmc.Monitor):
+ 
+     def _on_playback_started(self):
+         player_id = _get_player_id()
+-        self._notify_all(ActionManager.call_on_playback_started, self._get_player_state(player_id))
++        self.active_player_id = player_id
++        player_state = self._get_player_state(player_id)
++        if not player_state:
++            LOG.warn('ActionController: delayed playback-start manager notifications until player state is available')
++            return
++        self._notify_playback_started(player_state)
++
++    def _notify_playback_started(self, player_state):
++        self._notify_all(ActionManager.call_on_playback_started, player_state)
++        self._is_playback_started_notified = True
+         if LOG.is_enabled and G.ADDON.getSettingBool('show_codec_info'):
+             common.json_rpc('Input.ExecuteAction', {'action': 'codecinfo'})
+-        self.active_player_id = player_id
+ 
+     def _on_playback_seek(self, time_override):
+         if self.active_player_id is not None:
+@@ -228,11 +241,15 @@ class ActionController(xbmc.Monitor):
+         self.active_player_id = None
+         # Immediately send the request to release the license
+         common.run_threaded(True, self.msl_handler.release_license)
+-        self._notify_all(ActionManager.call_on_playback_stopped,
+-                         self._last_player_state)
++        if self._is_playback_started_notified and self._last_player_state:
++            self._notify_all(ActionManager.call_on_playback_stopped,
++                             self._last_player_state)
++        else:
++            LOG.warn('ActionController: skipped playback-stop manager notifications due to missing player state')
+         self.action_managers = None
+         self.init_count -= 1
+         self._is_av_started = False
++        self._is_playback_started_notified = False
+ 
+     def _notify_all(self, notification, data=None):
+         LOG.debug('Notifying all action managers of {} (data={})', notification.__name__, data)
+@@ -280,10 +297,12 @@ class ActionController(xbmc.Monitor):
+         except IOError as exc:
+             LOG.warn('_get_player_state: {}', exc)
+             return {}
+-        if not player_state['currentaudiostream'] and player_state['audiostreams']:
++        if not player_state.get('currentaudiostream') and player_state.get('audiostreams'):
+             return {}  # if audio stream has not been loaded yet, there is empty currentaudiostream
+-        if not player_state['currentsubtitle'] and player_state['subtitles']:
++        if not player_state.get('currentsubtitle') and player_state.get('subtitles'):
+             return {}  # if subtitle stream has not been loaded yet, there is empty currentsubtitle
++        if not player_state.get('videostreams') or not player_state.get('time') or 'percentage' not in player_state:
++            return {}  # if video stream details have not been loaded yet
+         try:
+             player_state['playerid'] = self.active_player_id if player_id is None else player_id
+             # convert time dict to elapsed seconds
+diff --git a/resources/lib/services/playback/am_playback.py b/resources/lib/services/playback/am_playback.py
+index 0f61afc..44bafe2 100644
+--- a/resources/lib/services/playback/am_playback.py
++++ b/resources/lib/services/playback/am_playback.py
+@@ -13,6 +13,7 @@ import xbmc
+ import xbmcvfs
+ 
+ import resources.lib.common as common
++from resources.lib.common.cache_utils import CACHE_BOOKMARKS, CACHE_INFOLABELS
+ from resources.lib.globals import G
+ from resources.lib.utils.logging import LOG
+ from .action_manager import ActionManager
+@@ -92,12 +93,16 @@ class AMPlayback(ActionManager):
+         # falls in the part that kodi recognizes as unwatched (playcountminimumpercent 90% + no-mans land 2%)
+         # https://kodi.wiki/view/HOW-TO:Modify_automatic_watch_and_resume_points#Settings_explained
+         # In these cases we try change/fix manually the watched status of the video by using netflix offset data
+-        if int(player_state['percentage']) > 92:
+-            return
+-        if not self.watched_threshold or not player_state['current_pts'] > self.watched_threshold:
++        watched_by_percent = int(player_state['percentage']) > 92
++        watched_by_threshold = self.watched_threshold and player_state['current_pts'] > self.watched_threshold
++        if not watched_by_percent and not watched_by_threshold:
+             return
+         if G.ADDON.getSettingBool('sync_watched_status') and not self.is_played_from_strm:
+-            # This have not to be applied with our custom watched status of Netflix sync, within the addon
++            profile_guid = G.LOCAL_DB.get_active_profile_guid()
++            G.SHARED_DB.set_watched_status(profile_guid, self.videoid.value, True)
++            G.CACHE.delete(CACHE_INFOLABELS, f'{self.videoid.value}_{G.LOCAL_DB.get_profile_config("language", "")}')
++            G.CACHE.delete(CACHE_BOOKMARKS, self.videoid.value)
++            LOG.info('Has been fixed the local watched status of the video: {}', self.videoid)
+             return
+         if self.is_played_from_strm:
+             # The current video played is a STRM, then generate the path of a STRM file
+diff --git a/resources/lib/services/playback/am_video_events.py b/resources/lib/services/playback/am_video_events.py
+index a8823d1..5361cb8 100644
+--- a/resources/lib/services/playback/am_video_events.py
++++ b/resources/lib/services/playback/am_video_events.py
+@@ -8,10 +8,12 @@
+     See LICENSES/MIT.md for more information.
+ """
+ from typing import TYPE_CHECKING
++import time
+ 
+ from resources.lib import common
+ from resources.lib.common.cache_utils import CACHE_BOOKMARKS, CACHE_COMMON, CACHE_MANIFESTS
+ from resources.lib.common.exceptions import InvalidVideoListTypeError
++import requests.exceptions as req_exceptions
+ from resources.lib.globals import G
+ from resources.lib.services.nfsession.msl.msl_utils import EVENT_ENGAGE, EVENT_START, EVENT_STOP, EVENT_KEEP_ALIVE
+ from resources.lib.utils.api_paths import build_paths, EVENT_PATHS
+@@ -54,7 +56,13 @@ class AMVideoEvents(ActionManager):
+             return
+         if (not data['is_played_from_strm'] or
+                 (data['is_played_from_strm'] and G.ADDON.getSettingBool('sync_watched_status_library'))):
+-            self.event_data = self._get_event_data(self.videoid)
++            try:
++                self.event_data = self._get_event_data(self.videoid)
++            except req_exceptions.HTTPError as exc:
++                if getattr(exc.response, 'status_code', None) != 404:
++                    raise
++                LOG.warn('AMVideoEvents: falling back to metadata endpoint because video event metadata path returned 404')
++                self.event_data = self._get_event_data_metadata(self.videoid)
+             self.event_data['videoid'] = self.videoid
+             self.event_data['is_played_by_library'] = data['is_played_from_strm']
+         else:
+@@ -67,7 +75,7 @@ class AMVideoEvents(ActionManager):
+         try:
+             videoid_exists, list_id = self.directory_builder.get_continuewatching_videoid_exists(
+                 str(self.videoid_parent.value))
+-            if not videoid_exists:
++            if not videoid_exists and list_id:
+                 # Delete the cache of continueWatching list
+                 G.CACHE.delete(CACHE_COMMON, list_id, including_suffixes=True)
+                 # When the continueWatching context is invalidated from a refreshListByContext call
+@@ -202,6 +210,33 @@ class AMVideoEvents(ActionManager):
+             event_data['track_id'] = videoid_data['trackIds']['value']['trackId_jaw']
+         return event_data
+ 
++    def _get_event_data_metadata(self, videoid):
++        parent_id = videoid.tvshowid if videoid.mediatype == common.VideoId.EPISODE else videoid.value
++        metadata_data = self.nfsession.get_safe(
++            endpoint='metadata',
++            params={'movieid': parent_id, '_': int(time.time() * 1000)})
++        item = metadata_data.get('video', {})
++        if videoid.mediatype == common.VideoId.EPISODE:
++            for season in item.get('seasons', []):
++                for episode in season.get('episodes', []):
++                    if str(episode.get('id')) == videoid.value:
++                        item = episode
++                        break
++                else:
++                    continue
++                break
++        bookmark = item.get('bookmark') or {}
++        bookmark_position = bookmark.get('offset') or item.get('bookmarkPosition') or 0
++        return {
++            'resume_position': bookmark_position if bookmark_position and bookmark_position > -1 else None,
++            'runtime': item.get('runtime') or 0,
++            'request_id': item.get('requestId') or '',
++            'watched': bool(bookmark.get('watchedDate') or item.get('watched')),
++            'is_in_mylist': False,
++            'track_id': (item.get('trackIds') or {}).get('trackId_jawEpisode') or
++                        (item.get('trackIds') or {}).get('trackId_jaw') or 0
++        }
++
+     def _get_video_raw_data(self, videoids):
+         """Retrieve raw data for specified video id's"""
+         video_ids = [int(videoid.value) for videoid in videoids]
+diff --git a/resources/lib/utils/api_paths.py b/resources/lib/utils/api_paths.py
+index 7764571..bb0f78f 100644
+--- a/resources/lib/utils/api_paths.py
++++ b/resources/lib/utils/api_paths.py
+@@ -112,7 +112,9 @@ INFO_MAPPINGS = [
+     ('Duration', ['runtime', 'value']),
+     # 'trailer' add the trailer button support to 'Information' window of ListItem, can be used from custom Kodi skins
+     #   to reproduce a background promo video when a ListItem is selected
++    ('Trailer', ['trailerUrl', 'value']),
+     ('Trailer', ['promoVideo', 'value', 'id']),
++    ('Trailer', ['promoVideo', 'value', 'videoId']),
+     # ListItem.DateAdded: Removed for now, the actual use of this property for tvshow ListItem type is not clear,
+     #                     the documentation says "date of adding in the library", but kodi developers say that
+     #                     is used as the latest update date
+@@ -124,8 +126,7 @@ INFO_TRANSFORMATIONS = {
+     'Season': lambda s_value: _convert_season(s_value),
+     'Rating': lambda r: r / 10,
+     'PlayCount': lambda w: int(w),
+-    'Trailer': lambda video_id: common.build_url(pathitems=[common.VideoId.SUPPLEMENTAL, str(video_id)],
+-                                                 mode=G.MODE_PLAY),
++    'Trailer': lambda video_id: _convert_trailer(video_id),
+     'DateAdded': lambda ats: common.strf_timestamp(int(ats / 1000), '%Y-%m-%d %H:%M:%S')
+ }
+ 
+@@ -144,6 +145,13 @@ def _convert_season(value):
+     return int(''.join([n for n in value if n.isdigit()] or '0'))
+ 
+ 
++def _convert_trailer(value):
++    if isinstance(value, str) and (value.startswith('http') or value.startswith('plugin://')):
++        return value
++    return common.build_url(pathitems=[common.VideoId.SUPPLEMENTAL, str(value)],
++                            mode=G.MODE_PLAY)
++
++
+ def build_paths(base_path, partial_paths):
+     """Build a list of full paths by concatenating each partial path with the base path"""
+     paths = [base_path + partial_path for partial_path in partial_paths]
+diff --git a/resources/lib/utils/api_requests.py b/resources/lib/utils/api_requests.py
+index c6cd1ce..4c46147 100644
+--- a/resources/lib/utils/api_requests.py
++++ b/resources/lib/utils/api_requests.py
+@@ -18,6 +18,22 @@ from .logging import LOG, measure_exec_time_decorator
+ from ..database.db_utils import TABLE_SESSION
+ 
+ 
++MY_LIST_GRAPHQL_MUTATIONS = {
++    'add': {
++        'operation_name': 'AddToPlaylist',
++        'operation_id': '8d985f07-2117-4add-980c-b83895549d1c',
++        'response_key': 'addEntityToPlaylist',
++        'expected_state': True
++    },
++    'remove': {
++        'operation_name': 'RemoveFromPlaylist',
++        'operation_id': '11403da1-d6fd-4cd7-9ad7-892554b70047',
++        'response_key': 'removeEntityFromPlaylist',
++        'expected_state': False
++    }
++}
++
++
+ def logout():
+     """Logout of the current account"""
+     common.make_call('logout')
+@@ -152,20 +168,26 @@ def update_remindme(operation, videoid, trackid):
+ @measure_exec_time_decorator()
+ def update_my_list(videoid, operation, params):
+     """Call API to add / remove videos to my list"""
+-    if params['trackid'] == 'None':
+-        raise ErrorMsg('Unable update my list, trackid not found.')
++    mutation = MY_LIST_GRAPHQL_MUTATIONS.get(operation)
++    if not mutation:
++        raise APIError(f'Unsupported my list operation: {operation}')
++
+     LOG.debug('My List: {} {}', operation, videoid)
++    variables = {'entityId': str(videoid.value)}
++    trackid = params.get('trackid')
++    if trackid and trackid != 'None':
++        variables['trackId'] = str(trackid)
++
+     response = common.make_call(
+-        'post_safe',
+-        {'endpoint': 'playlistop',
+-         'data': {
+-             'lolomoId': 'unknown',
+-             'operation': operation,
+-             'videoId': int(videoid.value),
+-             'trackId': int(params['trackid']),
+-             'skipRootInvalidation': True,
+-         }})
+-    if response.get('status') != 'success':
++        'post_graphql',
++        {'operation_name': mutation['operation_name'],
++         'operation_id': mutation['operation_id'],
++         'variables': variables,
++         'referer': f'https://www.netflix.com/title/{videoid.value}'})
++    entity = (response.get('data', {})
++              .get(mutation['response_key'], {})
++              .get('entity', {}))
++    if entity.get('isInPlaylist') != mutation['expected_state']:
+         LOG.debug('update_my_list response: {}', response)
+         raise APIError('Unable update my list, an error occurred in the request.')
+     _update_mylist_cache(videoid, operation, params)
+diff --git a/resources/lib/utils/data_types.py b/resources/lib/utils/data_types.py
+index 914e3be..8f3b083 100644
+--- a/resources/lib/utils/data_types.py
++++ b/resources/lib/utils/data_types.py
+@@ -337,7 +337,10 @@ def _filterout_loco_contexts(root_id, data, contexts):
+     """Deletes from the data all records related to the specified contexts"""
+     total_items = data['locos'][root_id]['componentSummary'].get('value', {}).get('length', 0)
+     for index in range(total_items - 1, -1, -1):
+-        list_id = data['locos'][root_id][str(index)]['value'][1]
++        row = data['locos'][root_id].get(str(index))
++        if not row:
++            continue
++        list_id = row['value'][1]
+         if not data['lists'][list_id]['componentSummary'].get('value', {}).get('context') in contexts:
+             continue
+         del data['lists'][list_id]
