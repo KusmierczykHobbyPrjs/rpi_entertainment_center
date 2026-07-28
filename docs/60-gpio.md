@@ -128,14 +128,42 @@ script if you need that.
 
 Three layers, because a falling edge on its own means very little:
 
-- **300 ms hardware debounce** in `RPi.GPIO` — mechanical contacts bounce for
-  a few milliseconds, and without this one press fires several times.
+- **Debounce** in the GPIO library — mechanical contacts bounce for a few
+  milliseconds, and without this one press fires several times.
 - **A hold check.** The pin must still read LOW after `HOLD_MS` (50 ms by
   default). This is what rejects electrical crosstalk: a neighbouring button
   can induce a genuine edge, but not hold the line down.
 - **1 second repeat guard** in the handler, because the actions are heavyweight
   (shutdown, UI switch, VPN reconnect) and a second press that soon is almost
-  always an accident.
+  always an accident. Ignored presses are logged, so a button that seems dead
+  can be told apart from one that is being deliberately suppressed.
+
+### The two backends debounce differently
+
+This matters enough to state plainly, because it once made every button feel
+broken:
+
+| Package | What `bouncetime` does |
+|---|---|
+| `python3-rpi.gpio` | **A lockout.** The edge is reported at once, then further edges are ignored for that long. Free in latency. |
+| `python3-rpi-lgpio` | **A stability filter.** The line must stay steady for that long *before the edge is reported at all* — so it is added directly to how long you must hold the button. |
+
+`gpio_buttons.py` detects which is in use and picks the debounce accordingly —
+300 ms on the original, 20 ms on the shim — then subtracts what the filter
+already waited from its own hold check. The result is that `HOLD_MS` means the
+same thing on both: **how long you actually hold the button**.
+
+A single value would have been wrong for one of them. At 300 ms on the shim,
+an ordinary button needed 350 ms of steady contact and the shutdown button
+1800 ms, which is indistinguishable from a broken wire.
+
+The listener prints what it decided, so you never have to guess:
+
+```
+[gpio] Backend: rpi-lgpio, debounce 20ms
+[gpio] GPIO3 -> sudo shutdown now   (press and hold ~1500ms)
+[gpio] GPIO4 -> bash .../stop_current_ui.sh   (press and hold ~50ms)
+```
 
 `stop_current_ui.sh` and `nordvpn_rotate.sh` additionally rate-limit
 themselves to one run per 5 seconds, since they are also reachable from Kodi
@@ -258,6 +286,36 @@ responsiveness for tolerance; a pull-up resistor is the real answer.
 The debounce is not taking effect, which usually means a particularly bouncy
 switch. Raise `BOUNCE_MS` in `bin/gpio_buttons.py`, or add a 100 nF capacitor
 across the switch.
+
+On `python3-rpi-lgpio`, raise it in small steps — every millisecond there is a
+millisecond longer you must hold the button before anything happens. Past about
+50 ms, fix the switch instead.
+
+**Buttons feel unresponsive, or seem to need a long press**
+
+Run the listener in the foreground and read the first lines:
+
+```bash
+pkill -f gpio_buttons.py
+python3 bin/gpio_buttons.py "4:echo PRESSED"
+```
+
+```
+[gpio] Backend: rpi-lgpio, debounce 20ms
+[gpio] GPIO4 -> echo PRESSED   (press and hold ~50ms)
+```
+
+The bracketed figure is how long the button genuinely has to be held. If it
+says something like 350 ms for an ordinary button, `BOUNCE_MS` has been raised
+on a backend where it costs latency — see [the two backends
+above](#the-two-backends-debounce-differently).
+
+If presses print nothing at all but a second press a moment later works, you
+are hitting the repeat guard; it logs the fact:
+
+```
+[gpio] GPIO4 ignored - within 1.0s of the last press
+```
 
 **The button works but the command does not**
 
