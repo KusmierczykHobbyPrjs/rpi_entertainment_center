@@ -86,4 +86,9 @@ ${REC_C_BOLD}Not bundled - download these yourself${REC_C_OFF}
 
   Netflix, Disney+ and other DRM services additionally need Widevine and an
   authentication key - documented in docs/20-kodi-addons.md.
+
+  Netflix logins currently fail with a 404 on .../api/shakti/mre/profilehub -
+  Netflix retired that endpoint. After installing the add-on, run:
+      bash $REC_BIN/kodi_netflix_fix.sh
+  and re-run it after each add-on update. See docs/20-kodi-addons.md.
 EOF

@@ -682,6 +682,19 @@ break, not your configuration — Netflix changed its API and the add-on has not
 caught up. See [when it
 breaks](20-kodi-addons.md#when-it-breaks-netflix-api-changes).
 
+**Netflix login returns to the login-method chooser after you type the
+password**, with `404 Client Error ... /api/shakti/mre/profilehub` in
+`kodi.log`. Netflix retired that endpoint, so the add-on cannot verify the
+password — even though the session it just built is valid. Fix:
+
+```bash
+bash bin/kodi_netflix_fix.sh
+```
+
+Restart Kodi and log in again with your key. Details and the reasoning:
+[20-kodi-addons.md](20-kodi-addons.md#fixing-the-login).
+Re-run it after any add-on update.
+
 **Read the actual error:**
 
 ```bash
@@ -828,7 +841,7 @@ sed -i '/>>> rpi-entertainment-center >>>/,/<<< rpi-entertainment-center <<</d' 
 ```
 
 **Reinstall the whole system:** back up the things listed in
-[INSTALL.md §13](../INSTALL.md#13-restoring-a-previous-installation) first —
+[INSTALL.md §14](../INSTALL.md#14-restoring-a-previous-installation) first —
 in particular `config.sh`, `~/.kodi/userdata/`, `~/RetroPie/roms/` and
 `/opt/retropie/configs/`.
 

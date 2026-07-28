@@ -259,32 +259,109 @@ requests.exceptions.HTTPError: 404 Client Error: Not Found for url:
   https://www.netflix.com/api/shakti/mre/profilehub
 ```
 
-A **404 is server-side**: that endpoint does not exist. Note the path segment
-before the endpoint (`mre` above) — that is normally a Netflix build
-identifier the add-on scrapes from the page. When it looks like a placeholder,
-the add-on has failed to parse Netflix's current page layout and is building
-URLs that could never resolve.
+A **404 is server-side**: that address does not exist. `mre` is not a
+placeholder and not something the add-on failed to parse — it is a **hardcoded
+constant** in the add-on, in
+`resources/lib/services/nfsession/session/endpoints.py`:
+
+```python
+'profile_hub':
+    {'address': '/api/shakti/mre/profilehub',
+```
+
+Netflix has retired the whole `/api/shakti/mre/*` family. Four endpoints use
+it — `profilehub`, `profiles/switch`, `profileLock`, `contentRestrictions` —
+so login, profile switching and parental controls all broke together. Because
+the address is a constant rather than a value scraped per session, the
+add-on's built-in "refresh the session and retry" recovery cannot help: it
+retries the same dead URL. That is the second `Attempt to refresh the session
+due to HTTP error 404` line in the log.
 
 Reported repeatedly over the years, and open again through 2026:
-[#1438](https://github.com/CastagnaIT/plugin.video.netflix/issues/1438),
-[#1781](https://github.com/CastagnaIT/plugin.video.netflix/issues/1781),
-[#1792](https://github.com/CastagnaIT/plugin.video.netflix/issues/1792).
+[#1438](https://github.com/CastagnaIT/plugin.video.netflix/issues/1438)
+(closed, 2022),
+[#1781](https://github.com/CastagnaIT/plugin.video.netflix/issues/1781) and
+[#1792](https://github.com/CastagnaIT/plugin.video.netflix/issues/1792) (both
+open as of July 2026).
 
 ### What actually helps
 
-1. **Update the add-on**, and make sure it came from the CastagnaIT
-   *repository* rather than a one-off zip — a zip never updates itself, so you
-   can sit on a broken version indefinitely.
-2. **Check the tracker** for the exact endpoint from your log:
-   <https://github.com/CastagnaIT/plugin.video.netflix/issues>
-3. **Wait.** If the issue is open and untriaged, there is nothing local to do.
-4. **Watch it in the browser instead** — see below. There is no alternative
+**Updating does not.** `1.23.5+matrix.1` — the version in the log above — is
+the newest release, and upstream has had no commits since August 2025. There
+is nothing newer to install. Check before you assume otherwise:
+
+```bash
+grep -o 'version="[^"]*"' ~/.kodi/addons/plugin.video.netflix/addon.xml | head -1
+```
+
+against <https://github.com/CastagnaIT/plugin.video.netflix/releases>.
+
+For the **login** failure specifically, this project ships a fix — see the
+next section. For everything else:
+
+1. **Check the tracker** for the exact endpoint from your log:
+   <https://github.com/CastagnaIT/plugin.video.netflix/issues>. Community
+   patches appear there before releases do; profile switching has one in
+   [PR #1783](https://github.com/CastagnaIT/plugin.video.netflix/pull/1783),
+   unmerged.
+2. **Watch it in the browser instead** — see below. There is no alternative
    Kodi add-on to switch to.
 
 > **There is only one Netflix add-on for Kodi.** CastagnaIT's is it. The
 > [SlyGuy add-ons](https://github.com/matthuisman/slyguy.addons) cover Disney+
 > and HBO Max but **not Netflix** — it has been requested and does not exist.
 > When CastagnaIT's is broken, Kodi cannot play Netflix at all.
+
+### Fixing the login
+
+The login failure *is* fixable locally, because the call that fails does not
+do anything the login needs.
+
+```bash
+bash bin/kodi_netflix_fix.sh          # apply
+bash bin/kodi_netflix_fix.sh --status # is it applied?
+bash bin/kodi_netflix_fix.sh --revert # undo
+```
+
+Restart Kodi, then log in with your authentication key again.
+
+**Why skipping it is sound.** Read `login_auth_data()` in
+`resources/lib/services/nfsession/session/access.py` and note the order. Before
+it ever calls `profilehub`, the add-on has already:
+
+1. loaded your authentication-key cookies into the session
+2. fetched `/browse` and parsed the session data — *this* is the real
+   validation, and it passed
+3. read your account e-mail off `/account/security`
+
+The `profilehub` call is a **confirmation** that the password you just typed is
+the right one, made through the parental-control API. Its 404 throws away a
+session that already works — the `cookies.save()` two lines later never runs,
+so a successful login is discarded.
+
+The patch adds a `404` branch beside the existing `500` one, logs a warning and
+carries on. Your password is still stored exactly as before, because the add-on
+needs it for MSL `EMAIL_PASSWORD` authentication during playback — so **type
+your real password**; the patch removes a check, not a credential.
+
+The cost: a wrong password is no longer caught at login. It shows up later as a
+playback failure instead.
+
+The script keeps the original as `access.py.rec-orig`, matches the exact 1.23.5
+source block (so an upstream rewrite makes it a clean no-op rather than a
+mangle), refuses to leave a file that does not compile, and is safe to re-run.
+
+> **Re-run it after every add-on update.** An update overwrites the patch —
+> which is what you want, since a genuine upstream fix should win.
+> `./bin/doctor.sh kodi` tells you when it needs reapplying.
+
+**This gets you logged in. It does not fix everything else.** Netflix also
+changed its Falcor content schema, which breaks browsing, search, My List and
+Continue Watching for some accounts
+([#1792](https://github.com/CastagnaIT/plugin.video.netflix/issues/1792)); and
+profile switching hits the same dead `mre` address
+([PR #1783](https://github.com/CastagnaIT/plugin.video.netflix/pull/1783)).
+If those bite too, the browser below is the answer.
 
 ### The fallback: Netflix in the browser
 
@@ -309,17 +386,18 @@ It is the difference between watching something and not watching it.
 
 - **Leaving the password prompt blank.** The failing call is guarded by
   `if password and ...` in `resources/lib/utils/api_requests.py`, which looks
-  like it would skip it — but the add-on simply returns to the login-method
-  chooser. Tested; it does not work.
+  like it would skip it — but `is_success` then stays `False` and the add-on
+  returns to the login-method chooser. Tested; it does not work.
 - **Regenerating the authentication key.** A 404 means the request never
   reached an authenticating endpoint, so the key is not the problem. If the
   key were wrong you would see 401 or 403.
 - **Reinstalling Widevine.** DRM is not involved until playback starts; this
   fails during login.
+- **Updating the add-on.** There is nothing newer than 1.23.5 — see above.
 
 ### Patching by hand
 
-Only worth it if you can see the fix in the traceback and cannot wait. Any edit
+Worth it when you can see the fix in the traceback and cannot wait. Any edit
 under `~/.kodi/addons/plugin.video.netflix/` is overwritten by the next add-on
 update — which is the outcome you want, since the real fix comes from upstream.
 
@@ -327,11 +405,17 @@ update — which is the outcome you want, since the real fix comes from upstream
 tail -100 ~/.kodi/temp/kodi.log
 ```
 
-A past example: a Netflix response stopped including `preferredLocale` and the
-add-on raised `KeyError` in `resources/lib/utils/website.py`. The fix was to
-read that key with a default rather than indexing it directly. A missing-key
-crash is patchable that way; a 404 is not — there is no local edit that brings
-back a deleted endpoint.
+Two kinds of breakage are worth telling apart:
+
+- **A crash on missing data is usually patchable.** A past example: a Netflix
+  response stopped including `preferredLocale` and the add-on raised
+  `KeyError` in `resources/lib/utils/website.py`. The fix was to read that key
+  with a default rather than indexing it directly.
+- **A 404 is patchable only if the call is dispensable.** No local edit brings
+  back a deleted endpoint, so the question is what the response was *for*. The
+  login 404 above qualifies — the answer was only a yes/no about your password
+  — which is exactly what `bin/kodi_netflix_fix.sh` exploits. A 404 on a call
+  that fetches content you then display does not: there is nothing to skip to.
 
 ---
 

@@ -201,6 +201,19 @@ if rec_has kodi; then
     else
         warn "Shell Script Launcher menu is missing" "./install.sh 20-kodi-addons"
     fi
+
+    # The Netflix add-on cannot complete a login on its own any more: Netflix
+    # retired the endpoint it uses to verify your password. Only report this if
+    # the add-on is actually installed - most people do not have it.
+    nf_access="${KODI_HOME:-$HOME/.kodi}/addons/plugin.video.netflix/resources/lib/services/nfsession/session/access.py"
+    if [[ -f "$nf_access" ]]; then
+        if grep -q 'rec-patch:profilehub-404' "$nf_access"; then
+            pass "Netflix add-on has the profilehub 404 login patch"
+        else
+            warn "Netflix add-on login will fail with a profilehub 404" \
+                 "bash bin/kodi_netflix_fix.sh"
+        fi
+    fi
 else
     warn "Kodi is not installed" "./install.sh 10-kodi"
 fi

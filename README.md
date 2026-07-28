@@ -189,6 +189,7 @@ Install them in this order; each is a separate `./install.sh <name>` run.
 │   ├── speech.sh               spoken messages
 │   ├── signal_action.sh        the confirmation beep
 │   ├── clipboard2chromium.sh   open the phone's clipboard URL on the TV
+│   ├── kodi_netflix_fix.sh     unstick the Netflix add-on's broken login
 │   ├── backup.sh               save settings before a reinstall
 │   ├── restore.sh              put them back afterwards
 │   ├── doctor.sh               health check
