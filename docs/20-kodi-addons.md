@@ -188,9 +188,9 @@ actually shows a `pycryptodomex`/`Crypto` import error.
 > **Once it plays, it will probably play badly.** A Pi 3B decodes only H.264 in
 > hardware, and Widevine decrypts in software on top of that.
 > **[PERFORMANCE.md](PERFORMANCE.md)** covers which resolution and codec
-> settings to use — and warns about the InputStream Adaptive bandwidth cap,
-> which is global to every add-on and is the usual reason live TV mysteriously
-> drops to 576p after someone tunes Netflix.
+> settings to use. Read it before reaching for InputStream Adaptive's bandwidth
+> cap: that setting belongs to ISA rather than to the add-on you found it
+> under, so it silently degrades every other streaming add-on too.
 
 ### 3. Install Widevine
 

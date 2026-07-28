@@ -69,9 +69,9 @@ add-on whose menu you reached them through. Setting
 > **Maksymalna przepustowość (Kbps)** / *Maximum bandwidth (Kbps)* → `1000`
 
 throttles **every** add-on that uses InputStream Adaptive — Netflix, Disney+,
-TVP VOD, Polsat, and IPTV channels configured to use ISA. If you capped
-bandwidth to make Netflix watchable and then found live TV stuck at 576p, that
-is not a coincidence; it is the same setting.
+TVP VOD, Polsat, and IPTV channels configured to use ISA. Tune one service with
+it and you have quietly degraded all the others, in a place you will not think
+to look when live TV turns soft a fortnight later.
 
 It is also the wrong lever. It limits **bitrate**, while the Pi's difficulty is
 **pixels and decryption**. Netflix's H.264 ladder puts 720p at roughly
@@ -162,14 +162,45 @@ These add-ons often let you choose the playback engine:
 | Obeys the ISA caps above | **yes** | no |
 | Typical starting quality | whatever the caps allow | usually the highest variant |
 
-**If live TV looked low-resolution under ISA, suspect the global bandwidth cap
-first.** Set `Maximum bandwidth` back to `0`, then try ISA again before
-settling on ffmpeg. If ISA is still worse, ffmpeg is a perfectly reasonable
-choice for live TV — you lose the ability to step down gracefully, so a
-congested network shows up as buffering rather than a softer picture.
+### Live TV starts low under ISA and stays there
 
-Note that these settings live in each add-on, so TVP, Polsat and Player.pl are
-configured separately.
+The usual cause is not a cap you set — it is an ISA **default**:
+
+> **Automatycznie określa początkową przepustowość**
+> / *Auto determines initial bandwidth* — default **on**
+
+ISA estimates your bandwidth from the very first download and picks a rung to
+start on. Upstream's own help text admits the estimate "may not be accurate"
+and says: *if the video quality at the start of playback is too low, try
+disabling it*.
+
+Live streams are the worst case for this. Segments are short, the first fetch
+is often a tiny init segment or comes from a warm edge cache, and there is no
+long buffer to climb out of a bad guess with — so it lands on a low rung and
+sits there for the whole session. Video on demand usually recovers; live
+usually does not.
+
+| Setting | Set to |
+|---|---|
+| **Automatycznie określa początkową przepustowość**<br>*Auto determines initial bandwidth* | off |
+| **Początkowa przepustowość (Kbps)**<br>*Initial bandwidth (Kbps)* | `4000` (the default), or higher on a fast wired link |
+
+This also explains why ffmpeg often looks better on live TV: it does not
+estimate anything, it just plays a variant from the master playlist — usually
+the top one.
+
+**Before changing anything, find out whether a better stream exists.** Set
+`Typ wyboru strumienia` to `manual-osd` and look at the list during playback.
+If 576p is the only entry, that is what the channel broadcasts and no setting
+will improve it.
+
+If ISA is still worse after that, ffmpeg is a perfectly reasonable choice for
+live TV — you lose the ability to step down gracefully, so a congested network
+shows up as buffering rather than a softer picture.
+
+Note that the player-type setting lives in each add-on, so TVP, Polsat and
+Player.pl are configured separately. The ISA settings above are shared by all
+of them.
 
 ---
 
@@ -181,6 +212,8 @@ ISA    → Stream selection type                         default
 ISA    → Maximum bandwidth (Kbps)                      0
 ISA    → Maximum resolution for DRM videos             720p
 ISA    → Maximum resolution                            auto
+ISA    → Auto determines initial bandwidth             off      (live TV)
+ISA    → Initial bandwidth (Kbps)                      4000
 Netflix→ VP9 / HEVC / AV1 codecs                       off
 Netflix→ Limit streaming resolution to                 --  (ISA handles it)
 TVP    → Player type                                   try ISA first
