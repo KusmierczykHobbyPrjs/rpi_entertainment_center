@@ -208,7 +208,7 @@ ports on your router unless the device behind them has its own password.
 
 ```bash
 REC_GPIO_BUTTONS=(
-    "3:sudo shutdown now"
+    "3@1500:sudo shutdown now"
     "4:bash $REC_BIN/stop_current_ui.sh"
     "17:bash $REC_BIN/nordvpn_rotate.sh"
     "22:kodi-send -a PlayerControl(Play)"

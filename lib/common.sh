@@ -250,6 +250,55 @@ rec_group_configured() {
     id -nG "${2:-$USER}" 2>/dev/null | tr ' ' '\n' | grep -qx "$1"
 }
 
+# Default hold time for a GPIO button, in milliseconds. Mirrors DEFAULT_HOLD_MS
+# in bin/gpio_buttons.py, which is the authority - change both together.
+REC_GPIO_DEFAULT_HOLD_MS=50
+
+# Parse one REC_GPIO_BUTTONS entry. Returns 1 if it is malformed, otherwise
+# sets three variables in the caller's scope:
+#
+#   REC_BTN_PIN      BCM pin number
+#   REC_BTN_HOLD_MS  how long the pin must stay low to count as a press
+#   REC_BTN_CMD      the command, unsplit
+#
+# Accepted forms - the @HOLD suffix is optional, so entries written before it
+# existed keep working:
+#
+#   "17:bash foo.sh"                 hold for REC_GPIO_DEFAULT_HOLD_MS
+#   "3@1500:sudo shutdown now"       hold the pin low for 1500 ms first
+#
+# This lives here because doctor.sh and modules/60-gpio/install.sh both
+# validate the map, and gpio_buttons.py parses it for real. Three copies of the
+# rule is two too many: the @HOLD syntax was added to the Python and the config
+# template but not to the two bash validators, which then rejected the shipped
+# default as malformed.
+rec_parse_button() {
+    local spec="$1" head cmd hold
+
+    [[ "$spec" == *:* ]] || return 1
+    head="${spec%%:*}"
+    cmd="${spec#*:}"                    # first colon only: URLs in the command survive
+    [[ -n "${cmd//[[:space:]]/}" ]] || return 1
+
+    hold=""
+    if [[ "$head" == *@* ]]; then
+        hold="${head#*@}"
+        head="${head%%@*}"
+        [[ "$hold" =~ ^[0-9]+$ ]] || return 1
+    fi
+    [[ "$head" =~ ^[0-9]+$ ]] || return 1
+
+    REC_BTN_PIN="$head"
+    REC_BTN_HOLD_MS="${hold:-$REC_GPIO_DEFAULT_HOLD_MS}"
+    REC_BTN_CMD="$cmd"
+}
+
+# Does this command power the machine off? Used to insist on a deliberate hold:
+# an accidental shutdown from crosstalk is the one button mistake you notice.
+rec_button_is_destructive() {
+    [[ "$1" =~ (^|[[:space:]/])(shutdown|reboot|poweroff|halt)([[:space:]]|$) ]]
+}
+
 # List Bluetooth adapters as "hciN kind MAC", one per line, where kind is
 # "usb" (a dongle) or "builtin" (the Pi's own chip).
 #

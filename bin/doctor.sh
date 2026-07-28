@@ -416,27 +416,36 @@ fi
 if [[ ${#REC_GPIO_BUTTONS[@]} -gt 0 ]]; then
     pass "${#REC_GPIO_BUTTONS[@]} button(s) configured"
     for entry in "${REC_GPIO_BUTTONS[@]}"; do
-        pin="${entry%%:*}"
-        cmd="${entry#*:}"
-        if [[ "$pin" =~ ^[0-9]+$ ]]; then
-            # Verify the command's binary exists - a typo here means a dead
-            # button with no error message anywhere.
-            read -r -a parts <<<"$cmd"
-            # Look past wrappers to the thing that actually has to exist.
-            idx=0
-            while [[ "${parts[$idx]:-}" =~ ^(sudo|bash|sh|python3)$ ]]; do
-                idx=$((idx + 1))
-            done
-            binary="${parts[$idx]:-}"
-            if [[ -z "$binary" ]]; then
-                bad "GPIO$pin has no command"
-            elif rec_has "$binary" || [[ -f "$binary" ]]; then
-                pass "GPIO$pin -> $cmd"
-            else
-                bad "GPIO$pin -> '$binary' not found" "Fix REC_GPIO_BUTTONS in config.sh"
-            fi
+        if ! rec_parse_button "$entry"; then
+            bad "Malformed button entry: $entry" \
+                "Use PIN:COMMAND or PIN@HOLD_MS:COMMAND - docs/60-gpio.md"
+            continue
+        fi
+        pin="$REC_BTN_PIN"; cmd="$REC_BTN_CMD"; hold="$REC_BTN_HOLD_MS"
+
+        # Verify the command's binary exists - a typo here means a dead
+        # button with no error message anywhere.
+        read -r -a parts <<<"$cmd"
+        # Look past wrappers to the thing that actually has to exist.
+        idx=0
+        while [[ "${parts[$idx]:-}" =~ ^(sudo|bash|sh|python3)$ ]]; do
+            idx=$((idx + 1))
+        done
+        binary="${parts[$idx]:-}"
+        if [[ -z "$binary" ]]; then
+            bad "GPIO$pin has no command"
+        elif rec_has "$binary" || [[ -f "$binary" ]]; then
+            pass "GPIO$pin (hold ${hold}ms) -> $cmd"
         else
-            bad "Malformed button entry: $entry" "Use the form PIN:COMMAND"
+            bad "GPIO$pin -> '$binary' not found" "Fix REC_GPIO_BUTTONS in config.sh"
+        fi
+
+        # Crosstalk between adjacent header pins produces genuine falling
+        # edges. A short hold on a power command is how a brush against one
+        # button turns into a shutdown.
+        if rec_button_is_destructive "$cmd" && (( hold < 1000 )); then
+            warn "GPIO$pin powers the Pi down after only ${hold}ms" \
+                 "Use \"${pin}@1500:${cmd}\" in config.sh - docs/60-gpio.md"
         fi
     done
 else

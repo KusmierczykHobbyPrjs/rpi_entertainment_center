@@ -55,12 +55,15 @@ if [[ ${#REC_GPIO_BUTTONS[@]} -eq 0 ]]; then
     skip "No buttons configured in REC_GPIO_BUTTONS"
 else
     for entry in "${REC_GPIO_BUTTONS[@]}"; do
-        pin="${entry%%:*}"
-        cmd="${entry#*:}"
-        if [[ "$pin" =~ ^[0-9]+$ ]]; then
-            ok "GPIO$pin -> $cmd"
+        if rec_parse_button "$entry"; then
+            ok "GPIO$REC_BTN_PIN (hold ${REC_BTN_HOLD_MS}ms) -> $REC_BTN_CMD"
+            if rec_button_is_destructive "$REC_BTN_CMD" && (( REC_BTN_HOLD_MS < 1000 )); then
+                note "GPIO$REC_BTN_PIN powers the Pi down after only ${REC_BTN_HOLD_MS}ms."
+                note "Crosstalk from a neighbouring button can trigger that."
+                note "Consider \"${REC_BTN_PIN}@1500:${REC_BTN_CMD}\" - see docs/60-gpio.md."
+            fi
         else
-            fail "Malformed entry (want 'PIN:COMMAND'): $entry"
+            fail "Malformed entry (want 'PIN:COMMAND' or 'PIN@HOLD_MS:COMMAND'): $entry"
         fi
     done
 fi

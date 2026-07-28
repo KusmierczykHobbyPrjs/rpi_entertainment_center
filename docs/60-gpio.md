@@ -163,8 +163,23 @@ a sudoers file can lock you out of `sudo` entirely.
 ./bin/doctor.sh gpio
 ```
 
-It checks the library is available, that every configured command actually
-exists, that the listener is running, and that the sudoers rule is in place.
+It checks the library is available, that every entry parses, that every
+configured command actually exists, that the listener is running, and that the
+sudoers rule is in place. Each button is reported with its hold time, so you
+can see at a glance which ones are using the default:
+
+```
+PASS  GPIO3 (hold 1500ms) -> sudo shutdown now
+PASS  GPIO4 (hold 50ms) -> bash .../stop_current_ui.sh
+```
+
+It also warns when a button that powers the Pi off has a hold under one
+second — the configuration that turns crosstalk into a shutdown:
+
+```
+WARN  GPIO3 powers the Pi down after only 50ms
+      -> Use "3@1500:sudo shutdown now" in config.sh
+```
 
 **Test a button** by running the listener in the foreground:
 
