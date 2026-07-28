@@ -36,6 +36,31 @@ Two things spend CPU even when decoding is in hardware:
 
 ---
 
+## Where these settings live
+
+InputStream Adaptive and ffmpeg are **add-ons**, not part of Kodi, so their
+settings are not under Settings → Player. Both are here:
+
+> Settings → **Add-ons** → **My add-ons** → **VideoPlayer InputStream**
+> → *InputStream Adaptive* or *InputStream FFmpeg Direct* → **Configure**
+>
+> *Ustawienia → Dodatki → Moje dodatki → Strumień wejściowy odtwarzacza wideo*
+
+Some add-ons offer a shortcut — the Netflix add-on's own settings have an entry
+that opens InputStream Adaptive directly — but most do not, and the path above
+always works.
+
+Settings levels, if a setting you are looking for is not visible (the toggle is
+at the bottom-left of the settings window):
+
+| Setting | Level needed |
+|---|---|
+| Everything in InputStream Adaptive below | **Basic** — always visible |
+| ffmpeg's **Stream selection bandwidth** | **Standard** — the default |
+| Kodi's hardware acceleration toggles | **Advanced** |
+
+---
+
 ## First, find out what is actually happening
 
 Do not guess from CPU usage. During playback press **`o`** — Kodi overlays the
@@ -192,8 +217,7 @@ stutter where 720p would not.
 
 If ffmpeg now picks something too heavy, this is the knob: around `3500` keeps
 you at 720p on most Polish broadcasters. Unlike ISA's cap it is scoped to
-`inputstream.ffmpegdirect` alone, so it cannot surprise you elsewhere. It lives
-at settings level **Advanced**.
+`inputstream.ffmpegdirect` alone, so it cannot surprise you elsewhere.
 
 ### Live TV starts low under ISA and stays there
 
@@ -238,10 +262,57 @@ of them.
 
 ---
 
+## Video falls behind the audio
+
+Distinct from stutter, and it has two quite different causes. The codec overlay
+(`o`) separates them — look at the **dropped / skipped frames** counters:
+
+| Overlay | Cause | Fix |
+|---|---|---|
+| Dropped frames climbing steadily | The Pi cannot decode this stream in real time and is falling behind | Give it a smaller stream — see below |
+| Dropped frames near zero | Not a decoding problem. A clock mismatch, or the stream's own timestamps | Refresh rate, below |
+
+### If frames are being dropped
+
+The variant is too heavy. On a Pi 3B the usual culprit is a **1080i50 or
+1080p50** broadcast: hardware H.264 decode tops out around 1080p30, and Polish
+television is 50 Hz, so an HD channel is roughly double what the chip can do —
+and interlaced content costs deinterlacing on top.
+
+- **ffmpeg:** set *Stream selection bandwidth* to about `3500`, which picks a
+  720p variant on most Polish broadcasters.
+- **ISA:** it should step down on its own; if it does not, cap *Maximum
+  resolution* at `720p`. (Note that is the general one, not the DRM one.)
+
+### If frames are not being dropped
+
+Then the decoder is keeping up and the picture is drifting for another reason.
+The most common on a Pi is a **frame-rate mismatch**: Polish broadcast is 25 or
+50 Hz, an HDMI display usually runs at 60 Hz, and Kodi then has to invent or
+discard a frame every sixth one.
+
+> Settings → Player → Videos → **Adjust display refresh rate** → `On start / stop`
+>
+> *Dostosuj częstotliwość odświeżania ekranu*
+
+This switches the output to 50 Hz for 50 Hz content and back afterwards, which
+removes the mismatch entirely. It is the single most useful playback setting on
+a Pi driving a TV, and it is off by default.
+
+Check your TV actually accepts 50 Hz — most do; a few PC monitors do not.
+
+If drift persists after that, it is the stream itself. ffmpeg plays live HLS
+with no adaptive correction, so a broadcaster whose timestamps drift will drift
+on your screen. Switching that channel back to ISA is the answer, once its
+initial-bandwidth estimate has been fixed above.
+
+---
+
 ## Recommended starting point for a Pi 3B
 
 ```
 Kodi   → Player → Videos → hardware acceleration       enabled
+Kodi   → Player → Videos → Adjust display refresh rate On start/stop
 ISA    → Stream selection type                         default
 ISA    → Maximum bandwidth (Kbps)                      0
 ISA    → Maximum resolution for DRM videos             720p
