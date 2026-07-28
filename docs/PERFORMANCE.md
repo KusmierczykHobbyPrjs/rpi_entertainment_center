@@ -237,24 +237,50 @@ long buffer to climb out of a bad guess with — so it lands on a low rung and
 sits there for the whole session. Video on demand usually recovers; live
 usually does not.
 
-| Setting | Set to |
-|---|---|
-| **Automatycznie określa początkową przepustowość**<br>*Auto determines initial bandwidth* | off |
-| **Początkowa przepustowość (Kbps)**<br>*Initial bandwidth (Kbps)* | `4000` (the default), or higher on a fast wired link |
+| Setting | Set to | |
+|---|---|---|
+| **Automatycznie określa początkową przepustowość**<br>*Auto determines initial bandwidth* | **off** | do this one **first** |
+| **Początkowa przepustowość (Kbps)**<br>*Initial bandwidth (Kbps)* | `4000` (the default), or higher on a fast wired link | ignored unless the above is off |
+
+> **The order matters, and the interface hides that.** Both settings are always
+> visible, but the number does nothing while the toggle is on — its own help
+> text says it "defines the initial bandwidth **when it cannot be automatically
+> determined**". Raising it to 40000 with the toggle left on changes nothing at
+> all, and looks exactly like the tuning having failed.
 
 This also explains why ffmpeg often looks better on live TV: it does not
 estimate anything, it just plays a variant from the master playlist — usually
 the top one.
 
-**Before changing anything, find out whether a better stream exists.** Set
-`Typ wyboru strumienia` to `manual-osd` and look at the list during playback.
-If 576p is the only entry, that is what the channel broadcasts and no setting
-will improve it. (This is the only way to see the list — see
-[below](#reading-the-stream-entry-in-video-settings).)
+### When no ISA setting helps
 
-If ISA is still worse after that, ffmpeg is a perfectly reasonable choice for
-live TV — you lose the ability to step down gracefully, so a congested network
-shows up as buffering rather than a softer picture.
+**Find out whether a better stream exists before tuning anything else.** Set
+`Typ wyboru strumienia` to `manual-osd` and look at the list during playback.
+This is the only way to see it — see
+[below](#reading-the-stream-entry-in-video-settings).
+
+If the list has **one entry**, ISA has nothing to choose from, and no
+bandwidth, resolution or selection setting will change what you get. Two things
+produce that:
+
+- the channel genuinely broadcasts at that resolution, or
+- **the add-on handed ISA a single-variant stream.** Add-ons often request a
+  different URL or streaming format depending on the player type you selected,
+  so "ISA versus ffmpeg" can decide *which stream is fetched*, not merely how
+  it is played.
+
+The second is not something you can fix from ISA, because the choice was made
+before ISA was involved.
+
+> **Observed on TVP VOD, Pi 3B, July 2026:** live channels under ISA served one
+> low-resolution stream (~576p) and stayed there regardless of initial
+> bandwidth, bandwidth caps or selection mode. Under `ffmpeg` the same channels
+> played at a visibly higher resolution. On this add-on, ffmpeg is the right
+> answer rather than a workaround — the ISA tuning above is worth trying once
+> and then abandoning.
+
+The cost of ffmpeg is real but modest: no adaptive switching, so a congested
+network shows up as buffering rather than a softer picture.
 
 Note that the player-type setting lives in each add-on, so TVP, Polsat and
 Player.pl are configured separately. The ISA settings above are shared by all
@@ -299,12 +325,21 @@ This switches the output to 50 Hz for 50 Hz content and back afterwards, which
 removes the mismatch entirely. It is the single most useful playback setting on
 a Pi driving a TV, and it is off by default.
 
+> **Confirmed on this hardware:** Pi 3B, TVP live TV through ffmpeg, video
+> progressively lagging the audio. Turning on *Adjust display refresh rate*
+> fixed it. Note what that rules out — the Pi was decoding the stream perfectly
+> well, and the "obvious" fix of capping the bitrate would have cost picture
+> quality without touching the cause.
+
 Check your TV actually accepts 50 Hz — most do; a few PC monitors do not.
+
+Turn this on **before** reaching for any bandwidth or resolution setting. It
+costs nothing, it helps Kodi's own video playback too, and if the drift is a
+clock mismatch nothing else will fix it.
 
 If drift persists after that, it is the stream itself. ffmpeg plays live HLS
 with no adaptive correction, so a broadcaster whose timestamps drift will drift
-on your screen. Switching that channel back to ISA is the answer, once its
-initial-bandwidth estimate has been fixed above.
+on your screen.
 
 ---
 
@@ -318,10 +353,10 @@ ISA    → Maximum bandwidth (Kbps)                      0
 ISA    → Maximum resolution for DRM videos             720p
 ISA    → Maximum resolution                            auto
 ISA    → Auto determines initial bandwidth             off      (live TV)
-ISA    → Initial bandwidth (Kbps)                      4000
+ISA    → Initial bandwidth (Kbps)                      4000     (needs the above)
 Netflix→ VP9 / HEVC / AV1 codecs                       off
 Netflix→ Limit streaming resolution to                 --  (ISA handles it)
-TVP    → Player type                                   try ISA first
+TVP    → Player type                                   ffmpeg   (see above)
 ffmpeg → Stream selection bandwidth                    off, or ~3500 if it
                                                        picks more than the Pi
                                                        can decode
