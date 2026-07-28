@@ -164,6 +164,7 @@ Install them in this order; each is a separate `./install.sh <name>` run.
 - **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — how the pieces fit together, and why
 - **[docs/CONFIGURATION.md](docs/CONFIGURATION.md)** — every setting in `config.sh`
 - **[docs/HARDWARE.md](docs/HARDWARE.md)** — GPIO wiring, the case, the parts list
+- **[docs/PERFORMANCE.md](docs/PERFORMANCE.md)** — getting watchable video out of a Pi 3B
 - **[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)** — symptom-first fixes
 - **[docs/BACKUP.md](docs/BACKUP.md)** — saving and restoring everything a reinstall would lose
 - **[docs/SOURCES.md](docs/SOURCES.md)** — the tutorials this is built on, credited and grouped by module

@@ -563,7 +563,19 @@ provided something downstream can take the audio.
 
 ## Video stutters
 
-In order of how often each is the cause:
+**First, press `o` during playback.** Kodi shows the decoder actually in use,
+and it splits this problem in two:
+
+| Overlay says | Meaning |
+|---|---|
+| `ff-h264 (V4L2 M2M)` | Hardware decode is working — carry on down this list |
+| `ff-h264` alone, `ff-vp9`, `ff-hevc` | Software decode on a CPU that cannot keep up. Nothing below will fix it — see **[PERFORMANCE.md](PERFORMANCE.md)** |
+
+A Pi 3B decodes only H.264 in hardware. If a streaming add-on is serving VP9 or
+HEVC, or a global bandwidth cap is starving it, that is a settings problem, not
+a hardware one: **[PERFORMANCE.md](PERFORMANCE.md)**.
+
+Otherwise, in order of how often each is the cause:
 
 **1. Power supply.** Under-voltage throttles the Pi silently.
 
@@ -577,10 +589,14 @@ supply — phone chargers frequently under-deliver.
 **2. GPU memory.**
 
 ```bash
-sudo raspi-config     # Performance Options -> GPU Memory -> 128
+sudo raspi-config     # Performance Options -> GPU Memory
 ```
 
-The default 64 MB is not enough for 1080p on a Pi 3B.
+Worth a try, but not the reliable fix older guides suggest: raising the split
+mattered on the pre-KMS graphics stack, and Raspberry Pi OS has used the KMS
+driver since Bullseye. If you already have `gpu_mem=128` or higher set, try the
+default instead — on a 1 GB Pi that memory is better spent on Kodi. See
+[PERFORMANCE.md](PERFORMANCE.md#what-does-not-help).
 
 **3. Temperature.**
 

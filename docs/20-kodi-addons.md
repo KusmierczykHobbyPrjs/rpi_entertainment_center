@@ -185,6 +185,13 @@ In many cases you need nothing at all: the add-on declares
 its own repository automatically. Only reach for apt if `~/.kodi/temp/kodi.log`
 actually shows a `pycryptodomex`/`Crypto` import error.
 
+> **Once it plays, it will probably play badly.** A Pi 3B decodes only H.264 in
+> hardware, and Widevine decrypts in software on top of that.
+> **[PERFORMANCE.md](PERFORMANCE.md)** covers which resolution and codec
+> settings to use — and warns about the InputStream Adaptive bandwidth cap,
+> which is global to every add-on and is the usual reason live TV mysteriously
+> drops to 576p after someone tunes Netflix.
+
 ### 3. Install Widevine
 
 `script.module.inputstreamhelper` (a dependency of the Netflix add-on) can

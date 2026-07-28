@@ -202,6 +202,22 @@ if rec_has kodi; then
         warn "Shell Script Launcher menu is missing" "./install.sh 20-kodi-addons"
     fi
 
+    # A low global bandwidth cap in InputStream Adaptive is invisible from
+    # inside the add-on that appears to be misbehaving, and it throttles every
+    # ISA add-on at once - Netflix, Disney+, TVP, IPTV. Easy to set once while
+    # tuning one service and then forget. See docs/PERFORMANCE.md.
+    isa_settings="${KODI_HOME:-$HOME/.kodi}/userdata/addon_data/inputstream.adaptive/settings.xml"
+    if [[ -f "$isa_settings" ]]; then
+        isa_bw="$(sed -n 's/.*id="adaptivestream.bandwidth.max"[^>]*>\([0-9]*\)<.*/\1/p' \
+                  "$isa_settings" 2>/dev/null | head -1)"
+        if [[ -n "$isa_bw" ]] && (( isa_bw > 0 && isa_bw < 2500 )); then
+            warn "InputStream Adaptive caps ALL add-ons at ${isa_bw} Kbps (720p needs ~1750+)" \
+                 "Set it to 0 and cap resolution instead - docs/PERFORMANCE.md"
+        elif [[ -n "$isa_bw" ]] && (( isa_bw > 0 )); then
+            pass "InputStream Adaptive bandwidth cap is ${isa_bw} Kbps"
+        fi
+    fi
+
     # Stock Netflix add-on 1.23.5 can neither log in nor browse: Netflix retired
     # the endpoints it uses. Both patches are reapplied by the same script, and
     # an add-on update wipes them. Only report if the add-on is installed.

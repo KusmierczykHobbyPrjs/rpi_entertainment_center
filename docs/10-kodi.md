@@ -194,11 +194,22 @@ error.
 
 **Video stutters or drops frames**
 
-- Raise the GPU memory split: `sudo raspi-config` → Performance Options → GPU
-  Memory → **128**. The default 64 MB is not enough for 1080p on a Pi 3B.
+Press **`o`** during playback first — it shows which decoder is in use, which
+decides everything else:
+
+- `ff-h264 (V4L2 M2M)` — hardware. Look at heat and power below.
+- `ff-h264` with no hardware name, or `ff-vp9` / `ff-hevc` — software decode on
+  a CPU that cannot keep up. **[PERFORMANCE.md](PERFORMANCE.md)** is the fix.
+
+Then:
+
 - Check the temperature: `./bin/pi_temp.sh`. Above 80 °C the Pi throttles.
 - Check for under-voltage: `vcgencmd get_throttled` should print `0x0`.
 - 1080p60 content is beyond a Pi 3B regardless of settings.
+
+Streaming add-ons have their own resolution and bandwidth limits, and one of
+them is global to every add-on at once — see
+**[PERFORMANCE.md](PERFORMANCE.md)**.
 
 **An add-on installs but plays nothing**
 
