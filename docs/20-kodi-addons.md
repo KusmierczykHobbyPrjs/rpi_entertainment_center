@@ -349,7 +349,7 @@ Before anything is modified the script tars up the add-on's `resources/lib`, so
 `sudo apt install patch`.
 
 > **Read [`assets/patches/README.md`](../assets/patches/README.md) before
-> running this.** The API patch is 71 hunks across 18 files, written by a user
+> running this.** The API patch is 79 hunks across 21 files, written by a user
 > in the upstream issue tracker, unreviewed by the add-on's author, and it runs
 > in an add-on you will hand your Netflix password to. Its provenance and
 > SHA-256 are recorded there so you can check it against the source.
@@ -385,13 +385,20 @@ makes it a clean no-op rather than a mangle.
 
 Netflix retired `/api/shakti/mre/*` and reshaped its Falcor content schema in
 June 2026, which broke `pathEvaluator` — the call behind nearly every screen.
-`netflix-api-fixes10.patch` reworks the API layer and adds GraphQL fallbacks
-where the old paths are simply gone. Full provenance, licence, hash and known
-limitations: [`assets/patches/README.md`](../assets/patches/README.md).
+`netflix-api-fixes14.patch` reworks the API layer and adds GraphQL fallbacks
+where the old paths are simply gone. Full provenance, licence, hash and
+revision history: [`assets/patches/README.md`](../assets/patches/README.md).
 
-Some users report search still times out with it. Everything else — browsing,
-profiles, My List, Continue Watching, playback, artwork, resume positions —
-works again.
+> **The revision number matters more than you would expect.** Netflix keeps
+> changing things and the series is revised every week or two; a revision a
+> few weeks old is not slightly behind, it is broken again. Empty menus, a
+> genre that errors on opening, and a search that times out after 20 seconds
+> are all symptoms of a stale revision rather than new faults.
+>
+> Revisions are cumulative rewrites of the same files and **cannot be
+> stacked**, so the script restores the add-on and re-applies from scratch
+> whenever the vendored file changes — including re-applying the login patch.
+> `--status` names the revision in place.
 
 Alternatives, if you would rather not run a vendored diff:
 

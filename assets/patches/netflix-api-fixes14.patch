@@ -111,7 +111,7 @@ index 261c41a..4ee3d37 100644
                             'loco_contexts': None,
                             'loco_known': False,
 diff --git a/resources/lib/kodi/infolabels.py b/resources/lib/kodi/infolabels.py
-index f6ec0c3..1c0da4c 100644
+index f6ec0c3..20d71de 100644
 --- a/resources/lib/kodi/infolabels.py
 +++ b/resources/lib/kodi/infolabels.py
 @@ -55,8 +55,17 @@ def get_info(videoid, item, raw_data, profile_language_code='', delayed_db_op=Fa
@@ -226,7 +226,7 @@ index f6ec0c3..1c0da4c 100644
      except CacheMiss:
          art = parse_art(videoid, item)
          G.CACHE.add(CACHE_ARTINFO, cache_identifier, art,
-@@ -139,6 +217,51 @@ def get_art(videoid, item, profile_language_code='', delayed_db_op=False):
+@@ -139,6 +217,61 @@ def get_art(videoid, item, profile_language_code='', delayed_db_op=False):
      return art
  
  
@@ -263,6 +263,16 @@ index f6ec0c3..1c0da4c 100644
 +        if not art.get('poster') or art.get('poster') in (art.get('landscape'), art.get('fanart'), fallback):
 +            art['poster'] = parsed_poster
 +            updated = True
++        elif art.get('thumb') == parsed_poster:
++            art['poster'] = parsed_poster
++            updated = True
++    elif parsed_poster and art.get('poster') and art['poster'] != parsed_poster:
++        if art['poster'] in (art.get('thumb'), art.get('landscape'), art.get('fanart')):
++            old_poster = art['poster']
++            art['poster'] = parsed_poster
++            if art.get('thumb') == old_poster:
++                art['thumb'] = parsed_poster
++            updated = True
 +    parsed_thumb = parsed_art.get('thumb')
 +    if (parsed_thumb and parsed_thumb == parsed_poster and parsed_thumb != fallback
 +            and art.get('thumb') != parsed_thumb):
@@ -278,7 +288,7 @@ index f6ec0c3..1c0da4c 100644
  def get_resume_info_from_library(videoid):
      """Retrieve the resume value from the Kodi library"""
      try:
-@@ -265,15 +388,13 @@ def parse_art(videoid, item):
+@@ -265,15 +398,13 @@ def parse_art(videoid, item):
  
  def _assign_art(videoid, **kwargs):
      """Assign the art available from Netflix to appropriate Kodi art"""
@@ -301,7 +311,7 @@ index f6ec0c3..1c0da4c 100644
      if videoid.mediatype != common.VideoId.UNSPECIFIED:
          art['clearlogo'] = _best_art([kwargs['clearlogo']])
      return art
-@@ -317,32 +438,42 @@ def set_watched_status(list_item: ListItemW, video_data, common_data):
+@@ -317,32 +448,42 @@ def set_watched_status(list_item: ListItemW, video_data, common_data):
      resume_time = 0
      video_runtime = video_data.get('runtime', {}).get('value', 0)
      if is_watched_user_overrided is None:
@@ -367,7 +377,7 @@ index f6ec0c3..1c0da4c 100644
          playcount = 1 if is_watched_user_overrided else 0
      # We have to set playcount with setInfo(), because the setProperty('PlayCount', ) have a bug
 diff --git a/resources/lib/navigation/actions.py b/resources/lib/navigation/actions.py
-index 75ecf5a..ac5fd69 100644
+index 75ecf5a..84c240b 100644
 --- a/resources/lib/navigation/actions.py
 +++ b/resources/lib/navigation/actions.py
 @@ -9,6 +9,8 @@
@@ -379,10 +389,35 @@ index 75ecf5a..ac5fd69 100644
  
  import resources.lib.common as common
  import resources.lib.kodi.ui as ui
-@@ -151,6 +153,57 @@ class AddonActionExecutor:
-         else:
-             ui.show_notification(common.get_local_string(30111))
+@@ -114,9 +116,10 @@ class AddonActionExecutor:
+         operation = pathitems[1]
+         api.update_my_list(videoid, operation, self.params)
+         sync_library(videoid, operation)
+-        if operation == 'remove' and common.WndHomeProps[common.WndHomeProps.CURRENT_DIRECTORY_MENU_ID] == 'myList':
++        is_mylist = common.WndHomeProps[common.WndHomeProps.CURRENT_DIRECTORY_MENU_ID] == 'myList'
++        if operation == 'remove' and is_mylist:
+             common.json_rpc('Input.Down')  # Avoids selection back to the top
+-        common.container_refresh()
++            common.container_refresh()
  
+     @common.inject_video_id(path_offset=1)
+     def remind_me(self, videoid):
+@@ -142,14 +145,78 @@ class AddonActionExecutor:
+                                                      'video_id_dict': video_id_dict,
+                                                      'supplemental_type': SUPPLEMENTAL_TYPE_TRAILERS
+                                                  })
+-        if list_data:
++        if list_data or self._direct_trailer_url(videoid):
+             url = common.build_url(['supplemental'],
+                                    params={'video_id_dict': dumps(video_id_dict),
+                                            'supplemental_type': SUPPLEMENTAL_TYPE_TRAILERS},
+                                    mode=G.MODE_DIRECTORY)
+             common.container_update(url)
+-        else:
+-            ui.show_notification(common.get_local_string(30111))
++            return
++        ui.show_notification(common.get_local_string(30111))
++
 +    @common.inject_video_id(path_offset=1)
 +    @measure_exec_time_decorator()
 +    def play_trailer(self, videoid):
@@ -392,14 +427,27 @@ index 75ecf5a..ac5fd69 100644
 +            from resources.lib.navigation.player import _play  # pylint: disable=protected-access,import-outside-toplevel
 +            _play(trailer_videoid, False)
 +            return
++        self._resolve_direct_trailer(videoid)
++
++    @common.inject_video_id(path_offset=1)
++    @measure_exec_time_decorator()
++    def play_direct_trailer(self, videoid):
++        """Resolve only the direct metadata trailer selected from the trailer menu."""
++        self._resolve_direct_trailer(videoid)
++
++    def _resolve_direct_trailer(self, videoid):
 +        trailer_url = self._direct_trailer_url(videoid)
 +        if trailer_url:
-+            list_item = xbmcgui.ListItem(path=trailer_url, offscreen=True)
++            title = xbmc.getInfoLabel('ListItem.Title') or xbmc.getInfoLabel('ListItem.Label')
++            list_item = xbmcgui.ListItem(title, path=trailer_url, offscreen=True)
++            if title:
++                list_item.setInfo('video', {'Title': title})
 +            list_item.setProperty('isPlayable', 'true')
 +            list_item.setContentLookup(False)
 +            xbmcplugin.setResolvedUrl(handle=G.PLUGIN_HANDLE, succeeded=True, listitem=list_item)
-+            return
++            return True
 +        xbmcplugin.setResolvedUrl(handle=G.PLUGIN_HANDLE, succeeded=False, listitem=xbmcgui.ListItem())
++        return False
 +
 +    @staticmethod
 +    def _first_trailer_videoid(videoid):
@@ -433,11 +481,10 @@ index 75ecf5a..ac5fd69 100644
 +        if trailer_url.startswith('http'):
 +            return trailer_url
 +        return ''
-+
+ 
      @measure_exec_time_decorator()
      def purge_cache(self, pathitems=None):  # pylint: disable=unused-argument
-         """Clear the cache. If on_disk param is supplied, also clear cached items from disk"""
-@@ -293,3 +346,8 @@ def change_watched_status_locally(videoid):
+@@ -293,3 +360,8 @@ def change_watched_status_locally(videoid):
          G.SHARED_DB.set_watched_status(profile_guid, videoid.value, True)
      ui.show_notification(common.get_local_string(30237).split('|')[txt_index])
      common.container_refresh()
@@ -447,10 +494,18 @@ index 75ecf5a..ac5fd69 100644
 +    path = unquote(urlparse(url).path).strip('/')
 +    return [part for part in path.split('/') if part]
 diff --git a/resources/lib/navigation/directory.py b/resources/lib/navigation/directory.py
-index 95a3ec7..ea71cc5 100644
+index 95a3ec7..a1f61c3 100644
 --- a/resources/lib/navigation/directory.py
 +++ b/resources/lib/navigation/directory.py
-@@ -156,10 +156,12 @@ class Directory:
+@@ -7,6 +7,7 @@
+     SPDX-License-Identifier: MIT
+     See LICENSES/MIT.md for more information.
+ """
++import xbmcgui
+ import xbmcplugin
+ 
+ import resources.lib.common as common
+@@ -156,10 +157,12 @@ class Directory:
          menu_data = G.MAIN_MENU_ITEMS.get(pathitems[1])
          if not menu_data:  # Dynamic menus
              menu_data = G.LOCAL_DB.get_value(pathitems[1], table=TABLE_MENU_DATA, data_type=dict)
@@ -465,7 +520,7 @@ index 95a3ec7..ea71cc5 100644
          }
          dir_items, extra_data = common.make_call('get_video_list', call_args)
  
-@@ -180,7 +182,7 @@ class Directory:
+@@ -180,7 +183,7 @@ class Directory:
              'menu_data': menu_data,
              'sub_genre_id': self.params.get('sub_genre_id'),  # Used to show the sub-genre folder when sub-genres exists
              'perpetual_range_start': self.perpetual_range_start,
@@ -474,18 +529,68 @@ index 95a3ec7..ea71cc5 100644
          }
          dir_items, extra_data = common.make_call('get_video_list_sorted', call_args)
          sort_type = 'sort_nothing'
+@@ -239,6 +242,19 @@ class Directory:
+             'supplemental_type': self.params['supplemental_type']
+         }
+         dir_items, extra_data = common.make_call('get_video_list_supplemental', call_args)
++        if not dir_items:
++            videoid = common.VideoId.from_dict(call_args['video_id_dict'])
++            infos, art = common.make_call('get_videoid_info', videoid)
++            if infos.get('Trailer', '').startswith('http'):
++                title = infos.get('Title') or common.get_local_string(30179)
++                list_item = xbmcgui.ListItem(title, offscreen=True)
++                infos['Title'] = title
++                list_item.setInfo('video', infos)
++                list_item.setArt(art)
++                list_item.setProperty('isPlayable', 'true')
++                list_item.setContentLookup(False)
++                play_url = common.build_url(['play_direct_trailer'], videoid=videoid, mode=G.MODE_ACTION)
++                dir_items = [(play_url, list_item, False)]
+ 
+         finalize_directory(dir_items, menu_data.get('content_type', G.CONTENT_SHOW),
+                            title=get_title(menu_data, extra_data))
+diff --git a/resources/lib/navigation/directory_search.py b/resources/lib/navigation/directory_search.py
+index f9b243e..16e570c 100644
+--- a/resources/lib/navigation/directory_search.py
++++ b/resources/lib/navigation/directory_search.py
+@@ -101,18 +101,10 @@ def search_add():
+             row_id = _search_add_bygenreid(SEARCH_TYPES[type_index], genre_id)
+     else:
+         raise NotImplementedError(f'Search type index {type_index} not implemented')
+-    # Redirect to "search" endpoint (otherwise no results in JSON-RPC)
+-    # Rewrite path history using dir_update_listing + container_update
+-    # (otherwise will retrigger input dialog on Back or Container.Refresh)
+-    if row_id is not None and search_query(row_id, 0, False):
+-        url = common.build_url(['search', 'search', row_id], mode=G.MODE_DIRECTORY, params={'dir_update_listing': True})
+-        from time import sleep
+-        # The forced sleep its needed because seem that change the container path too fast
+-        # make problems in Kodi core and the GUI fails to update, when this happens cause side effects to context menus
+-        # like "add/remove from my list" that when used ask again to make a new search because re-open the initial path
+-        sleep(1)
+-        common.container_update(url, False)
+-        return True
++    # Replace the current listing synchronously. An asynchronous Container.Update
++    # races the still-open /add directory and Kodi can discard the results.
++    if row_id is not None:
++        return search_query(str(row_id), 0, True)
+     return False
+ 
+ 
 diff --git a/resources/lib/services/nfsession/directorybuilder/dir_builder.py b/resources/lib/services/nfsession/directorybuilder/dir_builder.py
-index 67e9c81..9ff5fc3 100644
+index 67e9c81..1031546 100644
 --- a/resources/lib/services/nfsession/directorybuilder/dir_builder.py
 +++ b/resources/lib/services/nfsession/directorybuilder/dir_builder.py
-@@ -7,15 +7,21 @@
+@@ -7,15 +7,26 @@
      SPDX-License-Identifier: MIT
      See LICENSES/MIT.md for more information.
  """
 -from resources.lib.utils.data_types import merge_data_type
 -from resources.lib.common.exceptions import CacheMiss
++from concurrent.futures import ThreadPoolExecutor, as_completed
++
 +import resources.lib.common as common
 +from resources.lib.utils.data_types import merge_data_type, CustomVideoList
++from resources.lib.common.cache_utils import CACHE_COMMON
 +from resources.lib.common.exceptions import CacheMiss, InvalidVideoListTypeError
  from resources.lib.common import VideoId
  from resources.lib.globals import G
@@ -497,6 +602,8 @@ index 67e9c81..9ff5fc3 100644
 -from resources.lib.utils.logging import measure_exec_time_decorator
 +from resources.lib.services.nfsession.directorybuilder.dir_path_requests import (DirectoryPathRequests,
 +                                                                                 _has_reference_entries,
++                                                                                 _metadata_has_reference_names,
++                                                                                 _metadata_image_url,
 +                                                                                 _metadata_year,
 +                                                                                 metadata_with_title_page_fallback,
 +                                                                                 normalize_metadata_references)
@@ -504,7 +611,7 @@ index 67e9c81..9ff5fc3 100644
  
  
  class DirectoryBuilder(DirectoryPathRequests):
-@@ -76,32 +82,169 @@ class DirectoryBuilder(DirectoryPathRequests):
+@@ -76,32 +87,206 @@ class DirectoryBuilder(DirectoryPathRequests):
  
      @measure_exec_time_decorator(is_immediate=True)
      def get_video_list(self, list_id, menu_data, is_dynamic_id):
@@ -513,22 +620,38 @@ index 67e9c81..9ff5fc3 100644
 -        # pylint: disable=unexpected-keyword-arg
 -        video_list = self.req_video_list(list_id, no_use_cache=menu_data.get('no_use_cache'))
 +        menu_id = menu_data['path'][1]
++        cache_enriched_list = (
++            is_dynamic_id
++            and menu_data.get('initial_menu_id') == 'newAndPopular'
++            and not menu_data.get('no_use_cache'))
++        enriched_cache_id = f'enriched_video_list_{list_id}'
++        video_list = None
++        if cache_enriched_list:
++            try:
++                video_list = G.CACHE.get(CACHE_COMMON, enriched_cache_id)
++            except CacheMiss:
++                pass
 +        current_contexts = {
 +            'chosenForYou': ('windowedNewReleases',),
 +            'currentTitles': ('windowedNewReleases',),
 +            'mostViewed': ('mostWatched',)
 +        }
-+        if not is_dynamic_id and menu_id == 'continueWatching':
-+            video_list = self._browser_continue_watching_list()
-+        elif not is_dynamic_id and menu_id in current_contexts:
-+            video_list = self._video_list_from_lolomo_category_context(
-+                'comingSoon', current_contexts[menu_id], fallback_first=True)
-+        else:
-+            if not is_dynamic_id:
-+                list_id = self.get_loco_list_id_by_context(menu_data['loco_contexts'][0])
-+            # pylint: disable=unexpected-keyword-arg
-+            video_list = self.req_video_list(list_id, menu_data=menu_data, no_use_cache=menu_data.get('no_use_cache'))
-+        self._enrich_video_list_art(video_list)
++        if video_list is None:
++            if not is_dynamic_id and menu_id == 'continueWatching':
++                video_list = self._browser_continue_watching_list()
++            elif not is_dynamic_id and menu_id in current_contexts:
++                video_list = self._video_list_from_lolomo_category_context(
++                    'comingSoon', current_contexts[menu_id], fallback_first=True)
++            else:
++                if not is_dynamic_id:
++                    list_id = self.get_loco_list_id_by_context(menu_data['loco_contexts'][0])
++                # pylint: disable=unexpected-keyword-arg
++                video_list = self.req_video_list(
++                    list_id, menu_data=menu_data, no_use_cache=menu_data.get('no_use_cache'))
++            if menu_id != 'continueWatching':
++                self._enrich_video_list_art(video_list, include_refs=True)
++            if cache_enriched_list:
++                G.CACHE.add(CACHE_COMMON, enriched_cache_id, video_list)
          return build_video_listing(video_list, menu_data,
                                     mylist_items=self.req_mylist_items())
  
@@ -561,20 +684,23 @@ index 67e9c81..9ff5fc3 100644
 +                                                    perpetual_range_start=perpetual_range_start,
 +                                                    menu_data=menu_data,
 +                                                    no_use_cache=menu_data.get('no_use_cache'))
-+        self._enrich_video_list_art(video_list)
++        self._enrich_video_list_art(video_list, include_refs=True)
          return build_video_listing(video_list, menu_data, sub_genre_id, pathitems, perpetual_range_start,
                                     self.req_mylist_items())
  
 +    def _enrich_video_list_art(self, video_list, include_refs=False):
 +        if not getattr(video_list, 'videos', None):
 +            return video_list
++        pending = []
 +        for video in video_list.videos.values():
 +            if not isinstance(video, dict):
 +                continue
 +            needs_art = self._needs_metadata_boxart(video)
 +            needs_refs = include_refs and not _has_reference_entries(video, 'cast')
 +            needs_year = not common.get_path_safe(['releaseYear', 'value'], video)
-+            if not needs_art and not needs_refs and not needs_year:
++            needs_synopsis = not (common.get_path_safe(['synopsis', 'value'], video) or
++                                  common.get_path_safe(['regularSynopsis', 'value'], video))
++            if not needs_art and not needs_refs and not needs_year and not needs_synopsis:
 +                continue
 +            try:
 +                videoid = VideoId.from_videolist_item(video)
@@ -582,60 +708,78 @@ index 67e9c81..9ff5fc3 100644
 +                continue
 +            if videoid.mediatype not in (VideoId.MOVIE, VideoId.SHOW):
 +                continue
++            pending.append((videoid, video, needs_art, needs_refs, needs_year, needs_synopsis))
++        if not pending:
++            return video_list
++
++        def _load_metadata(item):
++            videoid, _video, _needs_art, needs_refs, needs_year, needs_synopsis = item
 +            try:
-+                metadata = self.nfsession._metadata(videoid)  # pylint: disable=protected-access
++                metadata = self._search_metadata_for_video(videoid.value)
 +            except Exception as exc:  # pylint: disable=broad-except
 +                LOG.debug('Metadata enrichment skipped for {}: {}', videoid, exc)
-+                continue
-+            if needs_year and not _metadata_year(metadata):
++                metadata = {}
++            if ((needs_refs and not _metadata_has_reference_names(metadata)) or
++                    (needs_year and not _metadata_year(metadata)) or
++                    (needs_synopsis and not self._metadata_synopsis(metadata))):
 +                metadata = metadata_with_title_page_fallback(videoid.value, metadata)
-+            if needs_art:
-+                self._apply_metadata_art(video, metadata)
-+            if needs_year:
-+                release_year = _metadata_year(metadata)
-+                if release_year:
-+                    video['releaseYear'] = {'value': release_year}
-+            if needs_refs:
-+                metadata = metadata_with_title_page_fallback(videoid.value, metadata)
-+                normalize_metadata_references(video_list.data, videoid.value, metadata, video)
++            return item, metadata
++
++        max_workers = min(6, len(pending))
++        with ThreadPoolExecutor(max_workers=max_workers) as executor:
++            futures = [executor.submit(_load_metadata, item) for item in pending]
++            for future in as_completed(futures):
++                try:
++                    item, metadata = future.result()
++                except Exception as exc:  # pylint: disable=broad-except
++                    LOG.debug('Metadata enrichment worker failed ({})', type(exc).__name__)
++                    continue
++                videoid, video, needs_art, needs_refs, needs_year, needs_synopsis = item
++                if needs_art:
++                    self._apply_metadata_art(video, metadata)
++                if needs_synopsis:
++                    self._apply_metadata_synopsis(video, metadata)
++                if needs_year:
++                    release_year = _metadata_year(metadata)
++                    if release_year:
++                        video['releaseYear'] = {'value': release_year}
++                if needs_refs:
++                    normalize_metadata_references(video_list.data, videoid.value, metadata, video)
 +        video_list.artitem = next(iter(video_list.videos.values()), None)
 +        return video_list
 +
 +    @staticmethod
 +    def _needs_metadata_boxart(video):
 +        poster = common.get_path_safe(['boxarts', ART_SIZE_POSTER, 'jpg', 'value', 'url'], video)
-+        fallback = common.get_path_safe(['itemSummary', 'value', 'boxArt', 'url'], video)
-+        return not poster and not fallback
++        return not poster
 +
 +    @staticmethod
 +    def _apply_metadata_art(video, metadata):
-+        boxart = DirectoryBuilder._best_metadata_art(metadata, ('boxart', 'boxArt'), portrait=True)
++        boxart = DirectoryBuilder._best_metadata_art(
++            metadata, ('boxart', 'boxArt', 'boxarts'), portrait=True)
 +        if boxart:
 +            video.setdefault('boxarts', {})[ART_SIZE_POSTER] = {'jpg': {'value': {'url': boxart}}}
-+        wide_art = DirectoryBuilder._best_metadata_art(metadata, ('artwork', 'interestingMoment'), portrait=False)
++        wide_art = DirectoryBuilder._best_metadata_art(
++            metadata, ('artwork', 'interestingMoment', 'storyart', 'storyArt'), portrait=False)
 +        if wide_art:
 +            video.setdefault('interestingMoment', {})[ART_SIZE_FHD] = {'jpg': {'value': {'url': wide_art}}}
 +
 +    @staticmethod
++    def _metadata_synopsis(metadata):
++        if not isinstance(metadata, dict):
++            return ''
++        return metadata.get('synopsis') or metadata.get('regularSynopsis') or ''
++
++    @staticmethod
++    def _apply_metadata_synopsis(video, metadata):
++        synopsis = DirectoryBuilder._metadata_synopsis(metadata)
++        if synopsis:
++            video['synopsis'] = {'value': synopsis}
++            video['regularSynopsis'] = {'value': synopsis}
++
++    @staticmethod
 +    def _best_metadata_art(metadata, keys, portrait):
-+        candidates = []
-+        for key in keys:
-+            value = metadata.get(key) if isinstance(metadata, dict) else None
-+            items = value if isinstance(value, list) else [value]
-+            for item in items:
-+                if not isinstance(item, dict):
-+                    continue
-+                url = item.get('url')
-+                width = item.get('w') or item.get('width') or 0
-+                height = item.get('h') or item.get('height') or 0
-+                if not url or not width or not height:
-+                    continue
-+                if portrait and height <= width:
-+                    continue
-+                if not portrait and width <= height:
-+                    continue
-+                candidates.append((width * height, url))
-+        return max(candidates)[1] if candidates else ''
++        return _metadata_image_url(metadata, keys, portrait)
 +
 +    def _filter_unavailable_videos(self, video_list):
 +        videos_type = type(video_list.videos)
@@ -685,15 +829,17 @@ index 67e9c81..9ff5fc3 100644
      @measure_exec_time_decorator(is_immediate=True)
      def get_video_list_sorted_sp(self, pathitems, menu_data, context_name, context_id, perpetual_range_start):
          # Method used for the menu search
-@@ -131,6 +274,7 @@ class DirectoryBuilder(DirectoryPathRequests):
+@@ -131,14 +316,21 @@ class DirectoryBuilder(DirectoryPathRequests):
      @measure_exec_time_decorator(is_immediate=True)
      def get_video_list_search(self, pathitems, menu_data, search_term, perpetual_range_start, path_params=None):
          video_list = self.req_video_list_search(search_term, perpetual_range_start=perpetual_range_start)
-+        self._enrich_video_list_art(video_list)
++        # Search already uses browser GraphQL result art. Extra metadata/My List lookups can exceed the IPC timeout.
          return build_video_listing(video_list, menu_data,
-                                    pathitems=pathitems, mylist_items=self.req_mylist_items(), path_params=path_params)
+-                                   pathitems=pathitems, mylist_items=self.req_mylist_items(), path_params=path_params)
++                                   pathitems=pathitems, mylist_items=[], path_params=path_params)
  
-@@ -139,6 +283,12 @@ class DirectoryBuilder(DirectoryPathRequests):
+     @measure_exec_time_decorator(is_immediate=True)
+     def get_genres(self, menu_data, genre_id, force_use_videolist_id):
          if genre_id:
              # Load the LoCo list of the specified genre
              loco_list = self.req_loco_list_genre(genre_id)
@@ -706,7 +852,20 @@ index 67e9c81..9ff5fc3 100644
          else:
              # Load the LoCo root list filtered by 'loco_contexts' specified in the menu_data
              loco_list = self.req_loco_list_root()
-@@ -178,6 +328,11 @@ class DirectoryBuilder(DirectoryPathRequests):
+@@ -166,7 +358,11 @@ class DirectoryBuilder(DirectoryPathRequests):
+         """Add the specified video ids to a video list datatype in the cache (only if the cache item exists)"""
+         try:
+             video_list_sorted_data = G.CACHE.get(cache_bucket, cache_identifier)
+-            merge_data_type(video_list_sorted_data, self.req_datatype_video_list_byid(video_ids))
++            data_to_merge = self.req_datatype_video_list_byid(video_ids)
++            for video in data_to_merge.videos.values():
++                video.setdefault('queue', {'value': {}})
++                video['queue'].setdefault('value', {})['inQueue'] = True
++            merge_data_type(video_list_sorted_data, data_to_merge)
+             G.CACHE.add(cache_bucket, cache_identifier, video_list_sorted_data)
+         except CacheMiss:
+             pass
+@@ -178,6 +374,11 @@ class DirectoryBuilder(DirectoryPathRequests):
          :param video_id: videoid as [string] value
          :return: a tuple ([bool] true if videoid exists, [string] the current list id, that depends from loco id)
          """
@@ -721,7 +880,7 @@ index 67e9c81..9ff5fc3 100644
 +            video_list = current_list.videos if video_id else []
          return video_id in video_list, list_id
 diff --git a/resources/lib/services/nfsession/directorybuilder/dir_builder_items.py b/resources/lib/services/nfsession/directorybuilder/dir_builder_items.py
-index 0ef5c52..18b77cc 100644
+index 0ef5c52..a3e2e0a 100644
 --- a/resources/lib/services/nfsession/directorybuilder/dir_builder_items.py
 +++ b/resources/lib/services/nfsession/directorybuilder/dir_builder_items.py
 @@ -50,12 +50,23 @@ def build_mainmenu_listing(loco_list):
@@ -753,7 +912,19 @@ index 0ef5c52..18b77cc 100644
          else:
              menu_title = common.get_local_string(data['label_id']) if data.get('label_id') else 'Missing menu title'
              menu_description = (common.get_local_string(data['description_id'])
-@@ -262,7 +273,8 @@ def build_video_listing(video_list, menu_data, sub_genre_id=None, pathitems=None
+@@ -213,6 +224,11 @@ def build_loco_listing(loco_list, menu_data, force_use_videolist_id=False):
+         sub_menu_data['force_use_videolist_id'] = force_use_videolist_id
+         sub_menu_data['title'] = video_list['displayName']
+         sub_menu_data['initial_menu_id'] = menu_data.get('initial_menu_id', menu_data['path'][1])
++        if menu_data.get('path', [None])[0] == 'genres' and len(menu_data['path']) > 2:
++            sub_menu_data['browser_genre_id'] = (
++                str(video_list['genreId'])
++                if video_list['context'] == 'genre'
++                else str(menu_data['path'][2]))
+         # Do not use the cache with 'Top 10' menus, so that you always get up-to-date data.
+         sub_menu_data['no_use_cache'] = video_list['context'] == 'mostWatched'
+         G.LOCAL_DB.set_value(list_id, sub_menu_data, TABLE_MENU_DATA)
+@@ -262,7 +278,8 @@ def build_video_listing(video_list, menu_data, sub_genre_id=None, pathitems=None
          'active_profile_guid': G.LOCAL_DB.get_active_profile_guid(),
          'marks_tvshow_started': G.ADDON.getSettingBool('marks_tvshow_started'),
          'trackid': trackid,
@@ -764,20 +935,22 @@ index 0ef5c52..18b77cc 100644
      directory_items = [_create_video_item(videoid_value, video, video_list, perpetual_range_start, common_data)
                         for videoid_value, video
 diff --git a/resources/lib/services/nfsession/directorybuilder/dir_path_requests.py b/resources/lib/services/nfsession/directorybuilder/dir_path_requests.py
-index 628cb07..8d3c732 100644
+index 628cb07..68d1722 100644
 --- a/resources/lib/services/nfsession/directorybuilder/dir_path_requests.py
 +++ b/resources/lib/services/nfsession/directorybuilder/dir_path_requests.py
-@@ -8,20 +8,797 @@
+@@ -8,20 +8,950 @@
      See LICENSES/MIT.md for more information.
  """
  from typing import TYPE_CHECKING
 +from collections import OrderedDict
++from concurrent.futures import ThreadPoolExecutor, as_completed
++from html.parser import HTMLParser
 +from types import SimpleNamespace
 +import json
 +import re
 +import time
 +import uuid
-+from urllib.parse import urlencode
++from urllib.parse import urlencode, urljoin
 +
 +import requests
 +import requests.exceptions as req_exceptions
@@ -785,7 +958,8 @@ index 628cb07..8d3c732 100644
  from resources.lib import common
 +from resources.lib.utils import website
  from resources.lib.utils.data_types import (VideoListSorted, SubgenreList, SeasonList, EpisodeList, LoCo, VideoList,
-                                             SearchVideoList, CustomVideoList, LoLoMoCategory, VideoListSupplemental,
+-                                            SearchVideoList, CustomVideoList, LoLoMoCategory, VideoListSupplemental,
++                                            CustomVideoList, LoLoMoCategory, VideoListSupplemental,
                                              VideosList)
 -from resources.lib.common.exceptions import InvalidVideoListTypeError, InvalidVideoId
 +from resources.lib.common.exceptions import (InvalidVideoListTypeError, InvalidVideoId, MetadataNotAvailable,
@@ -794,9 +968,9 @@ index 628cb07..8d3c732 100644
  from resources.lib.utils.api_paths import (VIDEO_LIST_PARTIAL_PATHS, RANGE_PLACEHOLDER, VIDEO_LIST_BASIC_PARTIAL_PATHS,
                                             SEASONS_PARTIAL_PATHS, EPISODES_PARTIAL_PATHS, ART_PARTIAL_PATHS,
 -                                           TRAILER_PARTIAL_PATHS, PATH_REQUEST_SIZE_STD, build_paths,
+-                                           PATH_REQUEST_SIZE_MAX)
 +                                           ART_SIZE_FHD, ART_SIZE_POSTER, TRAILER_PARTIAL_PATHS,
-+                                           PATH_REQUEST_SIZE_STD, build_paths,
-                                            PATH_REQUEST_SIZE_MAX)
++                                           SUPPLEMENTAL_TYPE_TRAILERS, build_paths, PATH_REQUEST_SIZE_MAX)
  from resources.lib.common import cache_utils
  from resources.lib.globals import G
  from resources.lib.utils.logging import LOG
@@ -805,6 +979,9 @@ index 628cb07..8d3c732 100644
 +GRAPHQL_OP_SEASONS = 'dbc3b274-d4f9-4811-aaf1-d082d3b936f2'
 +GRAPHQL_OP_EPISODES = '27b30e4e-871d-46aa-ac8b-244103d2e37d'
 +GRAPHQL_OP_SEARCH = '8d902979-56f2-4886-8c16-f8910f6b52ee'
++GRAPHQL_OP_CAROUSEL_PAGE = 'cbe70fd8-c3a1-4e1b-9ab3-d690850ad7f3'
++GRAPHQL_OP_DETAIL_MODAL = '7265187b-c065-4714-9eee-327751c8e215'
++GRAPHQL_OP_DETAIL_MODAL_TRAILERS = '06e30ee5-7983-4fef-8135-5914124b76ad'
 +NETFLIX_TITLE_URL = 'https://www.netflix.com/title/{}'
 +TITLE_PAGE_GRAPHQL_RE = re.compile(r"netflix\.reactContext\.models\.graphql\s*=\s*JSON\.parse\('(.*?)'\);", re.DOTALL)
 +TITLE_PAGE_JSONLD_RE = re.compile(
@@ -847,13 +1024,39 @@ index 628cb07..8d3c732 100644
 +BROWSER_LOCO_HOME_ROW_RANGE = {'from': 4, 'to': 50}
 +BROWSER_LOCO_HOME_VISIBLE_RANGE = {'from': 0, 'to': 8}
 +BROWSER_LOCO_CONTINUE_LAZY_RANGE = {'from': 8, 'to': 100}
++BROWSER_MYLIST_RANGE = {'from': 0, 'to': 48}
++BROWSER_MYLIST_FIELDS = [
++    'availability', 'episodeCount', 'inRemindMeList', 'itemSummary',
++    'queue', 'summary'
++]
 +SEARCH_GRAPHQL_PAGE_SIZE = 48
++SEARCH_TITLE_PAGE_METADATA_LIMIT = SEARCH_GRAPHQL_PAGE_SIZE
++SEARCH_TITLE_PAGE_METADATA_WORKERS = 12
 +METADATA_REFERENCE_KEYS = {
 +    'cast': ('people', ('cast', 'actors', 'actor', 'starring', 'starringActors')),
 +    'directors': ('people', ('directors', 'director')),
 +    'creators': ('people', ('creators', 'creator', 'writers', 'writer')),
 +    'genres': ('genres', ('genres', 'genre', 'tags'))
 +}
++
++
++class _ActiveProfileLinkParser(HTMLParser):
++    """Find the profile switch link without exposing its token in logs."""
++
++    def __init__(self, active_profile_guid):
++        super().__init__(convert_charrefs=True)
++        self.active_profile_guid = str(active_profile_guid or '').lower()
++        self.href = None
++
++    def handle_starttag(self, tag, attrs):
++        if self.href or tag != 'a' or not self.active_profile_guid:
++            return
++        attributes = dict(attrs)
++        href = attributes.get('href') or ''
++        classes = (attributes.get('class') or '').split()
++        if self.active_profile_guid in href.lower() and (
++                'profile-link' in classes or '/switchprofile' in href.lower()):
++            self.href = href
 +
 +
 +def _value(value):
@@ -979,19 +1182,45 @@ index 628cb07..8d3c732 100644
 +    metadata_video = dict(metadata_video or {})
 +    if (_metadata_has_reference_names(metadata_video) and
 +            _metadata_has_trailer(metadata_video) and
-+            _metadata_year(metadata_video)):
++            _metadata_year(metadata_video) and
++            (metadata_video.get('synopsis') or metadata_video.get('regularSynopsis'))):
 +        return metadata_video
 +    title_page_metadata = _metadata_from_title_page(video_id)
++    return _merge_title_page_metadata(metadata_video, title_page_metadata)
++
++
++def _merge_title_page_metadata(metadata_video, title_page_metadata):
++    metadata_video = dict(metadata_video or {})
 +    if not title_page_metadata:
 +        return metadata_video
 +    for key in ('actors', 'directors', 'creators', 'genre', 'trailer'):
 +        if key in title_page_metadata and key not in metadata_video:
 +            metadata_video[key] = title_page_metadata[key]
++    description = title_page_metadata.get('description')
++    if description and not (metadata_video.get('synopsis') or metadata_video.get('regularSynopsis')):
++        metadata_video['synopsis'] = description
++        metadata_video['regularSynopsis'] = description
 +    if not _metadata_year(metadata_video):
 +        title_page_year = _metadata_year(title_page_metadata)
 +        if title_page_year:
 +            metadata_video['year'] = title_page_year
 +    return metadata_video
++
++
++def _search_title_page_metadata(video_id):
++    try:
++        response = requests.get(
++            NETFLIX_TITLE_URL.format(video_id),
++            headers={
++                'Accept': 'text/html,application/xhtml+xml,application/xml',
++                'User-Agent': common.get_user_agent(enable_android_mediaflag_fix=True)
++            },
++            timeout=(2, 4))
++        response.raise_for_status()
++    except req_exceptions.RequestException as exc:
++        LOG.debug('Search title page metadata skipped for {} ({})', video_id, type(exc).__name__)
++        return {}
++    return _title_page_jsonld_data(response.content)
 +
 +
 +def _metadata_trailer_id(metadata_video):
@@ -1128,8 +1357,8 @@ index 628cb07..8d3c732 100644
 +
 +def _search_graphql_artwork_params():
 +    return {
-+        'artworkType': 'SDP',
-+        'dimension': {'width': 342, 'height': 192},
++        'artworkType': 'BOXSHOT',
++        'dimension': {'width': 300, 'height': 420},
 +        'features': {'fallbackStrategy': 'STILL'}
 +    }
 +
@@ -1239,6 +1468,30 @@ index 628cb07..8d3c732 100644
 +    return merged
 +
 +
++def _metadata_video_to_item(video_id, metadata_video):
++    title = metadata_video.get('title') or str(video_id)
++    video_type = str(metadata_video.get('type') or metadata_video.get('videoType') or '').lower()
++    if video_type not in ('movie', 'show'):
++        video_type = 'show' if metadata_video.get('seasons') else 'movie'
++    base_video = {
++        'summary': _summary(str(video_id), title, video_type),
++        'title': _value(title),
++        'availability': _value({'isPlayable': True}),
++        'queue': _value({'inQueue': False}),
++        'inRemindMeList': _value(False),
++        'bookmarkPosition': _value(0),
++        'creditsOffset': _value(0),
++        'watchedToEndOffset': _value(0),
++        'watched': _value(False),
++        'runtime': _value(0),
++        'releaseYear': _value(0),
++        'maturity': _value({}),
++        'trackIds': _value({}),
++        'requestId': _value('')
++    }
++    return _merge_search_metadata_video(base_video, metadata_video)
++
++
 +def _metadata_image_url(metadata, keys, portrait):
 +    candidates = []
 +
@@ -1263,16 +1516,18 @@ index 628cb07..8d3c732 100644
 +                _collect(nested_value)
 +
 +    for key in keys:
-+        _collect(metadata.get(key))
++        _collect(metadata.get(key) if isinstance(metadata, dict) else None)
 +    if not candidates:
 +        return ''
-+
-+    def _score(candidate):
-+        _url, width, height = candidate
-+        matches_orientation = height > width if portrait else width >= height
-+        return int(matches_orientation), width * height
-+
-+    return max(candidates, key=_score)[0]
++    matching = [
++        candidate for candidate in candidates
++        if candidate[1] and candidate[2] and
++        ((candidate[2] > candidate[1]) if portrait else (candidate[1] > candidate[2]))
++    ]
++    if matching:
++        return max(matching, key=lambda candidate: candidate[1] * candidate[2])[0]
++    unknown_size = [candidate for candidate in candidates if not candidate[1] or not candidate[2]]
++    return unknown_size[0][0] if unknown_size else ''
 +
 +
 +def _search_graphql_node_to_item(node):
@@ -1303,8 +1558,56 @@ index 628cb07..8d3c732 100644
 +    }
 +    artwork = (node.get('contextualArtwork') or {}).get('artwork') or {}
 +    if artwork.get('url'):
-+        _set_browser_boxart(item, {'id': int(video_id), 'title': title, 'boxArt': {'url': artwork['url']}})
++        _set_browser_boxart(item, {
++            'id': int(video_id),
++            'title': title,
++            'boxArt': {
++                'url': artwork['url'],
++                'width': artwork.get('width') or artwork.get('w'),
++                'height': artwork.get('height') or artwork.get('h')
++            }
++        })
 +    return video_id, item
++
++
++def _carousel_graphql_variables(row_id, end_cursor):
++    return {
++        'rowId': row_id,
++        'carouselAfterCursor': end_cursor,
++        'carouselPageSize': 12,
++        'eddEnabled': False,
++        'imageParamsForStandardBoxart': {
++            'artworkType': 'SDP',
++            'dimension': {'width': 342, 'height': 192},
++            'features': {'fallbackStrategy': 'STILL'}
++        },
++        'imageParamsForRankedBoxart': {
++            'artworkType': 'BOXSHOT',
++            'dimension': {'width': 426, 'height': 607},
++            'features': {'fallbackStrategy': 'STILL', 'suppressTop10Badge': True}
++        },
++        'imageParamsForContinueWatchingBoxart': {
++            'artworkType': 'SDP',
++            'dimension': {'width': 342, 'height': 192},
++            'features': {'fallbackStrategy': 'STILL'}
++        },
++        'imageParamsForMobileGameBoxart': {
++            'artworkType': 'APP_ICON',
++            'dimension': {'width': 200, 'height': 200},
++            'formats': ['WEBP', 'JPG', 'PNG']
++        },
++        'imageParamsForCloudGameBoxart': {
++            'artworkType': 'SDP',
++            'dimension': {'width': 342, 'height': 192},
++            'features': {'fallbackStrategy': 'STILL'}
++        },
++        'imageParamsForCharacterCircle': {
++            'artworkType': 'SQUAREHEADSHOT_1000x1000',
++            'dimension': {'width': 200, 'height': 200},
++            'formats': ['WEBP', 'JPG', 'PNG']
++        },
++        'carouselVersion': '1'
++    }
 +
 +
 +
@@ -1362,7 +1665,7 @@ index 628cb07..8d3c732 100644
 +
 +def _supplemental_artwork_url(node):
 +    for key, value in node.items():
-+        if 'artwork' not in key.lower():
++        if not any(name in key.lower() for name in ('artwork', 'boxart', 'storyart', 'still')):
 +            continue
 +        image_url = _first_artwork_url(value)
 +        if image_url:
@@ -1385,10 +1688,12 @@ index 628cb07..8d3c732 100644
 +        'creditsOffset': _value(0),
 +        'watchedToEndOffset': _value(0),
 +        'watched': _value(False),
-+        'runtime': _value(node.get('runtimeSec') or node.get('runtime') or 0),
++        'runtime': _value(node.get('displayRuntimeSec') or node.get('runtimeSec') or node.get('runtime') or 0),
 +        'trackIds': _value({'trackId': video_id}),
 +        'requestId': _value('')
 +    }
++    if node.get('isPlayable') is not None:
++        item['availability'] = _value({'isPlayable': bool(node.get('isPlayable'))})
 +    synopsis = node.get('synopsis') or node.get('contextualSynopsis') or ''
 +    if isinstance(synopsis, dict):
 +        synopsis = synopsis.get('text') or synopsis.get('value') or ''
@@ -1431,12 +1736,13 @@ index 628cb07..8d3c732 100644
 +    if not match:
 +        return {}
 +    try:
-+        graphql_cache = json.loads(match.group(1).encode().decode('unicode_escape'))
++        graphql_cache = json.loads(website.decode_javascript_string(match.group(1)))
 +    except (TypeError, ValueError, UnicodeDecodeError) as exc:
 +        LOG.warn('Unable to parse title page GraphQL cache ({})', type(exc).__name__)
 +        return {}
 +    graphql_data = graphql_cache.get('data') if isinstance(graphql_cache, dict) else None
 +    return graphql_data if isinstance(graphql_data, dict) else {}
++
 +
 +def _normalize_browser_list_lengths(path_response):
 +    for list_data in path_response.get('lists', {}).values():
@@ -1458,15 +1764,33 @@ index 628cb07..8d3c732 100644
 +    return paths
 +
 +
++def _boxart_dimensions(boxart):
++    try:
++        width = int(boxart.get('width') or boxart.get('w') or 0)
++        height = int(boxart.get('height') or boxart.get('h') or 0)
++    except (TypeError, ValueError):
++        return 0, 0
++    return width, height
++
++
 +def _set_browser_boxart(video, item_summary):
 +    boxart = item_summary.get('boxArt') or {}
 +    image_url = boxart.get('url')
-+    video.setdefault('itemSummary', _value(item_summary))
++    width, height = _boxart_dimensions(boxart)
++    is_portrait = bool(width and height and height > width)
++    item_summary_value = dict(item_summary)
++    if image_url and not is_portrait:
++        item_summary_value.pop('boxArt', None)
++    video['itemSummary'] = _value(item_summary_value)
 +    if not image_url:
 +        return
 +    art_value = {'url': image_url}
-+    video.setdefault('boxarts', {})
-+    video['boxarts'].setdefault(ART_SIZE_POSTER, {'jpg': {'value': art_value}})
++    if is_portrait:
++        video.setdefault('boxarts', {})
++        video['boxarts'].setdefault(ART_SIZE_POSTER, {'jpg': {'value': art_value}})
++    else:
++        video.setdefault('interestingMoment', {})
++        video['interestingMoment'].setdefault(ART_SIZE_FHD, {'jpg': {'value': art_value}})
 +
 +
 +def _browser_item_summary_score(item_summary):
@@ -1499,6 +1823,8 @@ index 628cb07..8d3c732 100644
 +        if not isinstance(video, dict):
 +            continue
 +        item_summary = item_summaries.get(str(video_id), {})
++        if not item_summary:
++            item_summary = video.get('itemSummary', {}).get('value', {})
 +        if item_summary:
 +            video.setdefault('itemSummary', _value(item_summary))
 +            _set_browser_boxart(video, item_summary)
@@ -1567,7 +1893,7 @@ index 628cb07..8d3c732 100644
  if TYPE_CHECKING:  # This variable/imports are used only by the editor, so not at runtime
      from resources.lib.services.nfsession.nfsession_ops import NFSessionOperations
  
-@@ -37,16 +814,17 @@ class DirectoryPathRequests:
+@@ -37,16 +967,17 @@ class DirectoryPathRequests:
          """Return the 'my list' video list as videoid items"""
          LOG.debug('Requesting "my list" video list as videoid items')
          try:
@@ -1592,7 +1918,7 @@ index 628cb07..8d3c732 100644
  
      @cache_utils.cache_output(cache_utils.CACHE_COMMON, fixed_identifier='loco_list', ignore_self_class=True)
      def req_loco_list_root(self):
-@@ -63,26 +841,20 @@ class DirectoryPathRequests:
+@@ -63,26 +994,20 @@ class DirectoryPathRequests:
                   # Art for the first video of each context list (needed only to add art to the menu item)
                   build_paths(['loco', {'from': 0, 'to': 50}, 0, 'reference'], ART_PARTIAL_PATHS))
          call_args = {'paths': paths}
@@ -1627,7 +1953,7 @@ index 628cb07..8d3c732 100644
  
      def get_loco_list_id_by_context(self, context):
          """Return the dynamic video list ID for a LoCo context"""
-@@ -119,8 +891,14 @@ class DirectoryPathRequests:
+@@ -119,8 +1044,14 @@ class DirectoryPathRequests:
              'length_params': ['stdlist_wid', ['videos', videoid.tvshowid, 'seasonList']],
              'perpetual_range_start': perpetual_range_start
          }
@@ -1644,7 +1970,7 @@ index 628cb07..8d3c732 100644
  
      @cache_utils.cache_output(cache_utils.CACHE_COMMON, identify_from_kwarg_name='videoid',
                                identify_append_from_kwarg_name='perpetual_range_start', ignore_self_class=True)
-@@ -138,12 +916,613 @@ class DirectoryPathRequests:
+@@ -138,16 +1069,742 @@ class DirectoryPathRequests:
              'length_params': ['stdlist_wid', ['seasons', videoid.seasonid, 'episodes']],
              'perpetual_range_start': perpetual_range_start
          }
@@ -2030,16 +2356,17 @@ index 628cb07..8d3c732 100644
 +        raise InvalidVideoListTypeError('No current direct My List content available')
 +
 +    def _browser_mylist_video_list(self):
-+        root_id, auth_url = self._get_current_loco_root_id()
-+        list_id, row_key = self._browser_mylist_list_info(root_id, auth_url)
-+        if row_key is not None:
-+            try:
-+                video_list = self._browser_mylist_loco_video_list(root_id, row_key, list_id, auth_url)
-+            except InvalidVideoListTypeError:
-+                LOG.warn('Falling back to direct My List request after LoCo row content lookup failed')
-+                video_list = self._browser_mylist_direct_video_list(list_id, auth_url)
-+        else:
-+            video_list = self._browser_mylist_direct_video_list(list_id, auth_url)
++        self._browse_html_and_auth_url()
++        path_response = self._post_browser_path_evaluator([
++            ['mylist', ['id', 'listId', 'name', 'requestId', 'trackIds']],
++            ['mylist', BROWSER_MYLIST_RANGE, BROWSER_MYLIST_FIELDS]
++        ], 'https://www.netflix.com/browse/my-list')
++        mylist_data = path_response.get('mylist')
++        if not isinstance(mylist_data, dict):
++            raise InvalidVideoListTypeError('No browser My List data available')
++        path_response['lists'] = {'mylist': mylist_data}
++        _normalize_browser_video_fields(path_response)
++        video_list = VideoList(path_response, 'mylist')
 +        for video in video_list.videos.values():
 +            video.setdefault('queue', _value({}))
 +            video['queue'].setdefault('value', {})['inQueue'] = True
@@ -2077,7 +2404,6 @@ index 628cb07..8d3c732 100644
 +            'https://www.netflix.com/latest')
 +        if str(list_id) not in path_response.get('lists', {}):
 +            raise InvalidVideoListTypeError(f'No LoLoMo category list with id {list_id}')
-+        self._enrich_browser_video_list_metadata(path_response, str(list_id))
 +        return VideoList(path_response, str(list_id))
 +
 +    def _browser_genre_video_list_by_id(self, genre_id, list_id):
@@ -2122,6 +2448,126 @@ index 628cb07..8d3c732 100644
 +        ], 'https://www.netflix.com/browse')
 +
 +    def _browser_continue_watching_list(self):
++        try:
++            return self._browser_continue_watching_graphql_list()
++        except (InvalidVideoListTypeError, WebsiteParsingError, KeyError, TypeError,
++                ValueError, req_exceptions.RequestException) as exc:
++            LOG.warn('GraphQL Continue Watching lookup failed ({}); using genre fallback',
++                     type(exc).__name__)
++            return self._browser_continue_watching_genre_fallback()
++
++    def _browser_continue_watching_graphql_list(self):
++        browse_html = self.nfsession.get_safe('browse')
++        api_data = self.nfsession.website_extract_session_data(browse_html)
++        self.nfsession.auth_url = api_data['auth_url']
++        react_context = website.extract_json(browse_html, 'reactContext')
++        graphql_data = _title_page_graphql_data(browse_html, react_context)
++        try:
++            section, connection = self._continue_watching_graphql_section(graphql_data)
++        except InvalidVideoListTypeError:
++            browse_html = self._active_profile_browse_html(browse_html)
++            api_data = self.nfsession.website_extract_session_data(browse_html)
++            self.nfsession.auth_url = api_data['auth_url']
++            react_context = website.extract_json(browse_html, 'reactContext')
++            graphql_data = _title_page_graphql_data(browse_html, react_context)
++            section, connection = self._continue_watching_graphql_section(graphql_data)
++        videos = OrderedDict()
++        self._append_continue_watching_graphql_edges(
++            videos, graphql_data, _iter_graphql_edges(connection))
++        page_info = connection.get('pageInfo') or {}
++        while page_info.get('hasNextPage') and page_info.get('endCursor'):
++            data = self._post_graphql(
++                'CarouselPage',
++                _carousel_graphql_variables(section.get('_id') or section['id'], page_info['endCursor']),
++                GRAPHQL_OP_CAROUSEL_PAGE)
++            next_section = data.get('node') or {}
++            next_connection = next_section.get('entities') or {}
++            previous_count = len(videos)
++            self._append_continue_watching_graphql_edges(
++                videos, {}, _iter_graphql_edges(next_connection))
++            page_info = next_connection.get('pageInfo') or {}
++            if len(videos) == previous_count:
++                break
++        if not videos:
++            raise InvalidVideoListTypeError('No GraphQL Continue Watching videos available')
++        return CustomVideoList({'videos': videos})
++
++    def _active_profile_browse_html(self, profile_gate_html):
++        parser = _ActiveProfileLinkParser(G.LOCAL_DB.get_active_profile_guid())
++        parser.feed(profile_gate_html.decode('utf-8', 'replace')
++                    if isinstance(profile_gate_html, bytes) else str(profile_gate_html))
++        if not parser.href:
++            raise InvalidVideoListTypeError('No active profile switch link available')
++        response = self.nfsession.session.get(
++            urljoin('https://www.netflix.com/browse', parser.href),
++            headers={
++                'Accept': 'text/html,application/xhtml+xml,application/xml',
++                'Referer': 'https://www.netflix.com/browse',
++                'User-Agent': common.get_user_agent(enable_android_mediaflag_fix=True)
++            },
++            timeout=8)
++        response.raise_for_status()
++        return response.content
++
++    @staticmethod
++    def _continue_watching_graphql_section(graphql_data):
++        for section in graphql_data.values():
++            if not isinstance(section, dict) or section.get('__typename') != 'PinotCarouselSection':
++                continue
++            connection = _graphql_ref_node(graphql_data, section.get('entities'))
++            if not isinstance(connection, dict):
++                continue
++            for edge in _iter_graphql_edges(connection):
++                edge_data = _graphql_ref_node(graphql_data, edge)
++                node = _graphql_ref_node(graphql_data, (edge_data or {}).get('node'))
++                if isinstance(node, dict) and node.get('__typename') == 'PinotContinueWatchingEntityTreatment':
++                    return section, connection
++        raise InvalidVideoListTypeError('No GraphQL Continue Watching section available')
++
++    @staticmethod
++    def _continue_watching_graphql_node(graphql_data, edge):
++        edge_data = _graphql_ref_node(graphql_data, edge) if graphql_data else edge
++        node = ((edge_data or {}).get('node') or {})
++        node = _graphql_ref_node(graphql_data, node) if graphql_data else node
++        if not isinstance(node, dict):
++            return None
++        entity = node.get('unifiedEntity') or {}
++        entity = _graphql_ref_node(graphql_data, entity) if graphql_data else entity
++        artwork_context = node.get('contextualArtwork') or {}
++        artwork_context = (_graphql_ref_node(graphql_data, artwork_context)
++                           if graphql_data else artwork_context)
++        artwork = {}
++        if isinstance(artwork_context, dict):
++            artwork_value = next(
++                (value for key, value in artwork_context.items() if key == 'artwork' or key.startswith('artwork(')),
++                {})
++            artwork = (_graphql_ref_node(graphql_data, artwork_value)
++                       if graphql_data else artwork_value)
++        return {
++            'displayString': node.get('displayString'),
++            'unifiedEntity': entity or {},
++            'contextualArtwork': {'artwork': artwork or {}}
++        }
++
++    def _append_continue_watching_graphql_edges(self, videos, graphql_data, edges):
++        for edge in edges:
++            node = self._continue_watching_graphql_node(graphql_data, edge)
++            item_data = _search_graphql_node_to_item(node or {})
++            if not item_data:
++                continue
++            video_id, item = item_data
++            entity = node.get('unifiedEntity') or {}
++            progress_entity = entity.get('currentEpisode') or entity
++            if graphql_data:
++                progress_entity = _graphql_ref_node(graphql_data, progress_entity) or progress_entity
++            bookmark = progress_entity.get('bookmark') or {}
++            if graphql_data:
++                bookmark = _graphql_ref_node(graphql_data, bookmark) or bookmark
++            item['bookmarkPosition'] = _value(bookmark.get('position', 0))
++            item['runtime'] = _value(progress_entity.get('runtimeSec') or entity.get('runtimeSec') or 0)
++            videos[video_id] = item
++
++    def _browser_continue_watching_loco_list(self):
 +        try:
 +            root_id, auth_url = self._get_current_loco_root_id()
 +        except InvalidVideoListTypeError:
@@ -2261,7 +2707,16 @@ index 628cb07..8d3c732 100644
          """Retrieve a video list"""
          # Some of this type of request have results fixed at ~40 from netflix
          # The 'length' tag never return to the actual total count of the elements
-@@ -155,7 +1534,20 @@ class DirectoryPathRequests:
+         LOG.debug('Requesting video list {}', list_id)
++        browser_genre_id = str((menu_data or {}).get('browser_genre_id') or '')
++        if browser_genre_id:
++            if str(list_id) == browser_genre_id:
++                return self._first_full_browser_genre_video_list(browser_genre_id)
++            return self._browser_genre_video_list_by_id(browser_genre_id, list_id)
+         paths = (build_paths(['lists', list_id, RANGE_PLACEHOLDER, 'reference'], VIDEO_LIST_PARTIAL_PATHS) +
+                  [['lists', list_id, 'componentSummary']])
+         call_args = {
+@@ -155,7 +1812,20 @@ class DirectoryPathRequests:
              'length_params': ['stdlist', ['lists', list_id]],
              'perpetual_range_start': perpetual_range_start
          }
@@ -2283,7 +2738,7 @@ index 628cb07..8d3c732 100644
          return VideoList(path_response)
  
      @cache_utils.cache_output(cache_utils.CACHE_COMMON, identify_from_kwarg_name='context_id',
-@@ -165,6 +1557,19 @@ class DirectoryPathRequests:
+@@ -165,6 +1835,19 @@ class DirectoryPathRequests:
          # This type of request allows to obtain more than ~40 results
          LOG.debug('Requesting video list sorted for context name: "{}", context id: "{}"',
                    context_name, context_id)
@@ -2303,7 +2758,7 @@ index 628cb07..8d3c732 100644
          base_path = [context_name]
          response_type = 'stdlist'
          if context_id:
-@@ -185,7 +1590,17 @@ class DirectoryPathRequests:
+@@ -185,7 +1868,17 @@ class DirectoryPathRequests:
          paths = (build_paths(_base_path, VIDEO_LIST_PARTIAL_PATHS) +
                   [base_path[:-1] + [['id', 'name', 'requestId', 'trackIds']]])
  
@@ -2322,7 +2777,22 @@ index 628cb07..8d3c732 100644
          return VideoListSorted(path_response, context_name, context_id, req_sort_order_type)
  
  
-@@ -228,8 +1643,65 @@ class DirectoryPathRequests:
+@@ -225,11 +1918,147 @@ class DirectoryPathRequests:
+         if videoid.mediatype not in (common.VideoId.SHOW, common.VideoId.MOVIE):
+             raise InvalidVideoId(f'Cannot request video list supplemental for {videoid}')
+         LOG.debug('Requesting video list supplemental of type "{}" for {}', supplemental_type, videoid)
++        if supplemental_type == SUPPLEMENTAL_TYPE_TRAILERS:
++            try:
++                trailer_list = self._req_video_list_supplemental_graphql(videoid)
++                if trailer_list.videos:
++                    return trailer_list
++                LOG.warn('Website GraphQL returned no trailers for {}', videoid)
++                return trailer_list
++            except (KeyError, TypeError, ValueError, req_exceptions.RequestException) as exc:
++                LOG.warn('Website trailer collection lookup failed for {} ({}), trying title page fallback',
++                         videoid, type(exc).__name__)
++                return self._req_video_list_supplemental_title_page(videoid)
++
          path = build_paths(
              ['videos', videoid.value, supplemental_type, {"from": 0, "to": 35}], TRAILER_PARTIAL_PATHS
          )
@@ -2352,29 +2822,8 @@ index 628cb07..8d3c732 100644
 +                component_summary={})
 +
 +        def _title_page_fallback():
-+            try:
-+                response = requests.get(
-+                    NETFLIX_TITLE_URL.format(videoid.value),
-+                    headers={
-+                        'Accept': 'text/html,application/xhtml+xml,application/xml',
-+                        'User-Agent': common.get_user_agent(enable_android_mediaflag_fix=True)
-+                    },
-+                    timeout=8)
-+                response.raise_for_status()
-+                react_context = website.extract_json(response.content, 'reactContext')
-+            except (req_exceptions.RequestException, WebsiteParsingError) as exc:
-+                LOG.warn('Title page trailer fallback failed for {} ({})', videoid, type(exc).__name__)
-+                return _empty_fallback()
-+            graphql_data = _title_page_graphql_data(response.content, react_context)
-+            videos = _supplemental_videos_from_graphql_cache(graphql_data, videoid.value)
-+            if videos:
-+                LOG.debug('Title page trailer fallback found {} supplemental videos for {}', len(videos), videoid)
-+                trailer_list = CustomVideoList({'videos': videos})
-+                trailer_list.is_supplemental_type = True
-+                trailer_list.component_summary = {}
-+                return _inherit_parent_metadata(trailer_list)
-+            LOG.warn('No title page supplemental videos found for {}', videoid)
-+            return _empty_fallback()
++            trailer_list = self._req_video_list_supplemental_title_page(videoid)
++            return _inherit_parent_metadata(trailer_list) if trailer_list.videos else _empty_fallback()
 +        try:
 +            path_response = self.nfsession.path_request(path)
 +            trailer_list = VideoListSupplemental(path_response, 'videos', videoid.value, supplemental_type)
@@ -2387,10 +2836,98 @@ index 628cb07..8d3c732 100644
 +                raise
 +            LOG.warn('Trailer supplemental path returned 404 for {}, trying title page fallback', videoid)
 +            return _title_page_fallback()
++
++    def _req_video_list_supplemental_graphql(self, videoid):
++        """Load the website's ordered Trailers & More collection."""
++        video_id = int(videoid.value)
++        detail_data = self._post_graphql(
++            'DetailModal',
++            {
++                'artworkContext': {},
++                'checkLinearChannel': True,
++                'fetchPromoVideoOverride': False,
++                'hasPromoVideoOverride': False,
++                'isLiveEpisodic': False,
++                'opaqueImageFormat': 'WEBP',
++                'promoVideoId': 0,
++                'textEvidenceUiContext': 'ODP',
++                'transparentImageFormat': 'WEBP',
++                'unifiedEntityId': f'Video:{video_id}',
++                'videoId': video_id,
++                'videoMerchContext': 'BROWSE',
++                'videoMerchEnabled': False
++            },
++            GRAPHQL_OP_DETAIL_MODAL)
++        entity = (detail_data.get('unifiedEntities') or [None])[0] or {}
++        edges = common.get_path_safe(['supplementalVideosList', 'edges'], entity, False, [])
++        trailer_ids = []
++        for edge in edges:
++            node = edge.get('node') or edge
++            trailer_id = node.get('videoId')
++            if trailer_id and trailer_id not in trailer_ids:
++                trailer_ids.append(trailer_id)
++        if not trailer_ids:
++            return self._empty_supplemental_list()
++
++        trailer_data = self._post_graphql(
++            'DetailModalTrailers',
++            {
++                'artworkContext': {},
++                'opaqueImageFormat': 'WEBP',
++                'videoIds': trailer_ids
++            },
++            GRAPHQL_OP_DETAIL_MODAL_TRAILERS)
++        nodes_by_id = {
++            str(node.get('videoId')): node
++            for node in trailer_data.get('videos') or []
++            if isinstance(node, dict) and node.get('videoId')
++        }
++        videos = OrderedDict()
++        for trailer_id in trailer_ids:
++            item = _supplemental_node_to_item(nodes_by_id.get(str(trailer_id), {}))
++            if item:
++                videos[item[0]] = item[1]
++        trailer_list = CustomVideoList({'videos': videos})
++        trailer_list.is_supplemental_type = True
++        trailer_list.component_summary = {}
++        LOG.debug('Website GraphQL returned {} trailers for {}', len(videos), videoid)
++        return trailer_list
++
++    def _req_video_list_supplemental_title_page(self, videoid):
++        try:
++            response = self.nfsession.session.get(
++                NETFLIX_TITLE_URL.format(videoid.value),
++                headers={
++                    'Accept': 'text/html,application/xhtml+xml,application/xml',
++                    'User-Agent': common.get_user_agent(enable_android_mediaflag_fix=True)
++                },
++                timeout=8)
++            response.raise_for_status()
++            react_context = website.extract_json(response.content, 'reactContext')
++        except (req_exceptions.RequestException, WebsiteParsingError) as exc:
++            LOG.warn('Title page trailer fallback failed for {} ({})', videoid, type(exc).__name__)
++            return self._empty_supplemental_list()
++        graphql_data = _title_page_graphql_data(response.content, react_context)
++        videos = _supplemental_videos_from_graphql_cache(graphql_data, videoid.value)
++        if not videos:
++            LOG.warn('No title page supplemental videos found for {}', videoid)
++            return self._empty_supplemental_list()
++        LOG.debug('Title page trailer fallback found {} supplemental videos for {}', len(videos), videoid)
++        trailer_list = CustomVideoList({'videos': videos})
++        trailer_list.is_supplemental_type = True
++        trailer_list.component_summary = {}
++        return trailer_list
++
++    @staticmethod
++    def _empty_supplemental_list():
++        trailer_list = CustomVideoList({'videos': OrderedDict()})
++        trailer_list.is_supplemental_type = True
++        trailer_list.component_summary = {}
++        return trailer_list
  
      @cache_utils.cache_output(cache_utils.CACHE_COMMON, identify_from_kwarg_name='chunked_video_list',
                                ttl=900, ignore_self_class=True)
-@@ -247,8 +1719,6 @@ class DirectoryPathRequests:
+@@ -247,21 +2076,114 @@ class DirectoryPathRequests:
              merged_response.update(perpetual_range_selector)
          return CustomVideoList(merged_response)
  
@@ -2399,20 +2936,18 @@ index 628cb07..8d3c732 100644
      def req_video_list_search(self, search_term, perpetual_range_start=None):
          """Retrieve a video list by search term"""
          LOG.debug('Requesting video list by search term "{}"', search_term)
-@@ -260,9 +1730,51 @@ class DirectoryPathRequests:
-             'length_params': ['searchlist', ['search', 'byReference']],
-             'perpetual_range_start': perpetual_range_start
-         }
+-        base_path = ['search', 'byTerm', f'|{search_term}', 'titles', PATH_REQUEST_SIZE_STD]
+-        paths = ([base_path + [['id', 'name', 'requestId', 'trackIds']]] +
+-                 build_paths(base_path + [RANGE_PLACEHOLDER, 'reference'], VIDEO_LIST_PARTIAL_PATHS))
+-        call_args = {
+-            'paths': paths,
+-            'length_params': ['searchlist', ['search', 'byReference']],
+-            'perpetual_range_start': perpetual_range_start
+-        }
 -        path_response = self.nfsession.perpetual_path_request(**call_args)
-+        try:
-+            path_response = self.nfsession.perpetual_path_request(**call_args)
-+        except req_exceptions.HTTPError as exc:
-+            if getattr(exc.response, 'status_code', None) != 404:
-+                raise
-+            LOG.warn('Falling back to browser GraphQL search for term "{}" after pathEvaluator 404', search_term)
-+            return self._req_video_list_search_graphql(search_term)
-         return SearchVideoList(path_response)
- 
+-        return SearchVideoList(path_response)
++        return self._req_video_list_search_graphql(search_term)
++
 +    def _req_video_list_search_graphql(self, search_term):
 +        data = self._post_graphql(
 +            'SearchPageQueryResults',
@@ -2432,12 +2967,80 @@ index 628cb07..8d3c732 100644
 +                if item:
 +                    video_id, video_data = item
 +                    videos.setdefault(video_id, video_data)
-+        for video_id, video_data in list(videos.items()):
-+            metadata_video = self._metadata_for_video(video_id, 'Search')
-+            if metadata_video:
-+                videos[video_id] = _merge_search_metadata_video(video_data, metadata_video)
-+                normalize_metadata_references(path_response, video_id, metadata_video, videos[video_id])
++        self._enrich_search_video_list(path_response)
++        LOG.debug('GraphQL search returned {} video results for "{}"', len(videos), search_term)
 +        return CustomVideoList(path_response)
++
++    def _enrich_search_video_list(self, path_response):
++        videos = path_response.get('videos') or {}
++        video_ids = list(videos)[:SEARCH_TITLE_PAGE_METADATA_LIMIT]
++        if not video_ids:
++            return
++        metadata_by_video = {video_id: {} for video_id in video_ids}
++        title_metadata_by_video = {}
++        max_workers = min(SEARCH_TITLE_PAGE_METADATA_WORKERS, len(video_ids))
++        with ThreadPoolExecutor(max_workers=max_workers) as metadata_executor:
++            with ThreadPoolExecutor(max_workers=max_workers) as title_executor:
++                metadata_futures = {
++                    metadata_executor.submit(self._search_metadata_for_video, video_id): video_id
++                    for video_id in video_ids
++                }
++                title_futures = {
++                    title_executor.submit(_search_title_page_metadata, video_id): video_id
++                    for video_id in video_ids
++                }
++                for future in as_completed(metadata_futures):
++                    video_id = metadata_futures[future]
++                    try:
++                        metadata_by_video[video_id] = future.result()
++                    except Exception as exc:  # pylint: disable=broad-except
++                        LOG.debug('Search metadata worker failed ({})', type(exc).__name__)
++                for future in as_completed(title_futures):
++                    video_id = title_futures[future]
++                    try:
++                        title_metadata_by_video[video_id] = future.result()
++                    except Exception as exc:  # pylint: disable=broad-except
++                        LOG.debug('Search title metadata worker failed ({})', type(exc).__name__)
++        for video_id in video_ids:
++            metadata = _merge_title_page_metadata(
++                metadata_by_video[video_id], title_metadata_by_video.get(video_id))
++            video = _merge_search_metadata_video(videos[video_id], metadata)
++            videos[video_id] = video
++            normalize_metadata_references(path_response, video_id, metadata, video)
++
++    def _enrich_search_title_page_metadata(self, metadata_by_video):
++        video_ids = [
++            video_id
++            for video_id, metadata_video in metadata_by_video.items()
++            if not _metadata_has_reference_names(metadata_video)
++        ][:SEARCH_TITLE_PAGE_METADATA_LIMIT]
++        if not video_ids:
++            return
++        max_workers = min(SEARCH_TITLE_PAGE_METADATA_WORKERS, len(video_ids))
++        with ThreadPoolExecutor(max_workers=max_workers) as executor:
++            future_by_video_id = {
++                executor.submit(_search_title_page_metadata, video_id): video_id
++                for video_id in video_ids
++            }
++            for future in as_completed(future_by_video_id):
++                video_id = future_by_video_id[future]
++                try:
++                    title_page_metadata = future.result()
++                except Exception as exc:  # pylint: disable=broad-except
++                    LOG.debug('Search title page metadata failed for {} ({})', video_id, type(exc).__name__)
++                    continue
++                metadata_by_video[video_id] = _merge_title_page_metadata(
++                    metadata_by_video.get(video_id), title_page_metadata)
++
++    def _search_metadata_for_video(self, video_id):
++        try:
++            metadata_data = self.nfsession.get_safe(
++                endpoint='metadata',
++                params={'movieid': video_id, '_': int(time.time() * 1000)})
++            return metadata_data.get('video') or {}
++        except (MetadataNotAvailable, KeyError, TypeError, req_exceptions.RequestException):
++            LOG.debug('Search metadata enrichment skipped for video {}', video_id)
++            return {}
 +
 +    def _metadata_for_video(self, video_id, context):
 +        try:
@@ -2448,11 +3051,10 @@ index 628cb07..8d3c732 100644
 +        except (MetadataNotAvailable, KeyError, TypeError, req_exceptions.RequestException):
 +            LOG.warn('{} metadata enrichment skipped for video {}', context, video_id)
 +            return metadata_with_title_page_fallback(video_id)
-+
+ 
      def req_subgenres(self, genre_id):
          """Retrieve sub-genres for the given genre"""
-         LOG.debug('Requesting sub-genres of the genre {}', genre_id)
-@@ -276,6 +1788,9 @@ class DirectoryPathRequests:
+@@ -276,6 +2198,9 @@ class DirectoryPathRequests:
          contains only minimal video info
          """
          LOG.debug('Requesting the full video list for {}', context_name)
@@ -2462,7 +3064,30 @@ index 628cb07..8d3c732 100644
          paths = (build_paths([context_name, 'az', RANGE_PLACEHOLDER], VIDEO_LIST_BASIC_PARTIAL_PATHS) +
                   [[context_name, ['id', 'name', 'requestId', 'trackIds']]])
          call_args = {
-@@ -309,14 +1824,10 @@ class DirectoryPathRequests:
+@@ -301,22 +2226,31 @@ class DirectoryPathRequests:
+         LOG.debug('Requesting a video list for {} videos', video_ids)
+         paths = build_paths(['videos', video_ids],
+                             custom_partial_paths if custom_partial_paths else VIDEO_LIST_PARTIAL_PATHS)
+-        path_response = self.nfsession.path_request(paths)
+-        return CustomVideoList(path_response)
++        try:
++            path_response = self.nfsession.path_request(paths)
++            return CustomVideoList(path_response)
++        except req_exceptions.HTTPError as exc:
++            status_code = getattr(exc.response, 'status_code', None)
++            if status_code not in (404, 412):
++                raise
++            LOG.warn('Falling back to metadata video list for {} videos after pathEvaluator {}',
++                     len(video_ids), status_code)
++        videos = OrderedDict()
++        for video_id in video_ids:
++            metadata_video = self._metadata_for_video(str(video_id), 'Video id list')
++            if metadata_video:
++                videos[str(video_id)] = _metadata_video_to_item(str(video_id), metadata_video)
++        return CustomVideoList({'videos': videos})
+ 
+     @cache_utils.cache_output(cache_utils.CACHE_COMMON, fixed_identifier='lolomo_category',
+                               identify_append_from_kwarg_name='category_name', ignore_self_class=True)
      def req_lolomo_category(self, category_name):
          """Retrieve LoLoMo by category lists"""
          LOG.debug('Requesting LoLoMo "{}" category lists', category_name)
@@ -3096,7 +3721,7 @@ index 7764571..bb0f78f 100644
      """Build a list of full paths by concatenating each partial path with the base path"""
      paths = [base_path + partial_path for partial_path in partial_paths]
 diff --git a/resources/lib/utils/api_requests.py b/resources/lib/utils/api_requests.py
-index c6cd1ce..4c46147 100644
+index c6cd1ce..186f789 100644
 --- a/resources/lib/utils/api_requests.py
 +++ b/resources/lib/utils/api_requests.py
 @@ -18,6 +18,22 @@ from .logging import LOG, measure_exec_time_decorator
@@ -3161,6 +3786,22 @@ index c6cd1ce..4c46147 100644
          LOG.debug('update_my_list response: {}', response)
          raise APIError('Unable update my list, an error occurred in the request.')
      _update_mylist_cache(videoid, operation, params)
+@@ -192,12 +214,11 @@ def _update_mylist_cache(videoid, operation, params):
+         except CacheMiss:
+             pass
+     else:
+-        common.make_call('add_videoids_to_video_list_cache', {'cache_bucket': cache_utils.CACHE_MYLIST,
+-                                                              'cache_identifier': mylist_identifier,
+-                                                              'video_ids': [videoid.value]})
++        G.CACHE.delete(cache_utils.CACHE_MYLIST, mylist_identifier)
+         try:
+             my_list_videoids = G.CACHE.get(cache_utils.CACHE_MYLIST, 'my_list_items')
+-            my_list_videoids.append(videoid)
++            if videoid not in my_list_videoids:
++                my_list_videoids.append(videoid)
+             G.CACHE.add(cache_utils.CACHE_MYLIST, 'my_list_items', my_list_videoids)
+         except CacheMiss:
+             pass
 diff --git a/resources/lib/utils/data_types.py b/resources/lib/utils/data_types.py
 index 914e3be..8f3b083 100644
 --- a/resources/lib/utils/data_types.py
@@ -3177,3 +3818,105 @@ index 914e3be..8f3b083 100644
          if not data['lists'][list_id]['componentSummary'].get('value', {}).get('context') in contexts:
              continue
          del data['lists'][list_id]
+diff --git a/resources/lib/utils/website.py b/resources/lib/utils/website.py
+index f1471bd..ba2265d 100644
+--- a/resources/lib/utils/website.py
++++ b/resources/lib/utils/website.py
+@@ -278,6 +278,72 @@ def validate_login(react_context):
+             raise WebsiteParsingError(error_msg) from exc
+ 
+ 
++def decode_javascript_string(value):
++    """Decode a JavaScript string literal without corrupting decoded Unicode."""
++    decoded = []
++    index = 0
++    value_length = len(value)
++    simple_escapes = {
++        "'": "'", '"': '"', '\\': '\\', '/': '/',
++        'b': '\b', 'f': '\f', 'n': '\n', 'r': '\r', 't': '\t', 'v': '\v', '0': '\0'
++    }
++    while index < value_length:
++        character = value[index]
++        if character != '\\':
++            decoded.append(character)
++            index += 1
++            continue
++        index += 1
++        if index >= value_length:
++            decoded.append('\\')
++            break
++        escape = value[index]
++        if escape == 'u' and index + 4 < value_length:
++            hex_value = value[index + 1:index + 5]
++            try:
++                codepoint = int(hex_value, 16)
++            except ValueError:
++                pass
++            else:
++                index += 5
++                if (0xD800 <= codepoint <= 0xDBFF and
++                        index + 5 < value_length and value[index:index + 2] == '\\u'):
++                    low_hex_value = value[index + 2:index + 6]
++                    try:
++                        low_codepoint = int(low_hex_value, 16)
++                    except ValueError:
++                        pass
++                    else:
++                        if 0xDC00 <= low_codepoint <= 0xDFFF:
++                            codepoint = 0x10000 + ((codepoint - 0xD800) << 10) + (low_codepoint - 0xDC00)
++                            index += 6
++                decoded.append(chr(codepoint))
++                continue
++        elif escape == 'x' and index + 2 < value_length:
++            hex_value = value[index + 1:index + 3]
++            try:
++                decoded.append(chr(int(hex_value, 16)))
++                index += 3
++                continue
++            except ValueError:
++                pass
++        elif escape in simple_escapes:
++            decoded.append(simple_escapes[escape])
++            index += 1
++            continue
++        elif escape == '\n':
++            index += 1
++            continue
++        elif escape == '\r':
++            index += 1
++            if index < value_length and value[index] == '\n':
++                index += 1
++            continue
++        decoded.append(escape)
++        index += 1
++    return ''.join(decoded)
++
++
+ @measure_exec_time_decorator(is_immediate=True)
+ def extract_json(content, name):
+     """Extract json from netflix content page"""
+@@ -292,7 +358,7 @@ def extract_json(content, name):
+         json_str_replace = json_str_replace.replace(r'\n', r'\\n')  # Escape line feed
+         json_str_replace = json_str_replace.replace(r'\t', r'\\t')  # Escape tab
+         json_str_replace = json_str_replace.replace(r'\p', r'/p')  # Unicode property not supported, we change slash to avoid unescape it
+-        json_str_replace = json_str_replace.encode().decode('unicode_escape')  # Decode the string as unicode
++        json_str_replace = decode_javascript_string(json_str_replace)
+         json_str_replace = sub(r'\\(?!["])', r'\\\\', json_str_replace)  # Escape backslash (only when is not followed by double quotation marks \")
+         return json.loads(json_str_replace)
+     except Exception as exc:  # pylint: disable=broad-except
+diff --git a/resources/settings.xml b/resources/settings.xml
+index 3f889c2..8f588bc 100644
+--- a/resources/settings.xml
++++ b/resources/settings.xml
+@@ -557,11 +557,6 @@
+                         <dependency type="visible" setting="show_menu_assistiveaudio">true</dependency>
+                     </dependencies>
+                 </setting>
+-                <setting id="show_menu_recommendations" type="boolean" label="30001" help="">
+-                    <level>0</level>
+-                    <default>true</default>
+-                    <control type="toggle"/>
+-                </setting>
+                 <setting id="show_menu_tvshowsgenres" type="boolean" label="30174" help="">
+                     <level>0</level>
+                     <default>true</default>

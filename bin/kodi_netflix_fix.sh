@@ -58,7 +58,12 @@ LIB_DIR="$ADDON_DIR/resources/lib"
 ACCESS_PY="$LIB_DIR/services/nfsession/session/access.py"
 BACKUP="$ADDON_DIR/.rec-original-lib.tar.gz"
 
-API_PATCH="$REC_ASSETS/patches/netflix-api-fixes10.patch"
+API_PATCH="$REC_ASSETS/patches/netflix-api-fixes14.patch"
+# Records which revision of the API patch is currently applied. Netflix keeps
+# changing things and the patch series is revised every few weeks, so bumping
+# the vendored file must restore the add-on and re-apply rather than try to
+# stack one revision on top of another.
+API_STAMP="$ADDON_DIR/.rec-api-patch"
 # Something the community patch introduces and stock 1.23.5 does not have.
 API_MARKER_FILE="$LIB_DIR/utils/api_requests.py"
 API_MARKER="MY_LIST_GRAPHQL_MUTATIONS"
@@ -83,6 +88,11 @@ version="$(sed -n 's/.*id="plugin.video.netflix".*version="\([^"]*\)".*/\1/p' \
 
 api_applied()   { grep -q "$API_MARKER" "$API_MARKER_FILE" 2>/dev/null; }
 login_applied() { grep -q "$LOGIN_MARKER" "$ACCESS_PY" 2>/dev/null; }
+
+api_patch_name() { basename "$API_PATCH"; }
+api_patch_sha()  { sha256sum "$API_PATCH" 2>/dev/null | cut -d' ' -f1; }
+api_stamp_read() { [[ -f "$API_STAMP" ]] && cut -d' ' -f1 < "$API_STAMP"; }
+api_stamp_name() { [[ -f "$API_STAMP" ]] && cut -d' ' -f2- < "$API_STAMP"; }
 
 # The whole of resources/lib is backed up once, before anything is touched, so
 # --revert is a restore rather than an attempt to reverse two patches that may
@@ -114,7 +124,12 @@ migrate_old_backup() {
 if [[ "$mode" == "status" ]]; then
     rec_log "Netflix add-on version: $version"
     if api_applied; then
-        rec_log "  [x] API patch (browsing, search, My List, playback metadata)"
+        if [[ "$(api_stamp_read)" == "$(api_patch_sha)" ]]; then
+            rec_log "  [x] API patch: $(api_patch_name) (current)"
+        else
+            rec_log "  [~] API patch: $(api_stamp_name || echo 'an unrecorded revision') - OUT OF DATE"
+            rec_log "      $(api_patch_name) is available; re-run to upgrade."
+        fi
     else
         rec_log "  [ ] API patch - profiles and browsing will fail with a 404"
     fi
@@ -141,7 +156,7 @@ if [[ "$mode" == "revert" ]]; then
     fi
     rm -rf -- "$LIB_DIR" || rec_die "Could not remove $LIB_DIR"
     tar xzf "$BACKUP" -C "$ADDON_DIR" || rec_die "Could not restore from $BACKUP"
-    rm -f -- "$BACKUP"
+    rm -f -- "$BACKUP" "$API_STAMP"
     rec_log "Restored the add-on as shipped. Restart Kodi."
     exit 0
 fi
@@ -158,8 +173,12 @@ fi
 
 # Stage 1: the community API patch.
 if [[ "$mode" == "apply" ]]; then
-    if api_applied; then
-        rec_log "API patch: already applied."
+    if api_applied && [[ "$(api_stamp_read)" == "$(api_patch_sha)" ]]; then
+        rec_log "API patch: $(api_patch_name) already applied."
+    elif api_applied && [[ ! -f "$BACKUP" ]]; then
+        rec_error "A different revision of the API patch is applied, and there is no"
+        rec_error "backup to undo it with. Revisions cannot be stacked."
+        rec_die   "Reinstall the Netflix add-on, then re-run this script."
     elif [[ ! -f "$API_PATCH" ]]; then
         rec_warn "API patch not found at $API_PATCH - skipping stage 1."
     else
@@ -174,6 +193,15 @@ if [[ "$mode" == "apply" ]]; then
             rec_die "Neither 'patch' nor 'git' is available.  sudo apt install patch"
         fi
 
+        # An older revision in place must be undone first - the revisions are
+        # cumulative rewrites of the same files, not increments.
+        if api_applied; then
+            rec_log "Replacing $(api_stamp_name || echo 'an older API patch') with $(api_patch_name)."
+            rm -rf -- "$LIB_DIR" || rec_die "Could not remove $LIB_DIR"
+            tar xzf "$BACKUP" -C "$ADDON_DIR" || rec_die "Could not restore from $BACKUP"
+            rm -f -- "$API_STAMP"
+        fi
+
         if ! "${checker[@]}" < "$API_PATCH" >/dev/null 2>&1; then
             rec_error "The API patch does not apply to add-on $version."
             rec_error "The add-on source has changed - check whether the fix has landed:"
@@ -182,10 +210,12 @@ if [[ "$mode" == "apply" ]]; then
         else
             make_backup
             if "${patcher[@]}" < "$API_PATCH" >/dev/null 2>&1; then
-                rec_log "API patch applied (18 files) - browsing, search and My List."
+                printf '%s %s\n' "$(api_patch_sha)" "$(api_patch_name)" > "$API_STAMP"
+                rec_log "API patch applied: $(api_patch_name)"
             else
                 rec_error "The API patch failed halfway. Restoring the original."
                 rm -rf -- "$LIB_DIR"; tar xzf "$BACKUP" -C "$ADDON_DIR"
+                rm -f -- "$API_STAMP"
                 rec_die "Add-on restored; nothing was changed."
             fi
         fi
