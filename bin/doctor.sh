@@ -218,6 +218,18 @@ if rec_has kodi; then
         fi
     fi
 
+    # ffmpegdirect has its own ceiling. Scoped to that add-on, so less of a trap
+    # than the ISA one, but still worth surfacing when live TV looks soft.
+    fd_settings="${KODI_HOME:-$HOME/.kodi}/userdata/addon_data/inputstream.ffmpegdirect/settings.xml"
+    if [[ -f "$fd_settings" ]]; then
+        fd_bw="$(sed -n 's/.*id="streamBandwidth"[^>]*>\([0-9]*\)<.*/\1/p' \
+                 "$fd_settings" 2>/dev/null | head -1)"
+        if [[ -n "$fd_bw" ]] && (( fd_bw > 0 && fd_bw < 2500 )); then
+            warn "inputstream.ffmpegdirect caps stream selection at ${fd_bw} Kbps" \
+                 "Raise or disable it if live TV looks soft - docs/PERFORMANCE.md"
+        fi
+    fi
+
     # Stock Netflix add-on 1.23.5 can neither log in nor browse: Netflix retired
     # the endpoints it uses. Both patches are reapplied by the same script, and
     # an add-on update wipes them. Only report if the add-on is installed.

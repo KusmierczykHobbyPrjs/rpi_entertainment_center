@@ -158,9 +158,42 @@ These add-ons often let you choose the playback engine:
 
 | | InputStream Adaptive | ffmpeg (`inputstream.ffmpegdirect`) |
 |---|---|---|
-| Adaptive switching | yes — steps down when the network dips | no — one variant for the whole session |
-| Obeys the ISA caps above | **yes** | no |
-| Typical starting quality | whatever the caps allow | usually the highest variant |
+| Adaptive switching | yes — steps down when the network dips | no — one variant, chosen at open, for the whole session |
+| How the variant is chosen | bandwidth estimate, then adapts | highest under **Stream selection bandwidth**, default off = no ceiling |
+| Obeys the ISA settings above | **yes** | no — it has its own, below |
+| Variant list in the OSD | only with `manual-osd` | never |
+
+### Reading the stream entry in Video settings
+
+**Neither engine gives you a list of renditions to pick from** — that is worth
+knowing before you go hunting for one. Kodi's playback *Video settings* shows a
+single video stream either way, because both engines hand Kodi one decoded
+stream and keep the variant choice to themselves.
+
+What changes is the **description** of that single entry: its resolution and
+codec are those of whichever variant the engine picked. So if switching from
+ISA to ffmpeg changed what that line says, you have learned something concrete
+— the channel offers more than one variant, and the two engines chose
+differently. A higher figure under ffmpeg means ISA was under-selecting, which
+points straight back at the initial-bandwidth estimate above.
+
+To enumerate the renditions properly, use ISA with `manual-osd`. ffmpeg has no
+equivalent.
+
+### ffmpeg's own bandwidth ceiling
+
+```
+Ustawienia → Przepustowość wyboru strumienia   (Stream selection bandwidth)
+```
+
+Default **off**, so ffmpeg takes the highest variant the channel offers. On a
+Pi 3B that can be more than the hardware can decode — a 1080p50 broadcast will
+stutter where 720p would not.
+
+If ffmpeg now picks something too heavy, this is the knob: around `3500` keeps
+you at 720p on most Polish broadcasters. Unlike ISA's cap it is scoped to
+`inputstream.ffmpegdirect` alone, so it cannot surprise you elsewhere. It lives
+at settings level **Advanced**.
 
 ### Live TV starts low under ISA and stays there
 
@@ -192,7 +225,8 @@ the top one.
 **Before changing anything, find out whether a better stream exists.** Set
 `Typ wyboru strumienia` to `manual-osd` and look at the list during playback.
 If 576p is the only entry, that is what the channel broadcasts and no setting
-will improve it.
+will improve it. (This is the only way to see the list — see
+[below](#reading-the-stream-entry-in-video-settings).)
 
 If ISA is still worse after that, ffmpeg is a perfectly reasonable choice for
 live TV — you lose the ability to step down gracefully, so a congested network
@@ -217,6 +251,9 @@ ISA    → Initial bandwidth (Kbps)                      4000
 Netflix→ VP9 / HEVC / AV1 codecs                       off
 Netflix→ Limit streaming resolution to                 --  (ISA handles it)
 TVP    → Player type                                   try ISA first
+ffmpeg → Stream selection bandwidth                    off, or ~3500 if it
+                                                       picks more than the Pi
+                                                       can decode
 ```
 
 Then play something and press `o`. If it says `ff-h264 (V4L2 M2M)` and the CPU
