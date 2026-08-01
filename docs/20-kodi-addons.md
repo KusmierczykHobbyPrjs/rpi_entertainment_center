@@ -141,8 +141,26 @@ plugin call that never returns.
 bash bin/kodi_youtube_fix.sh
 ```
 
-Restart Kodi and share the mix again; it should start within a couple of
-seconds, with roughly 50 tracks queued.
+Restart Kodi and share the mix again; it starts within a couple of seconds and
+queues the mix's distinct tracks.
+
+> **A second, separate bug is still open: only the first track then plays.**
+> Measured on this Pi with `Playlist.OnAdd` in `kodi.log` — before the patch, a
+> shared mix produced 84 queue entries containing 11 distinct videos, one of
+> them eleven times; after it, 14 entries and 14 distinct videos. So the patch
+> does what it claims. But in *both* runs Kodi ends up playing a single item,
+> because `Player.Open` on a `play/?playlist_id=…` URL treats it as one
+> playable file: Kodi clears its own video playlist, puts the one resolved
+> track in it and plays that, while the queue the add-on built sits unused.
+> That is not caused by this patch and is not fixed by it.
+>
+> Which playlist the add-on fills is decided by
+> `XbmcPlaylistPlayer.get_playlist_id()`, which asks *whatever is currently
+> playing* which playlist it came from. Share a mix while a video is already
+> playing and the queue can land in Kodi's **music** playlist — visible as a
+> full music queue and a one-item video queue in Kore. The add-on's own source
+> concedes the hazard: *"Sometimes Kodi gets confused and uses a music playlist
+> for video content"*.
 
 **Why it happens.** A mix is endless radio, not a playlist. YouTube does not
 store one — it re-generates a rolling ~50-track window on every request, so

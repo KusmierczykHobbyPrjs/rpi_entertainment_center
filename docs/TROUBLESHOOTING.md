@@ -723,7 +723,8 @@ are endless radio, so the add-on pages through them for ever, burns the whole
 daily API quota within minutes, and blocks every later playback request behind
 a plugin call that never returns. That last part is why `kodi-send` and the
 GPIO buttons stop responding at the same time. Afterwards a shared mix queues
-its ~50 distinct tracks and plays.
+its distinct tracks — but note that a separate, still-open bug means only the
+first one plays.
 
 ```bash
 bash bin/kodi_youtube_fix.sh
