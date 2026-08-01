@@ -191,6 +191,7 @@ Install them in this order; each is a separate `./install.sh <name>` run.
 │   ├── signal_action.sh        the confirmation beep
 │   ├── clipboard2chromium.sh   open the phone's clipboard URL on the TV
 │   ├── kodi_netflix_fix.sh     patch the broken Netflix add-on (login + API)
+│   ├── kodi_youtube_fix.sh     stop a shared YouTube mix looping for ever
 │   ├── backup.sh               save settings before a reinstall
 │   ├── restore.sh              put them back afterwards
 │   ├── doctor.sh               health check

@@ -127,6 +127,60 @@ Keep those credentials in the add-on's settings, not in this repository.
 
 Screenshots: [`photos/youtube/`](../photos/youtube/).
 
+#### Sharing a "Mix" from the phone hangs Kodi — run the fix
+
+Share an ordinary video or playlist from the YouTube app to Kore and it plays.
+Share one of the generated mixes — the ones titled **"Mix - Artist - Title"**,
+whose URL carries `&list=RD…` — and Kodi sits on
+*"Updating playlist… 0%, 0/0"* for ever. Nothing plays, your whole daily API
+quota is gone within minutes, and anything else that asks the player to do
+something (`kodi-send`, the GPIO buttons, Kore itself) queues up behind a
+plugin call that never returns.
+
+```bash
+bash bin/kodi_youtube_fix.sh
+```
+
+Restart Kodi and share the mix again; it should start within a couple of
+seconds with ~148 tracks queued.
+
+**Why it happens.** A mix is endless radio, not a playlist. YouTube generates
+it as you listen, so `playlistItems.list` never stops handing out a
+`nextPageToken`. Paging through `RDdQw4w9WgXcQ` against the live API, the token
+settles into a two-value cycle from page 2 and repeats for ever:
+
+| Page | Items | `nextPageToken` |
+|---|---|---|
+| 1 | 50 | `EAAaFVBUOkVndFFRWHBJTFZsQmJFWlpZdw` |
+| 2 | 49 | `EAAaFVBUOkVndG9RM1ZOVjNKbVdFYzBSUQ` |
+| 3 | 49 | `EAAaFVBUOkVnc3pSM2RxWmxWR2VWazJUUQ` |
+| 4 | 49 | …page 2's token again |
+| 5 | 49 | …page 3's token again |
+
+`get_playlist_items()` in the add-on pages with `while 1:` and only stops when
+a page arrives without a token. For a mix that never happens, so it fetches for
+ever at one quota unit per request. The progress dialog reads 0/0 because the
+total is only known once the fetch finishes — which it never does.
+
+The fix stops paging when a page token comes round a second time. A well-formed
+playlist never repeats one, so finite playlists page to the end exactly as
+before, and a mix stops after three pages. Both paging loops are patched: once
+the pages are cached, the cache pass spins the same way without even the
+network to slow it down.
+
+> **This bites you specifically because you followed the advice above and
+> configured your own API key.** With the add-on's shared keys
+> `v3_api_available()` is false, the add-on takes its InnerTube path instead,
+> and mixes are unaffected. Removing your key to dodge this trades one bug for
+> the quota-exhaustion it was meant to fix — patch instead.
+
+Present in 7.4.4 (the current release) and unchanged on `master`; no issue is
+filed upstream as of August 2026, so there is nothing to update to. Re-run the
+script after every add-on update — an update overwrites the patch, which is
+what you want, since a genuine upstream fix should win. `./bin/doctor.sh kodi`
+tells you when it is needed. `--status` and `--revert` work as they do for the
+Netflix script.
+
 ### `plugin.video.yleareena.jade.zip` — Finnish Yle Areena
 
 Finland's public broadcaster. Most content is geo-restricted to Finland — use

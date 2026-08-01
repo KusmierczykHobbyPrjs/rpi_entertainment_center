@@ -717,6 +717,21 @@ help — 1.23.5 is the newest release. Re-run the script after any add-on update
 `./bin/doctor.sh kodi` tells you when it is needed. Details, provenance and the
 reasoning: [20-kodi-addons.md](20-kodi-addons.md#fixing-it-binkodi_netflix_fixsh).
 
+**A YouTube "Mix" shared from the phone hangs on "Updating playlist… 0/0".**
+The generated mixes — titled "Mix - Artist - Title", URL carrying `&list=RD…` —
+are endless radio, so the add-on pages through them for ever, burns the whole
+daily API quota within minutes, and blocks every later playback request behind
+a plugin call that never returns. That last part is why `kodi-send` and the
+GPIO buttons stop responding at the same time.
+
+```bash
+bash bin/kodi_youtube_fix.sh
+```
+
+Restart Kodi. Only affects setups with a personal Google API key, and it is
+still worth having one. Details:
+[20-kodi-addons.md](20-kodi-addons.md#sharing-a-mix-from-the-phone-hangs-kodi--run-the-fix).
+
 **Read the actual error:**
 
 ```bash

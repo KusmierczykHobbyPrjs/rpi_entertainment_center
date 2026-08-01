@@ -83,6 +83,9 @@ ${REC_C_BOLD}Not bundled - download these yourself${REC_C_OFF}
             add-on is re-released whenever YouTube changes something.
             It also needs your own Google API key - see docs/20-kodi-addons.md.
             Download the .zip into $ADDON_DROP and install it like the others.
+            Once your API key is in, run:
+                bash $REC_BIN/kodi_youtube_fix.sh
+            or a mix shared from the phone hangs Kodi and drains the quota.
 
   Netflix, Disney+ and other DRM services additionally need Widevine and an
   authentication key - documented in docs/20-kodi-addons.md.

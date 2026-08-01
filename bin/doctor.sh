@@ -248,6 +248,22 @@ if rec_has kodi; then
                  "bash bin/kodi_netflix_fix.sh"
         fi
     fi
+
+    # A shared YouTube mix (RD...) is endless radio: the add-on pages through
+    # it for ever, exhausts the daily API quota and blocks the player. Only a
+    # problem with a personal API key, which is the configuration we recommend.
+    yt_rm="${KODI_HOME:-$HOME/.kodi}/addons/plugin.video.youtube/resources/lib/youtube_plugin/youtube/helper/resource_manager.py"
+    yt_keys="${KODI_HOME:-$HOME/.kodi}/userdata/addon_data/plugin.video.youtube/api_keys.json"
+    if [[ -f "$yt_rm" ]]; then
+        if grep -q 'rec-patch:endless-mix' "$yt_rm" 2>/dev/null; then
+            pass "YouTube add-on has the endless-mix patch"
+        elif grep -q '"api_key"[[:space:]]*:[[:space:]]*"[^"]\+"' "$yt_keys" 2>/dev/null; then
+            warn "A shared YouTube mix will hang Kodi and drain your API quota" \
+                 "bash bin/kodi_youtube_fix.sh"
+        else
+            pass "YouTube mixes unaffected (no personal API key configured)"
+        fi
+    fi
 else
     warn "Kodi is not installed" "./install.sh 10-kodi"
 fi

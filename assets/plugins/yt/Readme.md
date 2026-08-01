@@ -24,3 +24,13 @@ create an API key, an OAuth client ID and a client secret in the Google Cloud
 Console.
 
 Keep those credentials in the add-on's own settings, never in this repository.
+
+## And then run the mix fix
+
+With a personal key, sharing a generated "Mix — Artist — Title" from the phone
+hangs Kodi on "Updating playlist… 0/0" and drains the whole day's quota within
+minutes. Not fixed upstream:
+
+    bash bin/kodi_youtube_fix.sh
+
+Re-run it after every add-on update. See `docs/20-kodi-addons.md`.
