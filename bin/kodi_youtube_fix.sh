@@ -1,6 +1,6 @@
 #!/bin/bash
 # ---------------------------------------------------------------------------
-# kodi_youtube_fix.sh - stop a YouTube "Mix" from looping forever.
+# kodi_youtube_fix.sh - make a shared YouTube "Mix" playable.
 #
 # THE BUG
 #   Share a generated mix from the phone app - the ones called
@@ -11,16 +11,18 @@
 #   queues up behind a plugin call that never returns.
 #
 # WHY
-#   A mix is endless radio, not a playlist. YouTube generates it as you go, so
-#   playlistItems.list never stops handing out a nextPageToken - measured on
-#   RDdQw4w9WgXcQ, the token settles into a two-value cycle from page 2
-#   onwards and repeats for ever:
+#   A mix is endless radio, not a playlist. YouTube does not store it; it
+#   re-generates a rolling ~50-track window on every request, so
+#   playlistItems.list never stops handing out a nextPageToken. Measured on
+#   RDdQw4w9WgXcQ against the live API:
 #
-#     page 1: items=50 next='EAAaFVBUOkVndFFRWHBJTFZsQmJFWlpZdw'
-#     page 2: items=49 next='EAAaFVBUOkVndG9RM1ZOVjNKbVdFYzBSUQ'
-#     page 3: items=49 next='EAAaFVBUOkVnc3pSM2RxWmxWR2VWazJUUQ'
-#     page 4: items=49 next='EAAaFVBUOkVndG9RM1ZOVjNKbVdFYzBSUQ'   <- page 2's
-#     page 5: items=49 next='EAAaFVBUOkVnc3pSM2RxWmxWR2VWazJUUQ'   <- page 3's
+#     page 1: 50 items          page 3: 49 items, 48 of them already seen
+#     page 2: 49 items,         page 4: 49 items, and its token is page 2's
+#             48 of them                 - the tokens cycle from here for ever
+#             already seen
+#
+#     4 pages = 197 queue entries, 53 distinct videos. Page 2 is page 1 served
+#     again from the top: the first ten video IDs are identical.
 #
 #   get_playlist_items() in resource_manager.py pages with "while 1:" and only
 #   stops when a page comes back without a token. For a mix that never
@@ -31,16 +33,23 @@
 #   the add-on's shared keys v3_api_available() is false and the add-on takes
 #   the InnerTube path instead, which is not affected.
 #
-# THE FIX
-#   Stop paging when a page token comes round for the second time. A
-#   well-formed playlist never repeats one, so finite playlists page to the end
-#   exactly as before; a mix stops after three pages with ~148 videos in the
-#   queue, which is more radio than anyone listens to in a sitting. Both paging
-#   loops are patched - the cache pass spins the same way once the pages are
-#   cached, without even the network to slow it down.
+# THE FIX - two edits, because stopping the loop is not enough on its own
+#   1. resource_manager.py: stop paging when a page token comes round for the
+#      second time. A well-formed playlist never repeats one, so finite
+#      playlists page to the end exactly as before, and a mix stops after four
+#      pages. Both paging loops are patched - the cache pass spins the same way
+#      once the pages are cached, without even the network to slow it down.
 #
-#   Deliberately not a page-count cap: real uploads playlists run to thousands
-#   of videos and a cap would silently truncate them.
+#      Deliberately not a page-count cap: real uploads playlists run to
+#      thousands of videos and a cap would silently truncate them.
+#
+#   2. yt_play.py: with the loop stopped you would queue those 197 entries -
+#      the same 50 songs four times over, in the same order. So when a mix is
+#      among the requested playlists, drop videos already in the queue. You get
+#      the ~53 distinct tracks once, in order.
+#
+#      Scoped to RD... ids on purpose. A hand-made playlist may repeat a track
+#      deliberately, and that is none of our business.
 #
 # UPSTREAM
 #   Present in 7.4.4 (the current release) and unchanged on master. No issue
@@ -65,48 +74,70 @@ set -uo pipefail
 source "$(dirname "$(readlink -f "$0")")/../lib/common.sh"
 
 ADDON_DIR="${KODI_HOME:-$HOME/.kodi}/addons/plugin.video.youtube"
-TARGET="$ADDON_DIR/resources/lib/youtube_plugin/youtube/helper/resource_manager.py"
-BACKUP="$TARGET.rec-orig"
+HELPERS="$ADDON_DIR/resources/lib/youtube_plugin/youtube/helper"
+TARGETS=("$HELPERS/resource_manager.py" "$HELPERS/yt_play.py")
 MARKER="rec-patch:endless-mix"
 
 mode="apply"
 case "${1:-}" in
     --status)  mode="status" ;;
     --revert)  mode="revert" ;;
-    --help|-h) sed -n '2,61p' "$0" | sed 's/^# \?//'; exit 0 ;;
+    --help|-h) sed -n '2,68p' "$0" | sed 's/^# \?//'; exit 0 ;;
     "")        ;;
     *)         rec_die "Unknown option: $1  (try --help)" ;;
 esac
 
-[[ -f "$TARGET" ]] || rec_die "YouTube add-on not found at $ADDON_DIR
+for target in "${TARGETS[@]}"; do
+    [[ -f "$target" ]] || rec_die "YouTube add-on not found at $ADDON_DIR
 Install it first - see docs/20-kodi-addons.md."
+done
 
 version="$(sed -n 's/.*id="plugin.video.youtube".*version="\([^"]*\)".*/\1/p' \
     "$ADDON_DIR/addon.xml" 2>/dev/null | head -1)"
 [[ -n "$version" ]] || version="unknown"
 
-applied() { grep -q "$MARKER" "$TARGET" 2>/dev/null; }
+# Both files carry the marker, so a half-applied state is visible rather than
+# silently passing for a whole one.
+applied() {
+    local target
+    for target in "${TARGETS[@]}"; do
+        grep -q "$MARKER" "$target" 2>/dev/null || return 1
+    done
+    return 0
+}
 
 # -- status ----------------------------------------------------------------
 if [[ "$mode" == "status" ]]; then
     rec_log "YouTube add-on version: $version"
+    for target in "${TARGETS[@]}"; do
+        if grep -q "$MARKER" "$target" 2>/dev/null; then
+            rec_log "  [x] $(basename "$target")"
+        else
+            rec_log "  [ ] $(basename "$target")"
+        fi
+    done
     if applied; then
-        rec_log "  [x] Endless-mix patch - shared mixes stop paging and play"
+        rec_log "A shared mix stops paging and plays its distinct tracks once."
     else
-        rec_log "  [ ] Endless-mix patch - a shared mix will hang and burn your quota"
-        rec_log "      bash bin/kodi_youtube_fix.sh"
+        rec_log "A shared mix will hang Kodi and burn your daily API quota."
+        rec_log "  bash bin/kodi_youtube_fix.sh"
     fi
     exit 0
 fi
 
 # -- revert ----------------------------------------------------------------
 if [[ "$mode" == "revert" ]]; then
-    if [[ -f "$BACKUP" ]]; then
-        cp -- "$BACKUP" "$TARGET" || rec_die "Could not restore $TARGET"
-        rm -f -- "$BACKUP"
-        rec_log "Restored the add-on as shipped. Restart Kodi."
+    restored=0
+    for target in "${TARGETS[@]}"; do
+        [[ -f "$target.rec-orig" ]] || continue
+        cp -- "$target.rec-orig" "$target" || rec_die "Could not restore $target"
+        rm -f -- "$target.rec-orig"
+        restored=$((restored + 1))
+    done
+    if (( restored )); then
+        rec_log "Restored $restored file(s) as shipped. Restart Kodi."
     else
-        rec_log "Nothing to revert - no backup at $BACKUP"
+        rec_log "Nothing to revert - no backups in $HELPERS"
     fi
     exit 0
 fi
@@ -117,31 +148,45 @@ if applied; then
     exit 0
 fi
 
-backup_is_ours=0
-if [[ ! -f "$BACKUP" ]]; then
-    cp -- "$TARGET" "$BACKUP" || rec_die "Could not back up $TARGET"
-    backup_is_ours=1
-fi
+# Back up before touching anything, and remember which backups are ours, so a
+# refusal below leaves no misleading .rec-orig for --revert to find later.
+ours=()
+for target in "${TARGETS[@]}"; do
+    [[ -f "$target.rec-orig" ]] && continue
+    cp -- "$target" "$target.rec-orig" || rec_die "Could not back up $target"
+    ours+=("$target.rec-orig")
+done
 
-python3 - "$TARGET" "$MARKER" <<'PYEOF'
+undo() {
+    for target in "${TARGETS[@]}"; do
+        [[ -f "$target.rec-orig" ]] && cp -- "$target.rec-orig" "$target"
+    done
+    (( ${#ours[@]} )) && rm -f -- "${ours[@]}"
+    rec_error "Patch not applied; the add-on is left untouched."
+    rec_error "Its source has changed - check whether upstream has fixed this:"
+    rec_die   "  https://github.com/anxdpanic/plugin.video.youtube"
+}
+
+python3 - "$MARKER" "${TARGETS[@]}" <<'PYEOF'
 import sys
 
-path, marker = sys.argv[1], sys.argv[2]
+marker, rm_path, play_path = sys.argv[1], sys.argv[2], sys.argv[3]
 
-# Both paging loops, quoted exactly as 7.4.4 ships them. Matching whole blocks
+# Every block below is quoted exactly as 7.4.4 ships it. Matching whole blocks
 # rather than a regex means an upstream rewrite of this area is a clean
 # refusal, not a mangled add-on.
-EDITS = (
-    # The cache pass. Once a mix's pages are cached this spins without any
-    # network at all, appending to batch_ids until memory runs out.
-    (
-        """        for playlist_id in ids:
+EDITS = {
+    rm_path: (
+        # The cache pass. Once a mix's pages are cached this spins without any
+        # network at all, appending to batch_ids until memory runs out.
+        (
+            """        for playlist_id in ids:
             page_token = page_token or 0
             while 1:
                 batch_id = (playlist_id, page_token)
                 batch_ids.append(batch_id)
 """,
-        """        for playlist_id in ids:
+            """        for playlist_id in ids:
             page_token = page_token or 0
             # %s - applied by rpi_entertainment_center.
             # A mix (RD...) is endless radio: its nextPageToken cycles instead
@@ -153,94 +198,123 @@ EDITS = (
                 batch_id = (playlist_id, page_token)
                 batch_ids.append(batch_id)
 """ % marker,
-    ),
-    (
-        """                page_token = batch.get('nextPageToken') if fetch_next else None
+        ),
+        (
+            """                page_token = batch.get('nextPageToken') if fetch_next else None
                 if not page_token:
                     break
 
         if result:
 """,
-        """                page_token = batch.get('nextPageToken') if fetch_next else None
+            """                page_token = batch.get('nextPageToken') if fetch_next else None
                 if not page_token or page_token in seen_tokens:
                     break
                 seen_tokens.add(page_token)
 
         if result:
 """,
-    ),
-    # The fetch pass - the one that burns a quota unit per lap.
-    (
-        """        for playlist_id, page_token in to_update:
+        ),
+        # The fetch pass - the one that burns a quota unit per lap.
+        (
+            """        for playlist_id, page_token in to_update:
             new_batch_ids = []
             batch_id = (playlist_id, page_token)
             insert_point = batch_ids.index(batch_id, insert_point)
             while 1:
 """,
-        """        for playlist_id, page_token in to_update:
+            """        for playlist_id, page_token in to_update:
             new_batch_ids = []
             batch_id = (playlist_id, page_token)
             insert_point = batch_ids.index(batch_id, insert_point)
             seen_tokens = {page_token}
             while 1:
 """,
-    ),
-    (
-        """                page_token = batch.get('nextPageToken') if fetch_next else None
+        ),
+        (
+            """                page_token = batch.get('nextPageToken') if fetch_next else None
                 if not page_token:
                     break
 
             if new_batch_ids:
 """,
-        """                page_token = batch.get('nextPageToken') if fetch_next else None
+            """                page_token = batch.get('nextPageToken') if fetch_next else None
                 if not page_token or page_token in seen_tokens:
                     break
                 seen_tokens.add(page_token)
 
             if new_batch_ids:
 """,
+        ),
     ),
-)
+    play_path: (
+        (
+            """        if not video_items:
+            return False, None
 
-with open(path, encoding='utf-8') as fh:
-    src = fh.read()
+        result = process_items_for_playlist(context, video_items, action=action)
+""",
+            """        if playlist_ids and any(playlist_id.startswith('RD')
+                                for playlist_id in playlist_ids):
+            # %s - applied by rpi_entertainment_center.
+            # YouTube re-generates a mix on every request rather than storing
+            # it, so consecutive pages are the same rolling window served from
+            # the top - four pages of RDdQw4w9WgXcQ are 197 entries but only 53
+            # distinct videos. Queue each of them once.
+            #
+            # Scoped to mixes: a hand-made playlist may repeat a track
+            # deliberately, and that is none of our business.
+            seen_ids = set()
+            unique_items = []
+            for video_item in video_items:
+                video_id = video_item.video_id
+                if video_id and video_id in seen_ids:
+                    continue
+                seen_ids.add(video_id)
+                unique_items.append(video_item)
+            if len(unique_items) != len(video_items):
+                logging.debug('Mix: queued {0} distinct of {1} items'
+                              .format(len(unique_items), len(video_items)))
+                video_items = unique_items
 
-for index, (old, new) in enumerate(EDITS, start=1):
-    count = src.count(old)
-    if count != 1:
-        sys.exit('edit %d: expected this block exactly once, found %d'
-                 % (index, count))
-    src = src.replace(old, new)
+        if not video_items:
+            return False, None
 
-with open(path, 'w', encoding='utf-8') as fh:
-    fh.write(src)
+        result = process_items_for_playlist(context, video_items, action=action)
+""" % marker,
+        ),
+    ),
+}
 
-# Refuse to leave a file Kodi cannot import.
-try:
-    compile(src, path, 'exec')
-except SyntaxError as exc:
-    sys.exit('patched file does not compile: %s' % exc)
+for path, edits in EDITS.items():
+    with open(path, encoding='utf-8') as fh:
+        src = fh.read()
+
+    for index, (old, new) in enumerate(edits, start=1):
+        count = src.count(old)
+        if count != 1:
+            sys.exit('%s edit %d: expected this block exactly once, found %d'
+                     % (path, index, count))
+        src = src.replace(old, new)
+
+    # Refuse to write a file Kodi cannot import.
+    try:
+        compile(src, path, 'exec')
+    except SyntaxError as exc:
+        sys.exit('%s: patched source does not compile: %s' % (path, exc))
+
+    with open(path, 'w', encoding='utf-8') as fh:
+        fh.write(src)
 PYEOF
 
-if (( $? != 0 )); then
-    # Nothing was written - the python above replaces in memory and only saves
-    # once every edit has matched. Restoring anyway costs nothing, and a backup
-    # we took of a file we then refused to patch would only mislead --revert.
-    cp -- "$BACKUP" "$TARGET"
-    (( backup_is_ours )) && rm -f -- "$BACKUP"
-    rec_error "Patch not applied; $TARGET left untouched."
-    rec_error "The add-on source has changed - check whether upstream has fixed this:"
-    rec_die   "  https://github.com/anxdpanic/plugin.video.youtube"
-fi
+(( $? == 0 )) || undo
 
-# A stale .pyc next to a patched .py is not a risk Kodi's importer takes, but
-# an add-on update that restores the .py would leave ours cached. Cheap to be
-# sure.
-rm -rf -- "$(dirname "$TARGET")/__pycache__"
+# An add-on update that restores the .py files would otherwise leave our
+# bytecode cached beside them.
+rm -rf -- "$HELPERS/__pycache__"
 
 rec_log "Endless-mix patch applied to add-on $version."
 rec_log ""
 rec_log "Restart Kodi, then share a mix from the phone again - it should start"
-rec_log "playing within a couple of seconds with ~148 tracks queued."
+rec_log "playing within a couple of seconds, with ~50 tracks queued."
 rec_log ""
 rec_log "Revert with: bash bin/kodi_youtube_fix.sh --revert"

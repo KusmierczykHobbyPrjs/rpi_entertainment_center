@@ -142,31 +142,43 @@ bash bin/kodi_youtube_fix.sh
 ```
 
 Restart Kodi and share the mix again; it should start within a couple of
-seconds with ~148 tracks queued.
+seconds, with roughly 50 tracks queued.
 
-**Why it happens.** A mix is endless radio, not a playlist. YouTube generates
-it as you listen, so `playlistItems.list` never stops handing out a
-`nextPageToken`. Paging through `RDdQw4w9WgXcQ` against the live API, the token
-settles into a two-value cycle from page 2 and repeats for ever:
+**Why it happens.** A mix is endless radio, not a playlist. YouTube does not
+store one — it re-generates a rolling ~50-track window on every request, so
+`playlistItems.list` never stops handing out a `nextPageToken`. Paging through
+`RDdQw4w9WgXcQ` against the live API:
 
-| Page | Items | `nextPageToken` |
-|---|---|---|
-| 1 | 50 | `EAAaFVBUOkVndFFRWHBJTFZsQmJFWlpZdw` |
-| 2 | 49 | `EAAaFVBUOkVndG9RM1ZOVjNKbVdFYzBSUQ` |
-| 3 | 49 | `EAAaFVBUOkVnc3pSM2RxWmxWR2VWazJUUQ` |
-| 4 | 49 | …page 2's token again |
-| 5 | 49 | …page 3's token again |
+| Page | Items | Already seen | `nextPageToken` |
+|---|---|---|---|
+| 1 | 50 | — | `…QXpJLVlsQbEZZYw` |
+| 2 | 49 | 48 | `…Qc1NV3JmWEc0RQ` |
+| 3 | 49 | 48 | `…zR3dqZlVGeVk2TQ` |
+| 4 | 49 | 47 | page 2's token again — and it cycles from here for ever |
+
+Four pages are 197 queue entries but only **53 distinct videos**. Page 2 is
+page 1 served again from the top: the first ten video IDs are identical.
 
 `get_playlist_items()` in the add-on pages with `while 1:` and only stops when
 a page arrives without a token. For a mix that never happens, so it fetches for
 ever at one quota unit per request. The progress dialog reads 0/0 because the
 total is only known once the fetch finishes — which it never does.
 
-The fix stops paging when a page token comes round a second time. A well-formed
-playlist never repeats one, so finite playlists page to the end exactly as
-before, and a mix stops after three pages. Both paging loops are patched: once
-the pages are cached, the cache pass spins the same way without even the
-network to slow it down.
+**The fix is two edits**, because stopping the loop is not enough on its own:
+
+1. **`resource_manager.py` — stop paging when a page token comes round a second
+   time.** A well-formed playlist never repeats one, so finite playlists page
+   to the end exactly as before, and a mix stops after four pages. Both paging
+   loops are patched: once the pages are cached, the cache pass spins the same
+   way without even the network to slow it down.
+
+   Deliberately not a page-count cap — real uploads playlists run to thousands
+   of videos and a cap would silently truncate them.
+
+2. **`yt_play.py` — queue each video once.** Without this you would get those
+   197 entries: the same 50 songs four times over, in the same order. Scoped to
+   `RD…` ids, because a hand-made playlist may repeat a track deliberately and
+   that is none of our business.
 
 > **This bites you specifically because you followed the advice above and
 > configured your own API key.** With the add-on's shared keys
