@@ -33,7 +33,7 @@
 #   the add-on's shared keys v3_api_available() is false and the add-on takes
 #   the InnerTube path instead, which is not affected.
 #
-# THE FIX - two edits, because stopping the loop is not enough on its own
+# THE FIX - three edits, because stopping the loop is not enough on its own
 #   1. resource_manager.py: stop paging when a page token comes round for the
 #      second time. A well-formed playlist never repeats one, so finite
 #      playlists page to the end exactly as before, and a mix stops after four
@@ -50,6 +50,32 @@
 #
 #      Scoped to RD... ids on purpose. A hand-made playlist may repeat a track
 #      deliberately, and that is none of our business.
+#
+#   3. yt_play.py again: hand Kodi a command, not a file, so the queue is not
+#      thrown away. Kore shares by calling JSON-RPC Player.Open on
+#      plugin://.../play/?playlist_id=..., and Kodi treats that as ONE playable
+#      file. Measured in kodi.log: the add-on fills the playlist, then
+#
+#        Playlist.OnAdd x12  playlistid 1     <- the queue
+#        Playlist.OnClear    playlistid 1     <- Kodi throws it away
+#        Playlist.OnAdd x1   playlistid 1     <- replaced by the resolved track
+#
+#      and one song plays. Which playlist gets filled is decided by
+#      get_playlist_id(), which asks whatever is playing at that moment - so
+#      the queue sometimes lands in the MUSIC playlist instead and survives
+#      there, unused. Both outcomes play one track.
+#
+#      So on the resolve path we now return command://Playlist.PlayOffset(...)
+#      instead of a media item. The add-on runs it as a post-run action and
+#      starts its own playlist; Kodi has no file to play, so it never clears
+#      anything. This is the add-on's own mechanism - it already uses exactly
+#      this for busy-dialog recovery.
+#
+#      Verified on the Pi against a real Player.Open: 'Builtin command queued:
+#      Playlist.PlayOffset(video,0)', no OnClear, 10 items left in the queue,
+#      and Player.GoTo(next) advanced 0 -> 1 with the queue intact. A normal
+#      PL... playlist opened the same way also kept its 14 items, so this
+#      helps every shared playlist, not just mixes.
 #
 # UPSTREAM
 #   Present in 7.4.4 (the current release) and unchanged on master. No issue
@@ -77,12 +103,17 @@ ADDON_DIR="${KODI_HOME:-$HOME/.kodi}/addons/plugin.video.youtube"
 HELPERS="$ADDON_DIR/resources/lib/youtube_plugin/youtube/helper"
 TARGETS=("$HELPERS/resource_manager.py" "$HELPERS/yt_play.py")
 MARKER="rec-patch:endless-mix"
+# Bumped whenever the edits below change. An add-on already carrying an older
+# revision has to be restored and re-patched - the edits are anchored on stock
+# 7.4.4 source and cannot be stacked on top of each other.
+REVISION=3
+STAMP="$ADDON_DIR/.rec-youtube-patch"
 
 mode="apply"
 case "${1:-}" in
     --status)  mode="status" ;;
     --revert)  mode="revert" ;;
-    --help|-h) sed -n '2,68p' "$0" | sed 's/^# \?//'; exit 0 ;;
+    --help|-h) sed -n '2,95p' "$0" | sed 's/^# \?//'; exit 0 ;;
     "")        ;;
     *)         rec_die "Unknown option: $1  (try --help)" ;;
 esac
@@ -98,13 +129,17 @@ version="$(sed -n 's/.*id="plugin.video.youtube".*version="\([^"]*\)".*/\1/p' \
 
 # Both files carry the marker, so a half-applied state is visible rather than
 # silently passing for a whole one.
-applied() {
+marked() {
     local target
     for target in "${TARGETS[@]}"; do
         grep -q "$MARKER" "$target" 2>/dev/null || return 1
     done
     return 0
 }
+
+stamp_read() { [[ -f "$STAMP" ]] && cat "$STAMP" 2>/dev/null; }
+
+applied() { marked && [[ "$(stamp_read)" == "$REVISION" ]]; }
 
 # -- status ----------------------------------------------------------------
 if [[ "$mode" == "status" ]]; then
@@ -117,7 +152,11 @@ if [[ "$mode" == "status" ]]; then
         fi
     done
     if applied; then
-        rec_log "A shared mix stops paging and plays its distinct tracks once."
+        rec_log "Revision $REVISION. A shared mix pages, de-duplicates and plays through."
+    elif marked; then
+        rec_log "Revision $(stamp_read || echo 'unrecorded') - OUT OF DATE (current: $REVISION)."
+        rec_log "Only the first track of a shared mix will play. Re-run to upgrade:"
+        rec_log "  bash bin/kodi_youtube_fix.sh"
     else
         rec_log "A shared mix will hang Kodi and burn your daily API quota."
         rec_log "  bash bin/kodi_youtube_fix.sh"
@@ -134,6 +173,7 @@ if [[ "$mode" == "revert" ]]; then
         rm -f -- "$target.rec-orig"
         restored=$((restored + 1))
     done
+    rm -f -- "$STAMP"
     if (( restored )); then
         rec_log "Restored $restored file(s) as shipped. Restart Kodi."
     else
@@ -144,8 +184,21 @@ fi
 
 # -- apply -----------------------------------------------------------------
 if applied; then
-    rec_log "Endless-mix patch: already applied (add-on $version)."
+    rec_log "Endless-mix patch: already applied, revision $REVISION (add-on $version)."
     exit 0
+fi
+
+# An older revision is in place. The edits anchor on stock 7.4.4 source, so
+# they cannot be stacked - restore first, then apply the current set.
+if marked; then
+    rec_log "Upgrading from revision $(stamp_read || echo 'unrecorded') to $REVISION."
+    for target in "${TARGETS[@]}"; do
+        [[ -f "$target.rec-orig" ]] || rec_die \
+            "$target is patched but has no backup - reinstall the add-on first."
+    done
+    for target in "${TARGETS[@]}"; do
+        cp -- "$target.rec-orig" "$target" || rec_die "Could not restore $target"
+    done
 fi
 
 # Back up before touching anything, and remember which backups are ours, so a
@@ -279,7 +332,34 @@ EDITS = {
         if not video_items:
             return False, None
 
-        result = process_items_for_playlist(context, video_items, action=action)
+        # %s - applied by rpi_entertainment_center.
+        # Kore shares by calling Player.Open on this URL, and Kodi treats it as
+        # one playable file: it clears the playlist we just built and plays the
+        # single track we resolve for it. Ask for a command instead - see
+        # process_items_for_playlist below.
+        result = process_items_for_playlist(
+            context,
+            video_items,
+            action=(action if action or context.get_handle() == -1
+                    else 'resolve_playlist'),
+        )
+""" % (marker, marker),
+        ),
+        (
+            """    if action == 'queue':
+        return items
+""",
+            """    if action == 'resolve_playlist':
+        # %s - applied by rpi_entertainment_center.
+        # Hand Kodi a builtin rather than a file. The add-on runs it as a
+        # post-run action and starts its own playlist, so Kodi has nothing to
+        # play and never clears the queue. Same mechanism the add-on already
+        # uses to recover from a stuck busy dialog.
+        command = playlist_player.play_playlist_item(position, defer=True)
+        if command:
+            return UriItem(command)
+    if action == 'queue':
+        return items
 """ % marker,
         ),
     ),
@@ -308,17 +388,16 @@ PYEOF
 
 (( $? == 0 )) || undo
 
+printf '%s\n' "$REVISION" > "$STAMP"
+
 # An add-on update that restores the .py files would otherwise leave our
 # bytecode cached beside them.
 rm -rf -- "$HELPERS/__pycache__"
 
-rec_log "Endless-mix patch applied to add-on $version."
+rec_log "Endless-mix patch revision $REVISION applied to add-on $version."
 rec_log ""
-rec_log "Restart Kodi, then share a mix from the phone again - it should start"
-rec_log "playing within a couple of seconds, with its distinct tracks queued."
-rec_log ""
-rec_log "Known, separate, still unfixed: only the first track then plays. Kodi"
-rec_log "treats the shared URL as one playable file and never uses the queue."
-rec_log "See docs/20-kodi-addons.md."
+rec_log "Restart Kodi, then share a mix from the phone. It should start within a"
+rec_log "couple of seconds and play through the queue rather than stopping after"
+rec_log "the first track."
 rec_log ""
 rec_log "Revert with: bash bin/kodi_youtube_fix.sh --revert"

@@ -252,11 +252,21 @@ if rec_has kodi; then
     # A shared YouTube mix (RD...) is endless radio: the add-on pages through
     # it for ever, exhausts the daily API quota and blocks the player. Only a
     # problem with a personal API key, which is the configuration we recommend.
-    yt_rm="${KODI_HOME:-$HOME/.kodi}/addons/plugin.video.youtube/resources/lib/youtube_plugin/youtube/helper/resource_manager.py"
+    yt_addon="${KODI_HOME:-$HOME/.kodi}/addons/plugin.video.youtube"
+    yt_rm="$yt_addon/resources/lib/youtube_plugin/youtube/helper/resource_manager.py"
+    yt_play="$yt_addon/resources/lib/youtube_plugin/youtube/helper/yt_play.py"
     yt_keys="${KODI_HOME:-$HOME/.kodi}/userdata/addon_data/plugin.video.youtube/api_keys.json"
+    # Keep in step with REVISION in bin/kodi_youtube_fix.sh.
+    yt_revision=3
     if [[ -f "$yt_rm" ]]; then
-        if grep -q 'rec-patch:endless-mix' "$yt_rm" 2>/dev/null; then
-            pass "YouTube add-on has the endless-mix patch"
+        if grep -q 'rec-patch:endless-mix' "$yt_rm" 2>/dev/null \
+           && grep -q 'rec-patch:endless-mix' "$yt_play" 2>/dev/null; then
+            if [[ "$(cat "$yt_addon/.rec-youtube-patch" 2>/dev/null)" == "$yt_revision" ]]; then
+                pass "YouTube add-on has the endless-mix patch (revision $yt_revision)"
+            else
+                warn "YouTube endless-mix patch is out of date - a shared mix stops after one track" \
+                     "bash bin/kodi_youtube_fix.sh"
+            fi
         elif grep -q '"api_key"[[:space:]]*:[[:space:]]*"[^"]\+"' "$yt_keys" 2>/dev/null; then
             warn "A shared YouTube mix will hang Kodi and drain your API quota" \
                  "bash bin/kodi_youtube_fix.sh"
