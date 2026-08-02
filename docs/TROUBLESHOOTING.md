@@ -690,6 +690,14 @@ Then check the add-on's own settings select InputStream Adaptive.
 bash bin/nordvpn_connect.sh pl
 ```
 
+**It plays, but the picture is soft and blocky** — usually live TV from the
+mtr81 add-ons. InputStream Adaptive guesses your bandwidth from the manifest
+download, lands around 500 kbit/s, and stays on the lowest quality for the
+whole session. Fix it once in the ISA settings — see [live TV plays at
+288p](20-kodi-addons.md#live-tv-plays-at-288p--fix-inputstream-adaptive-first).
+Switching the add-on's "Player Type" from ISA to ffmpeg does not help and
+breaks playback completely.
+
 **DRM content** (Netflix, Disney+) additionally needs Widevine — see
 [20-kodi-addons.md](20-kodi-addons.md#netflix-disney-and-other-drm-services).
 

@@ -82,6 +82,45 @@ TVP VOD, Polsat Box Go, Player.pl and others.
 
 Source: <https://mtr81.github.io/kodi_addons/>
 
+#### Live TV plays at 288p — fix InputStream Adaptive first
+
+Live channels from these add-ons (Polsat News, Polsat, TV4 ...) are DASH
+streams played through InputStream Adaptive, and out of the box they pin
+themselves to the **lowest** quality on offer and stay there.
+
+It is not the network and not the Pi. InputStream Adaptive's "Auto determines
+initial bandwidth" setting measures the *first* download of the session — the
+manifest, a 5 KB file whose transfer time is almost entirely round-trip
+latency. On this Pi that measured 581 byte/s, giving an estimate of 505 kbit/s,
+which selects the 288p rung. The estimate then never rises again: over a
+60-second measurement it stayed frozen at 505 kbit/s while the video segments
+themselves were arriving at 18–24 Mbit/s.
+
+Turn the guess off and state the figure instead:
+
+> Settings → Add-ons → My add-ons → VideoPlayer InputStream →
+> InputStream Adaptive → Configure
+
+| Setting | Set to |
+|---|---|
+| Auto determines initial bandwidth | **off** |
+| Initial bandwidth (Kbps) | **20000** |
+
+20000 Kbps is not a promise about your connection — it is a starting guess
+that sits above the highest rung any of these channels offers (5000 Kbps for
+1080p). Adaptation still works from there: once real segments are flowing the
+estimate tracks them, and a genuinely slow connection still steps down.
+
+Measured on a Pi 3B after the change: Polsat News 512x288 → 1280x720 (its
+maximum — that channel publishes no 1080p), Polsat and TV4 1920x1080, cache
+holding at 95%, no dropped frames.
+
+**Do not switch "Player Type" to ffmpeg to work around this.** It stops
+playback entirely, and that is expected: with any value other than `ISA` the
+add-on hands the raw `.mpd` URL to Kodi's own player, and Kodi's built-in
+demuxer cannot read a DASH manifest. ISA is the only thing that can play these
+channels at all. Leave it set to ISA.
+
 ### YouTube — download this one
 
 **Not bundled.** The YouTube add-on breaks and gets re-released whenever

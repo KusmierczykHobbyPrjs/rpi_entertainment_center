@@ -218,6 +218,29 @@ if rec_has kodi; then
         fi
     fi
 
+    # "Auto determines initial bandwidth" times the manifest download - a few KB
+    # that is mostly round-trip latency - and that estimate then sticks for the
+    # whole session. On this Pi it measured 505 kbit/s and pinned live DASH to
+    # 288p while segments were arriving at 20+ Mbit/s. It is the ISA default, so
+    # a fresh install always needs this turned off.
+    if [[ -f "$isa_settings" ]]; then
+        isa_auto="$(sed -n 's/.*id="adaptivestream.bandwidth.init.auto"[^>]*>\([a-z]*\)<.*/\1/p' \
+                    "$isa_settings" 2>/dev/null | head -1)"
+        isa_init="$(sed -n 's/.*id="adaptivestream.bandwidth.init"[^>]*>\([0-9]*\)<.*/\1/p' \
+                    "$isa_settings" 2>/dev/null | head -1)"
+        if [[ "$isa_auto" == "true" ]]; then
+            warn "InputStream Adaptive guesses initial bandwidth - live TV will play at its lowest quality" \
+                 "Turn off 'Auto determines initial bandwidth', set it to 20000 Kbps - docs/20-kodi-addons.md"
+        elif [[ "$isa_auto" == "false" ]]; then
+            if [[ -n "$isa_init" ]] && (( isa_init < 6000 )); then
+                warn "InputStream Adaptive starts at ${isa_init} Kbps - below the 1080p rung of most live streams" \
+                     "20000 is a safe starting guess - docs/20-kodi-addons.md"
+            else
+                pass "InputStream Adaptive starts at ${isa_init:-?} Kbps (not guessed from the manifest)"
+            fi
+        fi
+    fi
+
     # ffmpegdirect has its own ceiling. Scoped to that add-on, so less of a trap
     # than the ISA one, but still worth surfacing when live TV looks soft.
     fd_settings="${KODI_HOME:-$HOME/.kodi}/userdata/addon_data/inputstream.ffmpegdirect/settings.xml"
