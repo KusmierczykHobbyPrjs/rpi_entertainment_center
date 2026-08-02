@@ -58,6 +58,33 @@ bash bin/speech.sh fi "Hei"
 Supported languages are the ISO 639-1 codes Google Translate accepts: `en`,
 `pl`, `fi`, `de`, `fr`, `es`, `it`, `ru`, `uk`, `ja`, `zh` and many more.
 
+### The language argument describes the text, it is not a preference
+
+The voice has to match the words. Set `SPEECH_LANG="pl"` and let an English
+sentence through untagged, and a Polish synthesiser reads English — which
+sounds broken, and reads badly enough that you cannot make out place names.
+
+So scripts in this project follow one rule:
+
+| Message | Passes | Why |
+|---|---|---|
+| Wording fixed in the source — the VPN announcements, the install test | `en` explicitly | The string *is* English, whatever `SPEECH_LANG` says |
+| Wording generated in your language — the weather | `$SPEECH_LANG` | `weather.py` asks OpenWeatherMap for a translated description and has a sentence template per language, so the text really is in that language |
+
+Omitting the code means *"this text is in `SPEECH_LANG`"*, which is only true
+for text you produced in that language.
+
+**To hear the VPN messages in your own language**, translate the strings
+themselves and tag them to match — in `bin/nordvpn_status.sh` and
+`bin/nordvpn_monitor.sh`:
+
+```bash
+bash "$REC_BIN/speech.sh" pl "VPN rozłączony."
+```
+
+Changing `SPEECH_LANG` alone cannot do this: it would pick a Polish voice for
+English words rather than translating anything.
+
 ### The action beep
 
 ```bash
@@ -177,6 +204,17 @@ spaces can still overflow — shorten the message.
 
 Pass the code explicitly: `bash bin/speech.sh pl "tekst"`, or change
 `SPEECH_LANG` in `config.sh`.
+
+**A foreign voice reads English words** — most often the VPN announcements
+
+The text and the voice disagree. Messages whose wording is fixed in English
+tag themselves `en`; if one does not, add it:
+
+```bash
+bash "$REC_BIN/speech.sh" en "VPN got disconnected."
+```
+
+See [the language argument](#the-language-argument-describes-the-text-it-is-not-a-preference).
 
 **Speech works over SSH but not from a button**
 

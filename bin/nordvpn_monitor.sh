@@ -56,10 +56,11 @@ while true; do
             # immediately after the tunnel drops used to fail with
             # "Temporary failure in name resolution" and stay silent.
             sleep 3
-            bash "$REC_BIN/speech.sh" "VPN got disconnected."
+            # "en" describes the text, not a preference - see nordvpn_status.sh.
+            bash "$REC_BIN/speech.sh" en "VPN got disconnected."
         else
             rec_log "VPN connected to $hostname ($city, $country)."
-            bash "$REC_BIN/speech.sh" "VPN changed to $country, $city"
+            bash "$REC_BIN/speech.sh" en "VPN changed to $country, $city"
         fi
         previous_state="$current_state"
     fi

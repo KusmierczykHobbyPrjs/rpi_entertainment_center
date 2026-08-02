@@ -87,7 +87,13 @@ export VOLUME=30
 # Set to "" to disable action sounds entirely.
 export ACTION_SOUND="signal_action.mp3"
 
-# Language used for spoken status messages (ISO 639-1: en, pl, fi, de, ...).
+# Language for spoken messages that this project generates in your language -
+# in practice the weather (ISO 639-1: en, pl, fi, de, ...).
+#
+# It does NOT re-voice messages whose wording is fixed in English, such as the
+# VPN status announcements: those say "en" explicitly, because a Polish voice
+# reading English words sounds broken. To hear those in your own language you
+# have to translate the strings themselves - see docs/90-speech.md.
 export SPEECH_LANG="en"
 
 

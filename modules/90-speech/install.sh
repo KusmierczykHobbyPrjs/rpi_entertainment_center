@@ -142,7 +142,9 @@ fi
 
 step "Testing speech"
 if confirm "Play a test message now?"; then
-    if bash "$REC_BIN/speech.sh" "Entertainment centre installed successfully."; then
+    # "en" describes the text. Without it a non-English SPEECH_LANG makes this
+    # test sound broken even when speech is working perfectly.
+    if bash "$REC_BIN/speech.sh" en "Entertainment centre installed successfully."; then
         ok "Speech works"
     else
         fail "Speech failed. Check the network and the volume - see docs/90-speech.md."

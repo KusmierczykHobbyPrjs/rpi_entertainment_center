@@ -25,4 +25,6 @@ fi
 # Print for the console/log as well as speaking, so the same script is useful
 # over SSH.
 rec_log "$message"
-bash "$REC_BIN/speech.sh" "$message"
+# "en" because the message above is English. It is not a preference - passing
+# the language the text is actually in stops a Polish voice reading English.
+bash "$REC_BIN/speech.sh" en "$message"

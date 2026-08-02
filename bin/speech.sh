@@ -9,6 +9,19 @@
 #   speech.sh "Welcome home"          speak in $SPEECH_LANG (default: en)
 #   speech.sh pl "Dzien dobry"        speak in a specific language
 #
+# THE LANGUAGE ARGUMENT DESCRIBES THE TEXT, IT IS NOT A PREFERENCE. The voice
+# has to match the words, or a Polish synthesiser ends up reading English and
+# sounds broken. So:
+#
+#   - text fixed in the source (the VPN messages, the install test) passes its
+#     own language explicitly, always "en";
+#   - text generated in the user's language (weather.py, which asks for
+#     translated descriptions and has per-language sentence templates) passes
+#     $SPEECH_LANG, because that is genuinely what it was written in.
+#
+# Omitting the code means "this text is in $SPEECH_LANG" - only correct for
+# text you produced in that language.
+#
 # The endpoint rejects long strings, so the text is split into <=150 character
 # chunks by speech_text_splitter.py and played back in order.
 #
