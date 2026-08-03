@@ -664,6 +664,38 @@ if rec_has apache2; then
 else
     warn "Apache is not installed" "Only needed if you want a public web server"
 fi
+
+# --- Firewall --------------------------------------------------------------
+# Checked without sudo on purpose: doctor.sh must never prompt for a password.
+# /etc/ufw/ufw.conf is world-readable and says whether the policy is enforced;
+# /etc/ufw/user.rules, which holds the actual rules, is not - hence the stamp.
+#
+# The failure this catches: ufw enabled with only 22/80/443 open, which is what
+# 80-webserver used to do. Kodi remotes, Tvheadend, KDE Connect, Samba and
+# Meshnet are all silently cut off, with no error anywhere.
+if [[ -r /etc/ufw/ufw.conf ]] && grep -q '^ENABLED=yes' /etc/ufw/ufw.conf 2>/dev/null; then
+    if [[ -f "$REC_UFW_STAMP" ]]; then
+        pass "Firewall is on and this project's ports have been opened"
+    else
+        # Only worth reporting when there is actually something to cut off.
+        blocked=()
+        rec_has kodi        && blocked+=("Kodi remotes")
+        rec_has tvheadend   && blocked+=("Tvheadend")
+        rec_has kdeconnectd && blocked+=("KDE Connect")
+        rec_has smbd        && blocked+=("Samba")
+        ip link show nordlynx >/dev/null 2>&1 && blocked+=("Meshnet")
+
+        if (( ${#blocked[@]} > 0 )); then
+            warn "Firewall is on but this project's ports were never opened - ${blocked[*]} may be unreachable" \
+                 "Re-open them: bash bin/firewall_refresh.sh  (check first with --status)"
+        else
+            pass "Firewall is on (no other project services need opening)"
+        fi
+    fi
+elif rec_has apache2; then
+    warn "No firewall on an internet-facing Pi" \
+         "Everything listening is reachable once the router forwards a port - bash bin/firewall_refresh.sh --enable"
+fi
 fi
 
 # ===========================================================================

@@ -27,6 +27,13 @@ REC_ASSETS="$REC_ROOT/assets"
 REC_MODULES="$REC_ROOT/modules"
 export REC_ROOT REC_BIN REC_ASSETS REC_MODULES
 
+# Written by rec_ufw_open_project_services (lib/install_helpers.sh) once the
+# firewall has been opened for the modules installed on this machine. Read by
+# doctor.sh, which cannot inspect /etc/ufw/user.rules itself: that file is
+# root-only and doctor.sh never calls sudo.
+REC_UFW_STAMP="/var/lib/rec/firewall-opened"
+export REC_UFW_STAMP
+
 # --- Logging ---------------------------------------------------------------
 # Tag every line with the calling script so that a shared journal/log stays
 # readable when several background scripts write to it at once.

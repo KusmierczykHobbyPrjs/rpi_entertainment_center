@@ -155,6 +155,94 @@ version and path on the system.
 
 ---
 
+## The firewall (ufw)
+
+`ufw` ("Uncomplicated Firewall") is a readable front end to the kernel's packet
+filter. It decides what may *reach* the Pi. This is the only module that turns
+it on, and answering **yes** is the right choice: once the router forwards 80
+and 443, the firewall is what guarantees the only thing reachable from the
+internet is Apache.
+
+That matters more than it sounds. Kodi's JSON-RPC on 8080 has no authentication
+worth the name — without a firewall it is one router mistake away from being
+public.
+
+### The trap this module used to fall into
+
+`80-webserver` is normally the *last* module installed, and a default-deny
+policy that opens only 22, 80 and 443 cuts off everything installed before it:
+
+| Port | Service | What breaks |
+|---|---|---|
+| 8080/tcp | Kodi web interface & JSON-RPC | Kore and Yatse stop connecting |
+| 9090/tcp | Kodi JSON-RPC (raw) | remote scripting |
+| 9777/udp | Kodi EventServer | `kodi-send` silently does nothing |
+| 9981-9982/tcp | Tvheadend web + HTSP | TV clients |
+| 1714-1764 | KDE Connect | phone pairing never completes |
+| 445, 139, 137-138 | Samba | ROM copying to RetroPie |
+| 5353/udp | mDNS / Avahi | `<hostname>.local` stops resolving |
+| `nordlynx` | **Meshnet** | the Pi disappears from remote access |
+
+Nothing reports an error. It reads exactly like "the Pi broke".
+
+### What the module does now
+
+After enabling ufw it detects what is actually installed and re-opens each
+service **to the local network only** — never to the internet:
+
+```
+[ok] ufw enabled (SSH, HTTP and HTTPS allowed from anywhere)
+[..] Re-opening the ports the rest of this project needs:
+  [ok]   Kodi web interface - 8080/tcp from the local network
+  [ok]   Kodi JSON-RPC - 9090/tcp from the local network
+  [ok]   Kodi EventServer - 9777/udp from the local network
+  [ok]   KDE Connect - 1714:1764/tcp from the local network
+  [ok]   mDNS / Avahi discovery - 5353/udp from the local network
+  [ok]   NordVPN Meshnet - everything arriving on nordlynx
+```
+
+Detection is by what is present on the machine, not by which modules you
+picked, so **install order stops mattering**. Modules installed *after* ufw
+(`45-kdeconnect`, `75-port-forwarding`) already open their own ports.
+
+Your local network is read from the kernel's routing table, so any interface
+name and any subnet works. Meshnet is handled as a whole-interface rule
+(`allow in on nordlynx`) rather than a subnet, because `100.64.0.0/10` is
+shared with every other NordVPN user — WireGuard has already authenticated the
+peer before the packet reaches the firewall.
+
+### Re-running it
+
+Installed another module since? Re-open its ports without touching anything
+else:
+
+```bash
+bash bin/firewall_refresh.sh            # re-open what is installed now
+bash bin/firewall_refresh.sh --status   # show the current rules
+bash bin/firewall_refresh.sh --enable   # install and enable ufw, then open
+```
+
+It is idempotent — ufw ignores rules it already has.
+
+### SSH stays open to everywhere
+
+Deliberately. Restricting 22 to the LAN would lock out anyone who reaches the
+Pi from elsewhere, and recovering needs a keyboard and monitor attached. If you
+only ever connect from home or over Meshnet, tighten it yourself:
+
+```bash
+sudo ufw delete allow OpenSSH
+sudo ufw allow from 192.168.1.0/24 to any port 22 proto tcp
+```
+
+Meshnet SSH keeps working either way, via the `nordlynx` rule.
+
+> **Never enable ufw over SSH without allowing 22 first.** Both
+> `80-webserver` and `firewall_refresh.sh --enable` add that rule *before*
+> `ufw enable` for exactly this reason.
+
+---
+
 ## Serving your own content
 
 ```
@@ -252,6 +340,26 @@ sudo apt install libapache2-mod-php
 sudo a2enmod php7.4        # match your PHP version
 sudo systemctl restart apache2
 ```
+
+**Kore/Yatse, `kodi-send` or Meshnet stopped working after this module**
+
+The firewall is on and that service's port is not open — the usual cause is
+that ufw was enabled by an older version of this module, which opened only 22,
+80 and 443. Check and repair:
+
+```bash
+sudo ufw status verbose          # is your service listed?
+bash bin/firewall_refresh.sh     # re-open everything that is installed
+```
+
+Note that `iptables -L INPUT` is **not** a reliable way to check this. On
+Raspberry Pi OS ufw uses the nftables backend and its rules live in the `inet
+filter` table, so `iptables -L` shows an empty `policy ACCEPT` chain on a Pi
+whose firewall is fully active. Use `sudo ufw status`, or `sudo nft list
+ruleset`.
+
+Also note `ufw` is in `/usr/sbin`, which is not on a normal user's `PATH` —
+`which ufw` finding nothing does not mean it is not installed.
 
 **I locked myself out with ufw**
 

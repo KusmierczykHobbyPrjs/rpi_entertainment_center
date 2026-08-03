@@ -671,6 +671,21 @@ More detail: [60-gpio.md](60-gpio.md).
    usual cause of a remote that worked yesterday.
 5. **From outside the house**, use the Pi's Meshnet address
    (`nordvpn meshnet peer list`), not its LAN address.
+6. **Did you install `80-webserver` recently?** It is the one module that
+   turns on the firewall. Older versions of it opened only 22, 80 and 443,
+   which cut off Kodi's remote-control ports along with Tvheadend, KDE Connect,
+   Samba and Meshnet — with no error message anywhere:
+
+   ```bash
+   sudo ufw status verbose        # is 8080 listed?
+   bash bin/firewall_refresh.sh   # re-open every service that is installed
+   ```
+
+   Two things make this hard to spot: `ufw` lives in `/usr/sbin`, so `which
+   ufw` finds nothing for a normal user, and on Raspberry Pi OS its rules are
+   in nftables — `iptables -L INPUT` shows an empty `policy ACCEPT` chain on a
+   Pi whose firewall is fully active. Trust `sudo ufw status`, not either of
+   those. `bin/doctor.sh web` also reports it.
 
 ---
 

@@ -179,17 +179,38 @@ fi
 
 # --- Firewall --------------------------------------------------------------
 step "Configuring the firewall"
+cat <<EOF
+
+  ufw switches this Pi to "deny everything that was not asked for". Once the
+  router forwards ports 80 and 443, that is what guarantees the only thing
+  reachable from the internet is Apache - not Kodi's JSON-RPC, which has no
+  authentication worth the name.
+
+  The web server stays public. Everything else this project installed - Kodi
+  remotes, Tvheadend, KDE Connect, Samba, Meshnet - is re-opened to your local
+  network only, so nothing you already use stops working.
+
+EOF
 if confirm "Restrict incoming connections with ufw?"; then
     apt_install ufw || exit 1
-    # Order matters: allow SSH before enabling, or an SSH session gets cut.
+    # Order matters: allow SSH before enabling, or this very SSH session dies
+    # the moment the policy takes effect.
     sudo ufw allow OpenSSH >/dev/null 2>&1 || sudo ufw allow 22/tcp >/dev/null
     sudo ufw allow 80/tcp  >/dev/null
     sudo ufw allow 443/tcp >/dev/null
     sudo ufw --force enable
-    ok "ufw enabled (SSH, HTTP and HTTPS allowed)"
-    note "Re-run ./install.sh 45-kdeconnect and 75-port-forwarding to re-open their ports."
+    ok "ufw enabled (SSH, HTTP and HTTPS allowed from anywhere)"
+
+    # Without this, enabling ufw here quietly breaks every other module that is
+    # already installed - see the comment above rec_ufw_open_project_services.
+    note "Re-opening the ports the rest of this project needs:"
+    rec_ufw_open_project_services
+
+    note "Review the result with: sudo ufw status verbose"
+    note "Installed another module since? Re-run: bash bin/firewall_refresh.sh"
 else
     skip "Skipped firewall"
+    note "Turn it on later with: bash bin/firewall_refresh.sh --enable"
 fi
 
 # --- Cleanup ---------------------------------------------------------------

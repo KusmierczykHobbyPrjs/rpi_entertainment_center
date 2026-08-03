@@ -204,6 +204,153 @@ ensure_group() {
     return 1
 }
 
+# --- Firewall --------------------------------------------------------------
+#
+# Only 80-webserver turns ufw on, and it is usually the LAST module installed.
+# By then Kodi, Tvheadend, KDE Connect and Meshnet are already running, and a
+# default-deny policy silently cuts every one of them off: phone remotes stop
+# connecting, `kodi-send` stops working, Meshnet peers can no longer reach the
+# Pi. Nothing errors - things just quietly stop.
+#
+# Modules installed AFTER ufw open their own ports (45-kdeconnect and
+# 75-port-forwarding both check `ufw status`). These helpers cover the other
+# direction: a module installed BEFORE ufw existed. Detection is by what is
+# actually present on the machine, not by which modules were chosen, so the
+# install order stops mattering either way.
+
+# True when ufw is installed and its policy is being enforced.
+ufw_active() {
+    rec_has ufw && sudo ufw status 2>/dev/null | grep -q "Status: active"
+}
+
+# Every directly-attached IPv4 network, one CIDR per line - "192.168.1.0/24".
+#
+# Taken from the kernel's own link-scope routes, so it works on any interface
+# name (eth0, wlan0, wlp3s0, end0) and any subnet, rather than assuming the
+# 192.168.1.0/24 this happened to be written on.
+#
+# VPN and container interfaces are excluded: a Meshnet peer is not "the LAN",
+# and 100.64.0.0/10 is shared with every other NordVPN user in the world.
+# Meshnet gets its own interface rule below instead.
+rec_lan_cidrs() {
+    ip -o -4 route show scope link 2>/dev/null | awk '
+        $3 ~ /^(lo|nordlynx|nordtun|tun|tap|wg|docker|veth|br-)/ { next }
+        $1 ~ /^(169\.254\.|100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.)/ { next }
+        { print $1 }' | sort -u
+}
+
+# ufw_allow_lan PORT[:PORT]/PROTO "comment" - reachable from the local network
+# only, never from the internet.
+#
+# This distinction is the whole point. Kodi's web interface and JSON-RPC have
+# no authentication worth the name; a bare `ufw allow 8080/tcp` would publish
+# them the moment a port-forwarding rule is added to the router. Scoping to the
+# LAN keeps the phone remotes working with no such exposure.
+ufw_allow_lan() {
+    local rule="$1" comment="$2"
+    local port="${rule%%/*}" proto="${rule##*/}"
+    local cidr found=0
+
+    while IFS= read -r cidr; do
+        [[ -n "$cidr" ]] || continue
+        found=1
+        sudo ufw allow from "$cidr" to any port "$port" proto "$proto" \
+            comment "$comment" >/dev/null 2>&1
+    done < <(rec_lan_cidrs)
+
+    if (( found )); then
+        ok "  $comment - $port/$proto from the local network"
+    else
+        # Opening it to the whole internet instead would be a silent security
+        # downgrade, so say what is wrong and let the user decide.
+        fail "  $comment - could not determine the LAN, left CLOSED"
+        note "    Open it by hand: sudo ufw allow from <your-lan>/24 to any port $port proto $proto"
+    fi
+}
+
+# ufw_allow_iface IFACE "comment" - trust everything arriving on one interface.
+# Used for Meshnet, where the peers are authenticated by WireGuard before a
+# packet ever reaches the firewall.
+ufw_allow_iface() {
+    local iface="$1" comment="$2"
+    ip link show "$iface" >/dev/null 2>&1 || return 1
+    sudo ufw allow in on "$iface" comment "$comment" >/dev/null 2>&1
+    ok "  $comment - everything arriving on $iface"
+}
+
+# Re-open the ports belonging to whatever else this project has installed.
+# Safe to run repeatedly: ufw skips rules it already has.
+rec_ufw_open_project_services() {
+    if ! ufw_active; then
+        skip "ufw is not active - nothing to open"
+        return 0
+    fi
+
+    # Kodi: web interface + JSON-RPC over HTTP (8080), raw JSON-RPC (9090) and
+    # the EventServer that `kodi-send` and most remotes use (9777/udp).
+    # Checked on disk rather than with pgrep, because Kodi is frequently not
+    # running while a module installs.
+    if rec_has kodi || [[ -d "$HOME/.kodi" ]]; then
+        ufw_allow_lan 8080/tcp "Kodi web interface"
+        ufw_allow_lan 9090/tcp "Kodi JSON-RPC"
+        ufw_allow_lan 9777/udp "Kodi EventServer"
+    fi
+
+    # Tvheadend: web interface (9981) and the HTSP stream protocol its clients
+    # use (9982).
+    if rec_has tvheadend || systemctl list-unit-files 2>/dev/null | grep -q '^tvheadend'; then
+        ufw_allow_lan 9981/tcp "Tvheadend web interface"
+        ufw_allow_lan 9982/tcp "Tvheadend HTSP"
+    fi
+
+    # KDE Connect picks a free port in this range per device, so the whole
+    # range has to be open for pairing to complete.
+    if rec_has kdeconnect-cli || rec_has kdeconnectd; then
+        ufw_allow_lan 1714:1764/tcp "KDE Connect"
+        ufw_allow_lan 1714:1764/udp "KDE Connect"
+    fi
+
+    # Samba - how RetroPie ROMs are usually copied over the network.
+    if rec_has smbd; then
+        ufw_allow_lan 445/tcp "Samba"
+        ufw_allow_lan 139/tcp "Samba (NetBIOS)"
+        ufw_allow_lan 137:138/udp "Samba (NetBIOS name service)"
+    fi
+
+    # mDNS, which is what makes <hostname>.local resolve and lets phone apps
+    # find the Pi without being told its address.
+    if rec_has avahi-daemon; then
+        ufw_allow_lan 5353/udp "mDNS / Avahi discovery"
+    fi
+
+    # Meshnet (70-nordvpn) is the recommended way to reach the Pi from outside,
+    # and is the one thing here that must keep working from off the LAN.
+    ufw_allow_iface nordlynx "NordVPN Meshnet" \
+        || skip "  Meshnet is not set up - no nordlynx rule needed"
+
+    # Ports this Pi forwards on to another device (75-port-forwarding). Read
+    # from config.sh, which installers do not load by default.
+    if [[ -z "${REC_PORT_FORWARDS+x}" && -f "$REC_ROOT/config.sh" ]]; then
+        # shellcheck source=/dev/null
+        source "$REC_ROOT/config.sh" 2>/dev/null
+    fi
+    local entry listen_port
+    for entry in "${REC_PORT_FORWARDS[@]:-}"; do
+        [[ -n "$entry" ]] || continue
+        IFS=':' read -r listen_port _ _ <<<"$entry"
+        [[ "$listen_port" =~ ^[0-9]+$ ]] || continue
+        ufw_allow_lan "$listen_port/tcp" "rec port forward"
+    done
+
+    # Record that this ran. doctor.sh cannot read /etc/ufw/user.rules - it is
+    # root-only and doctor.sh deliberately never calls sudo - so this
+    # world-readable stamp is how it tells "ufw on, ports opened" apart from
+    # "ufw on, everything still blocked".
+    sudo mkdir -p "$(dirname "$REC_UFW_STAMP")" 2>/dev/null
+    date -Is | sudo tee "$REC_UFW_STAMP" >/dev/null 2>&1
+    sudo chmod 644 "$REC_UFW_STAMP" 2>/dev/null
+}
+
 # --- Config bootstrap ------------------------------------------------------
 
 # Creates config.sh from the template on first run.
