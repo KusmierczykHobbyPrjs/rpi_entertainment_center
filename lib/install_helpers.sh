@@ -351,6 +351,51 @@ rec_ufw_open_project_services() {
     sudo chmod 644 "$REC_UFW_STAMP" 2>/dev/null
 }
 
+# --- Web server -------------------------------------------------------------
+
+# Path of the Apache snippet written by rec_apache_harden_paths.
+REC_APACHE_CONF="/etc/apache2/conf-available/rec-hardening.conf"
+
+# Deny web access to dotfiles and version-control metadata.
+#
+# Debian's stock config only blocks .ht* files. It does not block .git, and a
+# published .git directory hands out the entire repository - every file, every
+# past revision, and anything ever committed by mistake. It needs no directory
+# listing to exploit: .git/config and .git/HEAD are fetched by name.
+#
+# This matters most for exactly the setup webroot_link.sh creates, where the
+# published folder is a working copy rather than a build output.
+rec_apache_harden_paths() {
+    rec_has apache2 || { skip "Apache is not installed"; return 0; }
+
+    sudo tee "$REC_APACHE_CONF" >/dev/null <<'EOF'
+# Managed by rpi_entertainment_center (lib/install_helpers.sh).
+#
+# Version-control metadata anywhere below a document root. Serving .git means
+# serving the whole repository history, whether or not listings are enabled.
+<DirectoryMatch "/\.(git|svn|hg|bzr)/">
+    Require all denied
+</DirectoryMatch>
+
+# Dotfiles in general: .env, .htpasswd, editor backups, shell history.
+# .well-known is excluded - Certbot answers its challenge inside it.
+<FilesMatch "^\.(?!well-known)">
+    Require all denied
+</FilesMatch>
+EOF
+
+    sudo a2enconf rec-hardening >/dev/null 2>&1
+    if sudo apache2ctl configtest >/dev/null 2>&1; then
+        sudo systemctl reload apache2 >/dev/null 2>&1
+        ok "Blocked web access to .git and other dotfiles"
+    else
+        # Never leave Apache unable to start because of a snippet we added.
+        sudo a2disconf rec-hardening >/dev/null 2>&1
+        sudo rm -f "$REC_APACHE_CONF"
+        fail "Apache rejected the hardening snippet - reverted, nothing changed"
+    fi
+}
+
 # --- Config bootstrap ------------------------------------------------------
 
 # Creates config.sh from the template on first run.

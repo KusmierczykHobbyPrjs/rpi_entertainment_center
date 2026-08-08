@@ -638,6 +638,39 @@ if rec_has apache2; then
         pass "No phpinfo page is exposed"
     fi
 
+    # --- Content linked in from a home directory ---------------------------
+    # A symlink into ~/public_html looks right and still returns "Forbidden",
+    # because Apache needs the execute bit on every directory above the target
+    # and Raspberry Pi OS creates home directories as drwx------. The browser
+    # never says so; only Apache's error log does. Catch it here instead.
+    www_user="$(rec_www_user)"
+    linked=0; broken=0
+    for link in /var/www/html/*; do
+        [[ -L "$link" ]] || continue
+        linked=$((linked + 1))
+        target="$(readlink -f "$link" 2>/dev/null)"
+        if [[ -z "$target" || ! -e "$target" ]]; then
+            bad "/$(basename "$link") points at a target that no longer exists" \
+                "bash bin/webroot_link.sh --list"
+            broken=$((broken + 1))
+        elif blockers="$(rec_www_untraversable "$target" "$www_user")"; then
+            bad "/$(basename "$link") is unreachable by $www_user - serves 'Forbidden'" \
+                "$www_user cannot traverse ${blockers%%$'\n'*} - fix: bash bin/webroot_link.sh $(basename "$link")"
+            broken=$((broken + 1))
+        fi
+    done
+    if (( linked > 0 && broken == 0 )); then
+        pass "All $linked linked folder(s) are reachable by $www_user"
+    fi
+
+    # A published .git hands out the whole repository, listings or not.
+    if [[ -f /etc/apache2/conf-enabled/rec-hardening.conf ]]; then
+        pass "Web access to .git and dotfiles is blocked"
+    elif find -L /var/www/html -maxdepth 3 -name .git -print -quit 2>/dev/null | grep -q .; then
+        bad "A .git directory is reachable under the document root" \
+            "It exposes your full source history. Fix: bash bin/webroot_link.sh --list, then re-run webroot_link.sh"
+    fi
+
     if systemctl is-active --quiet noip2; then
         pass "No-IP client is running"
     else

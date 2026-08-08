@@ -87,6 +87,11 @@ if [[ -f "$SEC_CONF" ]]; then
     ok "Set ServerTokens Prod / ServerSignature Off"
 fi
 
+# Debian blocks .ht* files and nothing else. A .git directory under the
+# document root - easy to end up with once you serve a folder you develop in -
+# gives away the entire repository without needing a directory listing.
+rec_apache_harden_paths
+
 sudo systemctl reload apache2
 ok "Apache reloaded"
 

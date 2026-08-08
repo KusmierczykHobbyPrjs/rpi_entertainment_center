@@ -249,13 +249,134 @@ Meshnet SSH keeps working either way, via the `nordlynx` rule.
 /var/www/html/          document root
 ```
 
+The simplest approach is to put files straight into the document root:
+
 ```bash
 sudo chown -R $USER:www-data /var/www/html
 sudo chmod -R 755 /var/www/html
 ```
 
-Then copy your files in. PHP works out of the box: any `.php` file in the
-document root is executed.
+PHP works out of the box: any `.php` file in the document root is executed.
+
+### Keeping the site in your home directory instead
+
+Editing files in `/var/www/html` needs `sudo` for every change, and the folder
+is outside a normal home-directory backup. Keeping the site in
+`~/public_html` and linking it in is the better arrangement:
+
+```bash
+bash bin/webroot_link.sh memes          # publishes ~/public_html/memes at /memes
+bash bin/webroot_link.sh memes --as blog  # ... at /blog instead
+bash bin/webroot_link.sh ~/sites/thing  # any path, not just ~/public_html
+bash bin/webroot_link.sh --list         # what is published
+bash bin/webroot_link.sh --remove memes # unpublish (your files are untouched)
+```
+
+After that you edit files as your normal user, with no `sudo` anywhere.
+
+**Do not do it by hand.** The obvious version of this looks correct and does
+not work:
+
+```bash
+sudo ln -s /home/pi/public_html/memes /var/www/html/memes
+sudo chmod -R o+rX /var/www/html/memes     # <- not enough
+```
+
+The browser returns:
+
+```
+Forbidden
+You don't have permission to access this resource.
+```
+
+#### Why
+
+Apache runs as `www-data`. Reading a file needs the execute ("traverse") bit
+on **every directory above it**, not just on the folder you changed. Raspberry
+Pi OS creates home directories as `drwx------` — owner only — so `www-data`
+cannot enter `/home/pi` at all, and no permission set further down can rescue
+that.
+
+`namei` shows the whole chain at once, which is the fastest way to see it:
+
+```bash
+namei -om /var/www/html/memes
+```
+
+```
+ drwxr-xr-x root root /
+ drwxr-xr-x root root home
+ drwx------ pi   pi   pi           <- www-data stops here
+ drwxrwxr-x pi   pi   public_html
+ drwxrwxr-x pi   pi   memes
+```
+
+The browser never tells you this. Apache's log does:
+
+```bash
+sudo tail -5 /var/log/apache2/error.log
+```
+
+```
+AH00037: Symbolic link not allowed or link target not accessible: /var/www/html/memes
+```
+
+That message covers two different faults — the link not being followed, and
+the target not being reachable — which is why searching for it turns up
+`FollowSymLinks` advice that will not help here. On a stock Debian/Raspberry Pi
+OS Apache, `FollowSymLinks` is already enabled in `<Directory /var/www/>`.
+
+#### The fix
+
+Grant `www-data` the single permission it is missing:
+
+```bash
+sudo setfacl -m u:www-data:x /home/pi
+```
+
+An **ACL** rather than `chmod o+x /home/pi` on purpose: `chmod` would open your
+home directory to every account on the machine, whereas the ACL grants that one
+permission to that one user. `x` without `r` means `www-data` may *pass
+through* the directory but cannot list what is in it.
+
+Then give it read access to the content, including a **default** ACL so files
+you add tomorrow inherit it instead of producing a fresh 403:
+
+```bash
+sudo setfacl -R -m  u:www-data:rX ~/public_html/memes
+sudo setfacl -R -d -m u:www-data:rX ~/public_html/memes
+```
+
+`bin/webroot_link.sh` does all of the above, works out which directories are
+actually blocking, and then fetches the page to confirm the result.
+
+Check any path with:
+
+```bash
+getfacl -p /home/pi
+sudo -u www-data test -x /home/pi && echo reachable || echo blocked
+```
+
+#### If you publish a folder you develop in
+
+A working copy carries a `.git` directory, and a web server will serve it
+happily — `.git/config` and `.git/HEAD` are fetched **by name**, so disabling
+directory listings does not hide them. Anyone who finds it can reconstruct your
+full source history, including anything committed by mistake.
+
+This module now installs `/etc/apache2/conf-available/rec-hardening.conf`,
+which denies `.git`, `.svn`, `.hg`, `.bzr` and dotfiles in general, while
+leaving `.well-known` reachable for Certbot. Verify it:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost/memes/.git/config
+```
+
+`403` is correct. `200` means the rule is not active — run
+`bash bin/webroot_link.sh --list` and re-run `webroot_link.sh` for the folder.
+
+`doctor.sh web` checks all of this: broken links, links `www-data` cannot
+reach, and an exposed `.git`.
 
 ---
 
@@ -332,6 +453,37 @@ sudo certbot renew --dry-run
 
 Almost always port 80 no longer reaching the Pi — the same causes as the
 initial issue.
+
+**"Forbidden" on a folder linked in from my home directory**
+
+Apache cannot traverse your home directory. Full explanation under
+[Serving your own content](#keeping-the-site-in-your-home-directory-instead);
+the fix is:
+
+```bash
+bash bin/webroot_link.sh <folder>
+```
+
+Diagnose it by hand with `namei -om /var/www/html/<folder>` — look for the
+first directory in the chain without an `x` in its "other" column — and confirm
+in `sudo tail /var/log/apache2/error.log`, which is the only place the real
+reason appears.
+
+Note that a 403 on a folder with **no `index.html` or `index.php`** is
+different and expected: this module disables directory listings deliberately.
+Request a file inside it to tell the two apart.
+
+**A folder that worked stops working after I add files to it**
+
+You used `chmod -R o+rX` rather than a default ACL, so new files were created
+without the permission. Either repeat the `chmod` after every change, or fix it
+once:
+
+```bash
+sudo setfacl -R -d -m u:www-data:rX ~/public_html/<folder>
+```
+
+`bin/webroot_link.sh` sets that default ACL for you.
 
 **PHP shows source code instead of running**
 

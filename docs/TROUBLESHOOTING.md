@@ -23,6 +23,7 @@ is still wrong.
 - [Video stutters](#video-stutters)
 - [A GPIO button does nothing](#a-gpio-button-does-nothing)
 - [Kore cannot find Kodi](#kore-cannot-find-kodi)
+- ["Forbidden" on a website served from my home directory](#forbidden-on-a-website-served-from-my-home-directory)
 - [An add-on installs but plays nothing](#an-add-on-installs-but-plays-nothing)
 - [The Pi is slow or unstable in general](#the-pi-is-slow-or-unstable-in-general)
 - [Everything restarts when I SSH in](#everything-restarts-when-i-ssh-in)
@@ -686,6 +687,58 @@ More detail: [60-gpio.md](60-gpio.md).
    in nftables — `iptables -L INPUT` shows an empty `policy ACCEPT` chain on a
    Pi whose firewall is fully active. Trust `sudo ufw status`, not either of
    those. `bin/doctor.sh web` also reports it.
+
+---
+
+## "Forbidden" on a website served from my home directory
+
+You symlinked `~/public_html/something` into `/var/www/html`, the permissions
+on the folder look right, and the browser still says:
+
+```
+Forbidden
+You don't have permission to access this resource.
+```
+
+**Apache cannot get *to* the folder.** It runs as `www-data`, and reading a
+file needs the execute bit on **every directory above it**. Raspberry Pi OS
+creates home directories as `drwx------`, so `www-data` cannot enter
+`/home/pi` at all — and `chmod -R o+rX` on the target changes nothing about
+that.
+
+```bash
+bash bin/webroot_link.sh <folder>     # grants exactly what is missing, then verifies
+```
+
+To see it for yourself, `namei` prints the whole chain — look for the first
+directory without `x` in its "other" column:
+
+```bash
+namei -om /var/www/html/<folder>
+```
+
+The browser never explains it. Apache's log does, and this is the only place
+the real reason appears:
+
+```bash
+sudo tail -5 /var/log/apache2/error.log
+# AH00037: Symbolic link not allowed or link target not accessible
+```
+
+That message covers two unrelated faults, which is why searching for it turns
+up `FollowSymLinks` advice that does not apply — on a stock Raspberry Pi OS
+Apache that option is already enabled.
+
+Two things that look like this problem but are not:
+
+- **403 on a folder with no `index.html` or `index.php`.** Expected: module
+  `80-webserver` disables directory listings on purpose. Request a file inside
+  the folder to tell them apart.
+- **It worked, then stopped after you added files.** `chmod -R o+rX` only
+  applies to files that existed at the time. `bin/webroot_link.sh` sets a
+  *default* ACL so new files inherit access.
+
+Full explanation in [80-webserver.md](80-webserver.md#keeping-the-site-in-your-home-directory-instead).
 
 ---
 

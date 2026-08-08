@@ -194,6 +194,7 @@ Install them in this order; each is a separate `./install.sh <name>` run.
 │   ├── kodi_youtube_fix.sh     stop a shared YouTube mix looping for ever
 │   ├── backup.sh               save settings before a reinstall
 │   ├── restore.sh              put them back afterwards
+│   ├── webroot_link.sh         serve a folder from ~/public_html on the web server
 │   ├── doctor.sh               health check
 │   └── ...
 │

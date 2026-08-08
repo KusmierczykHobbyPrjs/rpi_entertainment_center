@@ -169,6 +169,101 @@ rec_online() {
     ping -c1 -W2 1.1.1.1 >/dev/null 2>&1
 }
 
+# --- Web server file access ------------------------------------------------
+#
+# Apache runs as an unprivileged user (www-data on Debian). Reaching a file
+# needs the execute bit on EVERY directory above it, not only on the file's
+# own folder. Raspberry Pi OS creates home directories as drwx------, so the
+# obvious way to serve a site from ~/public_html - a symlink into the document
+# root - fails no matter how permissive the target itself is.
+#
+# The browser only ever says "Forbidden"; the real reason appears solely in
+# Apache's error log as "AH00037: Symbolic link not allowed or link target not
+# accessible". These helpers let webroot_link.sh fix it and doctor.sh detect
+# it, both without sudo.
+
+# The user Apache runs as, read from its own environment file where possible.
+rec_www_user() {
+    local u=""
+    if [[ -r /etc/apache2/envvars ]]; then
+        u="$(sed -n 's/^[[:space:]]*export[[:space:]]*APACHE_RUN_USER=//p' \
+             /etc/apache2/envvars 2>/dev/null | tail -1)"
+    fi
+    printf '%s' "${u:-www-data}"
+}
+
+# True when USER can traverse (enter) DIR.
+#
+# Worked out from the mode bits rather than by running `sudo -u www-data test
+# -x`, because doctor.sh must never prompt for a password.
+rec_dir_traversable() {
+    local dir="$1" user="${2:-www-data}"
+    local mode owner group groups acl mask entry name
+
+    mode="$(stat -c '%A' "$dir" 2>/dev/null)" || return 1
+    owner="$(stat -c '%U' "$dir" 2>/dev/null)"
+    group="$(stat -c '%G' "$dir" 2>/dev/null)"
+    groups="$(id -nG "$user" 2>/dev/null | tr ' ' '\n')"
+
+    # Mode string is drwxr-xr-x: index 3 owner-x, 6 group-x, 9 other-x.
+    [[ "${mode:9:1}" == "x" || "${mode:9:1}" == "t" ]] && return 0
+    [[ "$owner" == "$user" && "${mode:3:1}" == "x" ]] && return 0
+    if [[ "${mode:6:1}" == "x" ]] && grep -qxF "$group" <<<"$groups"; then
+        return 0
+    fi
+
+    # An ACL can grant traverse with no mode bit showing it - which is exactly
+    # how webroot_link.sh does it, without opening the directory to everyone.
+    #
+    # There is no cheap pre-check for "has an ACL": `stat -c %A` does NOT print
+    # the trailing '+' that `ls -l` appends, so ask getfacl directly.
+    rec_has getfacl || return 1
+    acl="$(getfacl -p "$dir" 2>/dev/null)" || return 1
+
+    # A named entry only grants what the mask still permits.
+    mask="$(grep '^mask::' <<<"$acl" | head -1)"
+    [[ -z "$mask" || "$mask" == *x ]] || return 1
+
+    grep -q "^user:${user}:..x" <<<"$acl" && return 0
+
+    # ...and likewise for a group the user belongs to.
+    while IFS= read -r entry; do
+        name="${entry#group:}"; name="${name%%:*}"
+        [[ -n "$name" ]] || continue
+        [[ "$entry" == *x ]] || continue
+        grep -qxF "$name" <<<"$groups" && return 0
+    done < <(grep '^group:[^:]' <<<"$acl")
+
+    return 1
+}
+
+# Print every directory on the way to PATH that USER cannot traverse, one per
+# line. Returns 0 when at least one was found (grep-style), 1 when the whole
+# path is reachable - so callers can write:
+#
+#   if blockers="$(rec_www_untraversable "$dir")"; then ...fix $blockers... fi
+rec_www_untraversable() {
+    local target user path part found
+    target="$(readlink -f "$1" 2>/dev/null)"
+    user="${2:-$(rec_www_user)}"
+    [[ -n "$target" ]] || return 1
+
+    path=""
+    found=1
+    while IFS= read -r part; do
+        [[ -n "$part" ]] || continue
+        path="$path/$part"
+        # Only directories need the execute bit; the leaf may be a file.
+        [[ -d "$path" ]] || continue
+        if ! rec_dir_traversable "$path" "$user"; then
+            printf '%s\n' "$path"
+            found=0
+        fi
+    done < <(printf '%s\n' "${target#/}" | tr '/' '\n')
+
+    return "$found"
+}
+
 # Name of the controlling terminal, e.g. "tty1" or "pts/1"; empty if none.
 #
 # Deliberately NOT `tty`, which reports the terminal of *stdin*. autostart.sh
