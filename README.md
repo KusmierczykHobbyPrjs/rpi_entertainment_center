@@ -195,6 +195,7 @@ Install them in this order; each is a separate `./install.sh <name>` run.
 │   ├── backup.sh               save settings before a reinstall
 │   ├── restore.sh              put them back afterwards
 │   ├── webroot_link.sh         serve a folder from ~/public_html on the web server
+│   ├── controller_relink.py    re-bind a restored gamepad mapping after a rebuild
 │   ├── doctor.sh               health check
 │   └── ...
 │

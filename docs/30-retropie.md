@@ -119,6 +119,132 @@ input_product_id = "6"
 
 (Example values from a DragonRise generic pad — use your own.)
 
+### EmulationStation asks me to configure a pad I already configured
+
+Typically right after restoring a backup onto a fresh install. The mapping is
+in `es_input.cfg`, and EmulationStation genuinely cannot tell it belongs to the
+pad you have plugged in.
+
+ES identifies a controller by its **SDL GUID**, which is not a serial number
+but a hash of what the pad reports:
+
+```
+0300 457e 7900 0000 0600 0000 1001 0000
+ |    |    |         |         |
+ bus  |    vendor    product   version
+      CRC-16 of the device NAME
+```
+
+That third field is the problem. SDL changed whether it collapses the runs of
+whitespace in the kernel's device name before hashing it, so the same physical
+pad gets a different GUID on a newer image:
+
+| | name that gets hashed | CRC |
+|---|---|---|
+| older SDL | `DragonRise Inc. Generic USB Joystick` | `2061` |
+| newer SDL | `DragonRise Inc.   Generic   USB  Joystick  ` | `457e` |
+
+Vendor, product and version are identical — only the name hash moved. Restore
+therefore works perfectly and the controller still does not bind.
+
+Relink it rather than mapping every button again:
+
+```bash
+python3 bin/controller_relink.py            # show what would change
+python3 bin/controller_relink.py --apply    # write it (backs up first)
+```
+
+It computes the GUID your pad has on *this* system, finds entries describing
+the same physical device (same bus, vendor, product and version) and rewrites
+only the GUID field.
+
+**RetroArch is not affected** by any of this — its autoconfig files match on
+name plus `input_vendor_id` and `input_product_id`, none of which change
+between versions. This is an EmulationStation-only failure, which is why games
+can play fine while the ES menu itself refuses the pad.
+
+---
+
+## Performance on a Pi 3B
+
+A Pi 3B's VideoCore IV draws the EmulationStation UI at whatever the HDMI mode
+is. At 1920x1080 that is 2.07M pixels per frame for a menu, and it feels
+sluggish long before any game starts.
+
+Check first that it is really the resolution and not something dumber:
+
+```bash
+vcgencmd get_throttled     # 0x0 means it has never throttled
+vcgencmd measure_temp      # sustained >80'C throttles the CPU
+df -h /                    # a full card slows everything
+```
+
+If those are clean, lower the resolution ES runs at. It takes a flag:
+
+```bash
+emulationstation --resolution 1360 768
+```
+
+Put it in `REC_UI_START` in `config.sh` so the UI watchdog uses it:
+
+```bash
+REC_UI_START=("kodi-standalone &" "emulationstation --resolution 1360 768 &" "labwc-pi &")
+```
+
+Kodi and the desktop keep their own resolution, so video playback stays at
+1080p — only the emulator UI drops.
+
+**Use a mode your TV actually offers**, or SDL falls back and nothing improves:
+
+```bash
+cat /sys/class/drm/card*/card*-HDMI-A-1/modes
+```
+
+Many TVs do not list `1280x720` at all. `1360x768` is the usual 16:9
+alternative, and still roughly halves the pixels.
+
+For the games themselves, RetroArch has its own setting in
+`/opt/retropie/configs/all/retroarch.cfg`:
+
+```
+video_fullscreen_x = "1360"
+video_fullscreen_y = "768"
+```
+
+### N64 specifically
+
+N64 is the hardest system a Pi 3B is asked to run, and RetroPie installs two
+cores for it. The default, `lr-mupen64plus-next`, is the more accurate and the
+more demanding; `lr-mupen64plus` is the one to prefer on a Pi 3.
+
+```bash
+# /opt/retropie/configs/n64/emulators.cfg
+default = "lr-mupen64plus"
+```
+
+The GLideN64 framebuffer options cost the most. In
+`/opt/retropie/configs/all/retroarch-core-options.cfg`:
+
+```
+mupen64plus-next-EnableCopyColorToRDRAM = "Off"      # was "Sync"
+mupen64plus-next-EnableCopyDepthToRDRAM = "Off"      # was "Software"
+mupen64plus-next-EnableCopyAuxToRDRAM   = "False"
+```
+
+A few games lose minor effects (motion blur, some transitions) and run
+markedly better.
+
+Internal render resolution is separate from the screen mode and is what makes
+N64 look soft:
+
+```
+mupen64plus-next-43screensize = "640x480"     # the default
+```
+
+Raising it sharpens the image and costs framerate directly — on a Pi 3B,
+640x480 is usually the right trade. Change one thing at a time and test with a
+demanding game (Conker, DK64) rather than a simple one.
+
 ---
 
 ## How it fits the UI rotation

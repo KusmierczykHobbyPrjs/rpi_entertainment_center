@@ -206,6 +206,21 @@ bin/restore.sh <archive> --only content      # ROMs, BIOS, web files
 Useful when only one thing broke — restoring a Kodi library should not put
 back a stale VPN config.
 
+### EmulationStation still asks to configure the controller
+
+The mapping *was* restored. EmulationStation keys controller configs by SDL
+GUID, and part of that GUID is a hash of the pad's device name — which SDL
+computes differently across versions, so the same physical pad gets a
+different GUID on a newer image.
+
+```bash
+python3 bin/controller_relink.py            # show what would change
+python3 bin/controller_relink.py --apply
+```
+
+RetroArch is unaffected: it matches pads on name plus vendor and product IDs.
+Full explanation in [30-retropie.md](30-retropie.md#emulationstation-asks-me-to-configure-a-pad-i-already-configured).
+
 ### Inspecting an archive without touching anything
 
 ```bash

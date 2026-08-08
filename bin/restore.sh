@@ -148,7 +148,21 @@ if [[ $SAFE_ONLY -eq 1 ]]; then
 fi
 
 if [[ -n "$pattern" ]]; then
-    mapfile -t members < <(tar tzf "$ARCHIVE" | grep -E "$pattern" || true)
+    # Keep only the topmost path of each branch.
+    #
+    # tar already extracts a directory member's entire subtree, so listing the
+    # descendants as well makes it report every one of them as "Not found in
+    # archive" once it has passed them. '--only retropie' matched 239 paths,
+    # the first of which was the directory opt/retropie/configs/ - and printed
+    # 267 error lines after a restore that had in fact put everything back.
+    # Nobody reads that and concludes "it worked".
+    mapfile -t members < <(
+        tar tzf "$ARCHIVE" | grep -E "$pattern" | sort | awk '
+            prefix == "" || index($0, prefix) != 1 {
+                print
+                prefix = ($0 ~ /\/$/) ? $0 : $0 "/"
+            }'
+    )
     if [[ ${#members[@]} -eq 0 ]]; then
         rec_die "Nothing matching '--only $ONLY' found in the archive."
     fi
@@ -173,7 +187,15 @@ else
     sudo tar xzf "$ARCHIVE" -C / --same-owner --same-permissions \
         --exclude=MANIFEST.txt
 fi
-rec_log "Files restored"
+tar_status=$?
+
+# Say so honestly. The old version printed "Files restored" whatever tar did.
+if (( tar_status == 0 )); then
+    rec_log "Files restored"
+else
+    rec_warn "tar exited with status $tar_status - not everything was restored."
+    rec_warn "  See what the archive actually holds: $REC_BIN/restore.sh '$ARCHIVE' --list"
+fi
 
 # config.sh must stay private - it carries the VPN token.
 [[ -f "$REC_ROOT/config.sh" ]] && chmod 600 "$REC_ROOT/config.sh"
@@ -231,6 +253,14 @@ Restored. Now:
   2. Reboot, so the restored services and Bluetooth pairings take effect:
                               sudo reboot
 
-If you restored RetroPie configs, your controller mapping and scraped
-gamelists are back - EmulationStation will pick them up at next start.
+If you restored RetroPie configs, your scraped gamelists are back and
+EmulationStation will pick them up at next start.
+
+If EmulationStation still asks you to configure the controller, the mapping
+was restored but its SDL GUID no longer matches - the GUID includes a hash of
+the pad's name, and SDL changed how it derives that. Relink it instead of
+mapping every button again:
+
+  python3 $REC_BIN/controller_relink.py            # show what would change
+  python3 $REC_BIN/controller_relink.py --apply
 EOF
