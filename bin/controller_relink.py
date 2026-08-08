@@ -49,6 +49,12 @@ ES_INPUT = "/opt/retropie/configs/all/emulationstation/es_input.cfg"
 DEVICES = "/proc/bus/input/devices"
 
 
+def squash(name: str) -> str:
+    """Collapse runs of whitespace - the only difference between the two
+    namings SDL has used, so it is what "the same device name" must mean."""
+    return re.sub(r"\s+", " ", name).strip()
+
+
 def crc16_arc(data: bytes) -> int:
     """SDL_crc16: CRC-16/ARC, reversed polynomial 0xA001, initial value 0."""
     crc = 0
@@ -69,13 +75,13 @@ def sdl_guid(bus: int, vendor: int, product: int, version: int, name: str) -> st
     return "".join("%02x%02x" % (f & 0xFF, (f >> 8) & 0xFF) for f in fields)
 
 
-def connected_joysticks():
+def connected_joysticks(path=DEVICES):
     """Yield dicts for every device in /proc/bus/input/devices with a js handler."""
     try:
-        with open(DEVICES, encoding="utf-8", errors="replace") as fh:
+        with open(path, encoding="utf-8", errors="replace") as fh:
             blocks = fh.read().split("\n\n")
     except OSError as exc:
-        sys.exit("Cannot read %s: %s" % (DEVICES, exc))
+        sys.exit("Cannot read %s: %s" % (path, exc))
 
     for block in blocks:
         ids = re.search(
@@ -95,11 +101,11 @@ def connected_joysticks():
         # which rule this system's SDL follows rather than assuming.
         yield {
             "name": raw,
-            "collapsed": re.sub(r"\s+", " ", raw).strip(),
+            "collapsed": squash(raw),
             "bus": bus, "vendor": vendor, "product": product, "version": version,
             "guid": sdl_guid(bus, vendor, product, version, raw),
             "guid_collapsed": sdl_guid(bus, vendor, product, version,
-                                       re.sub(r"\s+", " ", raw).strip()),
+                                       squash(raw)),
             "js": re.search(r"\b(js\d+)\b", handlers.group(1)).group(1),
         }
 
@@ -118,9 +124,11 @@ def main():
     ap.add_argument("--apply", action="store_true",
                     help="write the changes (default is to only show them)")
     ap.add_argument("--file", default=ES_INPUT, help="es_input.cfg to repair")
+    ap.add_argument("--devices", default=DEVICES,
+                    help="device list to read (default %s)" % DEVICES)
     args = ap.parse_args()
 
-    pads = list(connected_joysticks())
+    pads = list(connected_joysticks(args.devices))
     if not pads:
         print("No joystick is connected - plug the controller in first.")
         return 1
@@ -147,18 +155,37 @@ def main():
         cfg_name, cfg_guid = m.group(1), m.group(2)
         parts = guid_parts(cfg_guid)
         if parts is None:
-            continue
-        bus, _crc, vendor, product, version = parts
+            continue          # e.g. the keyboard entry, whose GUID is "-1"
+        bus, cfg_crc, vendor, product, version = parts
 
         for p in pads:
             if cfg_guid == p["guid"]:
                 print('  OK      "%s" already matches %s' % (cfg_name, p["js"]))
                 break
-            # Same physical device? Everything except the name hash must agree.
-            if (bus, vendor, product, version) == \
+
+            # Everything except the name hash has to agree first.
+            if (bus, vendor, product, version) != \
                (p["bus"], p["vendor"], p["product"], p["version"]):
-                changes.append((cfg_guid, p["guid"], cfg_name, p["js"]))
-                break
+                continue
+
+            # Matching IDs alone are NOT enough to act on. Plenty of cheap pads
+            # report vendor=0000 product=0000 version=0000, so two unrelated
+            # controllers can agree on every one of those fields - and rewriting
+            # the wrong entry would replace a good mapping with another pad's
+            # identity. Require corroboration from the name as well, by either
+            # of two independent routes.
+            same_name = squash(cfg_name) == squash(p["name"])
+            known_crc = cfg_crc in (crc16_arc(p["name"].encode()),
+                                    crc16_arc(p["collapsed"].encode()))
+            if same_name or known_crc:
+                why = "name" if same_name else "name hash"
+                changes.append((cfg_guid, p["guid"], cfg_name, p["js"], why))
+            else:
+                print('  SKIP    "%s" has the same IDs as %s but a different '
+                      'name ("%s")' % (cfg_name, p["js"], p["name"]))
+                print("            Not relinking - that would overwrite one "
+                      "pad's mapping with another's.")
+            break
         else:
             print('  UNKNOWN "%s" (%s) matches no connected pad' % (cfg_name, cfg_guid))
 
@@ -167,8 +194,8 @@ def main():
         return 0
 
     print()
-    for old, new, name, js in changes:
-        print('  RELINK  "%s" -> %s' % (name, js))
+    for old, new, name, js, why in changes:
+        print('  RELINK  "%s" -> %s   (matched on %s)' % (name, js, why))
         print("            %s" % old)
         print("            %s" % new)
 
@@ -181,7 +208,7 @@ def main():
         shutil.copy2(args.file, backup)
         print("\nBacked up %s -> %s" % (args.file, backup))
 
-    for old, new, _name, _js in changes:
+    for old, new, _name, _js, _why in changes:
         text = text.replace('deviceGUID="%s"' % old, 'deviceGUID="%s"' % new)
     with open(args.file, "w", encoding="utf-8") as fh:
         fh.write(text)
