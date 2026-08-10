@@ -266,12 +266,13 @@ rec_www_untraversable() {
 
 # Name of the controlling terminal, e.g. "tty1" or "pts/1"; empty if none.
 #
-# Deliberately NOT `tty`, which reports the terminal of *stdin*. autostart.sh
-# is launched from .bashrc with `&`, and bash redirects an asynchronous
-# command's stdin to /dev/null whenever job control is off - which it is while
-# startup files are being processed. `tty` therefore prints "not a tty" (in
-# the system language, so not even reliably that string) on a perfectly normal
-# console login, which made the old console check impossible to satisfy.
+# Deliberately NOT `tty`, which reports the terminal of *stdin*. stdin is not
+# dependable here: anything launched with `&` while job control is off - as it
+# is while startup files are processed - gets /dev/null for stdin, and older
+# versions of this project did launch autostart.sh that way from .bashrc.
+# `tty` then prints "not a tty" (in the system language, so not even reliably
+# that string) on a perfectly normal console login, which made the old console
+# check impossible to satisfy.
 #
 # The controlling terminal survives that redirection, so ask ps for it. Walk
 # up to the parent when this process has none of its own.

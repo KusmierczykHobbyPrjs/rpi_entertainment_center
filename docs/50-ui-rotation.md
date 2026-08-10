@@ -57,17 +57,27 @@ before the command runs, so an entry written as `"kodi-standalone &"` still
 works and is simply not detached.
 
 **Each UI is attached to the console on all three descriptors**, stdin
-included. That last one matters more than it looks:
+included. That last one matters more than it looks.
+
+**`.bashrc` runs `autostart.sh` without `&`**, and that is deliberate:
 
 ```bash
 # ~/.bashrc
-bash .../autostart.sh &
+[ -f ".../autostart.sh" ] && bash ".../autostart.sh"     # NOT backgrounded
 ```
 
-Bash points an asynchronous command's stdin at `/dev/null` whenever job control
-is off — which it is while startup files are being processed. Every process
-below inherits it, so without an explicit `</dev/tty` the UI is started with no
-way to read the keyboard.
+Backgrounding it breaks the terminal in two separate ways.
+
+*It takes stdin away.* Bash points an asynchronous command's stdin at
+`/dev/null` whenever job control is off — which it is while startup files are
+processed — and every process below inherits it.
+
+*It leaves a second reader on the terminal.* The login shell returns to its
+prompt and goes on reading `/dev/tty1` while the UI stack reads it too. They
+are in the same process group, so the kernel stops neither: each receives part
+of every keystroke, arrow keys arrive as broken escape sequences, and both
+fight over whether echo is on. Without the `&` the shell blocks until the UI
+stack exits and the terminal has exactly one reader.
 
 Nothing looks wrong until something wants to *read* the terminal, and almost
 nothing does: Kodi, EmulationStation and the desktop all take their input from
@@ -215,11 +225,13 @@ start a second UI on a screen you cannot see. It determines this from the
 SSH check.
 
 It deliberately does *not* use `tty`. `tty` reports the terminal of **stdin**,
-and `.bashrc` starts autostart with `&` — bash redirects an async command's
-stdin to `/dev/null` whenever job control is off, which it is while startup
-files run. `tty` therefore prints "not a tty" (localised, so not even reliably
-that string) on a perfectly normal console boot. An earlier version checked
-`tty` and consequently refused to start on every system, every time.
+which is not dependable: anything started with `&` while job control is off
+gets `/dev/null` for stdin, and earlier versions of this project did start
+autostart that way. `tty` then prints "not a tty" (localised, so not even
+reliably that string) on a perfectly normal console boot. An earlier version
+checked `tty` and consequently refused to start on every system, every time.
+The controlling terminal survives regardless of what stdin points at, which is
+why `ps` is asked for it instead.
 
 The decision is logged:
 

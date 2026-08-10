@@ -116,7 +116,14 @@ ensure_block "$HOME/.bashrc" "rpi-entertainment-center" \
 "# Starts the UI watchdog, VPN, GPIO buttons and port forwarding.
 # autostart.sh exits immediately unless it is running on the physical
 # console (/dev/tty1), so SSH logins are unaffected.
-[ -f \"$REC_BIN/autostart.sh\" ] && bash \"$REC_BIN/autostart.sh\" &"
+#
+# Deliberately NOT backgrounded with '&'. It looks like an omission; it is not.
+# Backgrounding it leaves THIS shell sitting at its prompt reading /dev/tty1
+# while the UI stack reads the same terminal. Both then receive part of every
+# keystroke - arrow keys arrive as broken escape sequences - and both fight
+# over the echo setting. RetroPie's launch menu is unusable as a result.
+# Backgrounding also makes bash point the whole chain's stdin at /dev/null.
+[ -f \"$REC_BIN/autostart.sh\" ] && bash \"$REC_BIN/autostart.sh\""
 
 # --- Remove the old-style hook ---------------------------------------------
 # Earlier versions of this project appended a bare 'bash autostart.sh &' line
