@@ -19,11 +19,12 @@ really installed, which it can only do once they are.
 ```
   ┌──────────────────────────────────────────────────┐
   │  ui_rotate.sh   (watchdog, started at boot)      │
+  │                 runs in the FOREGROUND on tty1   │
   │                                                  │
-  │  every second:  is any UI process alive?         │
-  │      yes  ──▶  do nothing                        │
-  │      no   ──▶  read /tmp/rec-next-ui-index       │
-  │                start that UI, wait 10s           │
+  │  no UI alive?  ──▶  read /tmp/rec-next-ui-index  │
+  │                     announce it on the console   │
+  │                     run that UI HERE, and wait   │
+  │                     for it to exit               │
   └──────────────────────────────────────────────────┘
                           ▲
                           │ reads
@@ -43,7 +44,17 @@ terminates, while the long-running loop has exactly one job.
 
 **The next index is written before anything is killed.** If the switch is
 interrupted half-way, the watchdog still finds a valid choice and the TV never
-gets stuck on a black screen.
+gets stuck on a black screen. It is also how the watchdog tells a deliberate
+switch from a UI that failed to start: an index that is not the one that just
+exited means somebody pressed the button.
+
+**The watchdog runs in the foreground, on the console.** It starts each UI as
+its own child and waits, rather than detaching it and polling `ps`. Two things
+follow. The screen shows what is happening — which UI is starting, the command
+used, and how long the last one ran — instead of a blank prompt during the
+seconds a switch takes. And the trailing `&` in `REC_UI_START` is stripped
+before the command runs, so an entry written as `"kodi-standalone &"` still
+works and is simply not detached.
 
 ---
 

@@ -10,7 +10,8 @@
 #   stop_current_ui.sh   kills the running UI and records which comes next
 #   ui_rotate.sh         notices nothing is running and starts that one
 #
-# Started in the background by bin/autostart.sh. Runs forever.
+# Run in the foreground by bin/autostart.sh, on the console, so that the TV
+# shows what is happening instead of an empty prompt. Runs forever.
 # See docs/50-ui-rotation.md.
 # ---------------------------------------------------------------------------
 set -uo pipefail
@@ -116,26 +117,58 @@ while true; do
             continue
         fi
 
-        rec_log "No UI running. Starting ${REC_UI_NAMES[$index]}: ${REC_UI_START[$index]}"
-        eval "${REC_UI_START[$index]}"
+        # Strip the trailing '&'. REC_UI_START has carried one since the
+        # watchdog started UIs as detached background jobs; leaving it would
+        # detach this one too, which is exactly what left the console blank and
+        # meant the only way to know the UI had exited was to poll `ps`.
+        start_cmd="$(sed 's/[[:space:]]*&[[:space:]]*$//' <<<"${REC_UI_START[$index]}")"
 
-        # Give the UI time to claim the framebuffer before polling again,
-        # otherwise a slow-starting Kodi gets started a second time.
-        sleep 10
+        echo
+        rec_log "Starting ${REC_UI_NAMES[$index]}"
+        rec_log "  command: $start_cmd"
+        rec_log "  switch UI: press the button, or run bin/stop_current_ui.sh"
+        echo
 
-        if ui_running_at "$index"; then
+        # Run it HERE, in the foreground, on this terminal. The UI's own output
+        # lands on the console, and this returns the moment the UI exits -
+        # no polling, and no way to start a second copy of something already
+        # running, because this loop cannot reach the top until it is gone.
+        started_at=$SECONDS
+        eval "$start_cmd"
+        ran_for=$(( SECONDS - started_at ))
+
+        echo
+        rec_log "${REC_UI_NAMES[$index]} exited after ${ran_for}s."
+
+        # Was that a failure, or did somebody just press the switch button?
+        #
+        # Duration alone cannot tell them apart: switching two seconds after a
+        # UI appears is perfectly normal, and counting it as a failed start
+        # would pause the watchdog for five minutes after three quick presses -
+        # a switch button that stops working is exactly the bug this file
+        # already warns about elsewhere.
+        #
+        # stop_current_ui.sh records the UI to go to BEFORE stopping the
+        # current one, so a recorded index that is not the one that just ran is
+        # positive evidence the exit was deliberate.
+        switched=0
+        if [[ -f "$REC_UI_STATE_FILE" ]]; then
+            requested="$(cat "$REC_UI_STATE_FILE" 2>/dev/null)"
+            [[ -n "$requested" && "$requested" != "$index" ]] && switched=1
+        fi
+
+        if (( ran_for >= 5 || switched )); then
             start_failures=0
         else
             start_failures=$((start_failures + 1))
-            rec_warn "${REC_UI_NAMES[$index]} did not appear under any of: $(ui_candidates "$index" | tr '\n' ' ')"
-            rec_warn "Either it failed to start, or REC_UI_PROCESSES has the wrong name."
-            rec_warn "Check with: ps -A | grep -i ${REC_UI_PROCESSES[$index]:0:6}"
+            rec_warn "${REC_UI_NAMES[$index]} exited immediately - it probably failed to start."
+            rec_warn "Run it by hand to see why: $start_cmd"
 
-            # Back off hard rather than spawning a new instance every cycle -
-            # that is how a single undetectable UI became five running copies.
+            # Back off rather than relaunching every second, which would fill
+            # the screen with the same failure and hide the reason for it.
             if (( start_failures >= 3 )); then
                 rec_error "${REC_UI_NAMES[$index]} failed to start $start_failures times."
-                rec_error "Pausing for 5 minutes instead of launching more copies."
+                rec_error "Pausing for 5 minutes instead of retrying in a tight loop."
                 rec_error "Fix config.sh, then: pkill -f ui_rotate.sh (autostart restarts it)"
                 sleep 300
                 start_failures=0

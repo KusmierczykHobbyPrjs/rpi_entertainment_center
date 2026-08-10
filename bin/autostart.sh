@@ -69,11 +69,27 @@ start_service() {
     bash "$script" "$@" >>"$REC_LOG" 2>&1 &
 }
 
-start_service "UI watchdog"      "$REC_BIN/ui_rotate.sh"
 start_service "NordVPN autostart" "$REC_BIN/nordvpn_autostart.sh"
 start_service "NordVPN monitor"   "$REC_BIN/nordvpn_monitor.sh"
 start_service "Port forwarding"   "$REC_BIN/port_forwarding.sh"
 start_service "GPIO buttons"      "$REC_BIN/gpio_buttons.sh"
 
-log "All services launched; waiting."
-wait
+# The UI watchdog runs in the FOREGROUND, last, and keeps this console.
+#
+# Everything above is a background daemon whose output belongs in a log file.
+# The watchdog is not: it is the only thing the person in front of the TV can
+# see between one UI exiting and the next appearing. Backgrounding it and
+# redirecting it into $REC_LOG - which is what this script used to do - left
+# tty1 blank during every switch, with no prompt and no explanation.
+#
+# Output is tee'd rather than simply left on the terminal, so the log still
+# gets its copy for doctor.sh and for diagnosing a boot nobody was watching.
+if [[ -f "$REC_BIN/ui_rotate.sh" ]]; then
+    log "START UI watchdog (foreground, on this console)"
+    bash "$REC_BIN/ui_rotate.sh" 2>&1 | tee -a "$REC_LOG"
+    log "UI watchdog exited - returning to the shell."
+else
+    log "SKIP UI watchdog - $REC_BIN/ui_rotate.sh not found"
+    log "Background services launched; waiting."
+    wait
+fi
