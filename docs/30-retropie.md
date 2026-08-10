@@ -163,6 +163,69 @@ name plus `input_vendor_id` and `input_product_id`, none of which change
 between versions. This is an EmulationStation-only failure, which is why games
 can play fine while the ES menu itself refuses the pad.
 
+### I cannot exit a game — Select+Start does nothing
+
+Almost always because the game is running under a **standalone** emulator
+rather than a libretro one.
+
+Select+Start is a *RetroArch* feature. Every `lr-*` emulator runs inside
+RetroArch and gets it; standalone emulators — `mupen64plus-gles2rice`, PPSSPP,
+Amiberry — do not use RetroArch at all, so the hotkey does not exist there. You
+usually arrive at one by choosing it from runcommand's launch menu because the
+default did not work for a particular ROM.
+
+**Immediate escape:** `ESC` on a keyboard quits standalone mupen64plus. Failing
+that, from another machine:
+
+```bash
+ssh pi@rpi 'kill $(pgrep -x mupen64plus)'
+```
+
+Use the PID. `pkill -f mupen64plus` matches *its own* command line and kills
+your SSH session instead.
+
+**The fix:**
+
+```bash
+python3 bin/controller_hotkeys.py            # show what would change
+python3 bin/controller_hotkeys.py --apply
+```
+
+RetroPie already tries to do this — its mupen64plus scriptmodule copies your
+RetroArch hotkeys into `mupen64plus.cfg` — but it finds your autoconfig by
+matching the device *name*:
+
+```
+kernel  /sys/class/input/js0/device/name : DragonRise Inc.   Generic   USB  Joystick
+autoconfig  input_device                 : DragonRise Inc. Generic USB Joystick
+```
+
+For any pad whose name contains runs of whitespace those never match, the
+lookup silently yields nothing, and you get `Joy Mapping Stop = ""`. The same
+quirk breaks [controller mappings after a
+restore](#emulationstation-asks-me-to-configure-a-pad-i-already-configured).
+
+`controller_hotkeys.py` matches on **vendor and product ID** instead, which
+whitespace cannot affect, and writes the binding RetroPie would have written:
+
+```
+Joy Mapping Stop = "J0B8/B9,J1B8/B9"
+```
+
+That is RetroPie's own format — `J<pad>B<hotkey>/B<action>` — covering every
+connected pad, and it handles buttons, hats and axes.
+
+**What it does not cover.** The controller side is general; the emulator side
+cannot be, because standalone emulators share no common input format. It writes
+`mupen64plus.cfg` for every system that has one. Anything else it finds — PPSSPP,
+Amiberry, ScummVM — is listed in the output rather than silently skipped, so
+you know what still needs doing by hand.
+
+It also reports a trap worth knowing about: if the exit button and the hotkey
+button are the **same**, the combo collapses and a single press quits mid-game.
+That happens easily by pressing Select and Start in the wrong order when
+configuring the pad in EmulationStation.
+
 ---
 
 ## Performance on a Pi 3B
