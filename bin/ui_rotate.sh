@@ -129,12 +129,35 @@ while true; do
         rec_log "  switch UI: press the button, or run bin/stop_current_ui.sh"
         echo
 
-        # Run it HERE, in the foreground, on this terminal. The UI's own output
-        # lands on the console, and this returns the moment the UI exits -
-        # no polling, and no way to start a second copy of something already
-        # running, because this loop cannot reach the top until it is gone.
+        # Run it HERE, in the foreground, attached to the console on all three
+        # descriptors. This returns the moment the UI exits - no polling, and
+        # no way to start a second copy of something already running, because
+        # the loop cannot reach the top until it is gone.
+        #
+        # Attaching STDIN is the part that is easy to miss and hard to debug.
+        # .bashrc starts autostart.sh with '&', and bash points an asynchronous
+        # command's stdin at /dev/null whenever job control is off - which it is
+        # while startup files are being processed. Every process below inherits
+        # that, so without this the UI is started with no way to read the
+        # keyboard.
+        #
+        # Nothing looks wrong until something actually wants to READ the
+        # terminal. RetroPie's runcommand launch menu does: `dialog` draws to
+        # /dev/tty but takes its keys from stdin, and a stdin already at EOF
+        # makes it return instantly with no selection. Its enclosing `while
+        # true` loop then redraws the same menu, so every press appears to reset
+        # it to the initial state and no option can ever be chosen.
         started_at=$SECONDS
-        eval "$start_cmd"
+        # Redirections are applied left to right, so stderr has to be silenced
+        # BEFORE the open is attempted or bash prints the failure itself.
+        if : 2>/dev/null </dev/tty; then
+            eval "$start_cmd" </dev/tty >/dev/tty 2>&1
+        else
+            # No controlling terminal - running under a test harness or over
+            # SSH. Start it anyway rather than refusing to bring up a UI.
+            rec_warn "No controlling terminal; starting without one."
+            eval "$start_cmd"
+        fi
         ran_for=$(( SECONDS - started_at ))
 
         echo

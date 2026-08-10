@@ -56,6 +56,28 @@ seconds a switch takes. And the trailing `&` in `REC_UI_START` is stripped
 before the command runs, so an entry written as `"kodi-standalone &"` still
 works and is simply not detached.
 
+**Each UI is attached to the console on all three descriptors**, stdin
+included. That last one matters more than it looks:
+
+```bash
+# ~/.bashrc
+bash .../autostart.sh &
+```
+
+Bash points an asynchronous command's stdin at `/dev/null` whenever job control
+is off — which it is while startup files are being processed. Every process
+below inherits it, so without an explicit `</dev/tty` the UI is started with no
+way to read the keyboard.
+
+Nothing looks wrong until something wants to *read* the terminal, and almost
+nothing does: Kodi, EmulationStation and the desktop all take their input from
+`/dev/input`. **RetroPie's runcommand launch menu is the exception.** It uses
+`dialog`, which draws to `/dev/tty` but reads keys from stdin — so the menu
+appears normally, and a stdin already at EOF makes `dialog` return instantly
+with no selection. The `while true` loop around it redraws the same menu, and
+the result looks like a menu that resets to its initial state on every press
+and can never be used.
+
 ---
 
 ## Switching
@@ -264,6 +286,32 @@ SSH still works, so this is always recoverable.
    ```bash
    kodi
    ```
+
+### RetroPie's launch menu resets on every button press
+
+You start a ROM, press a button at "Press a button to configure", the menu
+appears — and every press puts it back to its initial state, so no option can
+be chosen.
+
+**The UI was started without a readable stdin.** `dialog` draws to `/dev/tty`
+but reads keys from stdin; at EOF it returns immediately with no selection, and
+runcommand's loop redraws the menu. Check what the UI actually got:
+
+```bash
+pid=$(pgrep -f emulationstation | head -1)
+readlink /proc/$pid/fd/0        # want /dev/tty or /dev/tty1, NOT /dev/null
+```
+
+`ui_rotate.sh` attaches `/dev/tty` explicitly when it starts a UI. If you launch
+a UI by some other route, do the same:
+
+```bash
+emulationstation </dev/tty >/dev/tty 2>&1
+```
+
+This is invisible for Kodi, EmulationStation and the desktop, which read
+`/dev/input` directly — runcommand's menu is the one thing that needs the
+terminal.
 
 ### The switch button does nothing
 
